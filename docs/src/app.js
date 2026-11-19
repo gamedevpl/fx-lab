@@ -27,6 +27,7 @@ const LOADERS = {
   fire: () => import("../effects/fire/index.js").then(m => m.createFireEffect),
   water: () => import("../effects/water/index.js").then(m => m.createWaterEffect),
   shadows: () => import("../effects/shadows/index.js").then(m => m.createShadowsEffect),
+  cloth: () => import("../effects/cloth/index.js").then(m => m.createClothEffect),
 };
 const engines = new Map();
 
@@ -247,7 +248,10 @@ function updateCard() {
 
   const isWaterLive = currentEffect.id === "water" && st.stage === 7;
   const isShadows = currentEffect.id === "shadows";
-  $("hintLine").textContent = isWaterLive ? u.waterClickHint : (isShadows ? u.shadowsClickHint : u.dragHint);
+  const isCloth = currentEffect.id === "cloth" && st.stage >= 3;
+  $("hintLine").textContent = isWaterLive
+    ? u.waterClickHint
+    : (isShadows ? u.shadowsClickHint : (isCloth ? u.clothClickHint : u.dragHint));
   const linkLabel = u[currentEffect.videoLabelKey] || u.channelLink;
   $("filmLine").innerHTML = `${u.videoPrefix} <a href="${currentEffect.videoUrl}" target="_blank" rel="noopener">${linkLabel}</a>`;
 

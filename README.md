@@ -10,6 +10,7 @@ Interactive WebGL2 sandbox for real-time graphics effects from [gamedev.pl](http
 2. **[Evolution of Fire](https://gamedevpl.github.io/fx-lab/fire/)** (8 eras, 1985–2026 · [source & notes](./docs/effects/fire/README.md)) — Indexed palette cycling (CLUT), live 30 Hz PSX Doom cellular automaton, additive billboard sprite, soft particles with heat haze, baked 6-way directional lit flipbook with optical flow and blackbody HDR, 3D volumetric raymarching, sparse volume self-shadowing with split firelight GI, and a live 24×36×24 3D Navier–Stokes + vorticity confinement fluid solver with an interactive iron sphere collider.
 3. **[Evolution of Water](https://gamedevpl.github.io/fx-lab/water/)** (8 eras, 1985–2026 · [source & notes](./docs/effects/water/README.md)) — Indexed palette cycling, dual scrolling UV warp, Beer–Lambert depth absorption, Schlick Fresnel reflections, 6-wave Gerstner displacement with contact foam, Snell refraction with RGB caustics, spectral waves with backlit emerald SSS, and a live 128×128 zero-mean viscous shallow-water PDE with a 3D liquid splash crown, Worthington rebound jet, ballistic droplets, and click-to-ripple interaction.
 4. **[Evolution of Shadows](https://gamedevpl.github.io/fx-lab/shadows/)** (8 eras, 1988–2026 · [source & notes](./docs/effects/shadows/README.md)) — 1988 ground blob discs, planar `y = 0` projection, *Doom 3*-style stencil volumes, real `88×88` hard shadow map aliasing, 16-tap Poisson PCF, PCSS contact-hardening, cone-traced ray-traced area lights with crevice AO and blue sky fill, and colored stained-glass shadows with crystal lens caustics and color-bounce GI.
+5. **[Evolution of Cloth](https://gamedevpl.github.io/fx-lab/cloth/)** (8 eras, 1988–2026 · [source & notes](./docs/effects/cloth/README.md)) — 1988 2-frame `32×24` pixel banner, rigid hinged flap, travelling sine-wave vertex shader, Verlet mass-spring physics, 2-hop bending stiffness with woven linen normal map, PBR Charlie velvet sheen + backlit translucency, stretch-free XPBD sphere wrapping, and per-triangle aerodynamic wind with PCF self-shadows and live tearing.
 
 ## Project structure
 
@@ -17,14 +18,15 @@ Each effect lives in its own self-contained folder under `docs/effects/<id>/` wi
 
 ```text
 docs/
-├── index.html                  # Root entry (loads default effect)
-├── splats/ fire/ water/ shadows/  # Clean per-effect routes with dedicated Open Graph cards
-├── src/                        # Shared app shell, catalog metadata, WebGL2 helpers
+├── index.html                        # Root entry (loads default effect)
+├── splats/ fire/ water/ shadows/ cloth/  # Clean per-effect routes with dedicated Open Graph cards
+├── src/                              # Shared app shell, catalog metadata, WebGL2 helpers
 └── effects/
-    ├── splats/                 # README.md · scene.js · shaders.js · index.js
-    ├── fire/                   # README.md · simulations.js · shaders.js · index.js
-    ├── water/                  # README.md · simulation.js · shaders.js · index.js
-    └── shadows/                # README.md · shaders.js · index.js
+    ├── splats/                       # README.md · scene.js · shaders.js · index.js
+    ├── fire/                         # README.md · simulations.js · shaders.js · index.js
+    ├── water/                        # README.md · simulation.js · shaders.js · index.js
+    ├── shadows/                      # README.md · shaders.js · index.js
+    └── cloth/                        # README.md · simulation.js · shaders.js · index.js
 ```
 
 ## Controls
