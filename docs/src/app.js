@@ -37,10 +37,12 @@ async function loadEngine(id) {
   return engines.get(id);
 }
 
-// Parse initial URL state (?fx=splats|fire|water&step=1..8&split=0|1&lang=en|pl)
+// Parse initial URL state (supports clean /splats/, /fire/, /water/ routes and legacy ?fx=...)
+const basePath = new URL("../", import.meta.url).pathname;
 const params = new URLSearchParams(location.search);
+if (params.get("hud") === "0") document.body.classList.add("no-hud");
 let lang = params.get("lang") === "pl" ? "pl" : "en";
-let currentEffect = getEffect(params.get("fx"));
+let currentEffect = getEffect(params.get("fx") || document.documentElement.dataset.fx);
 let currentStepIdx = (() => {
   const s = params.get("step");
   if (!s) return currentEffect.defaultStep;
@@ -75,11 +77,14 @@ function resetCamera() {
 
 function syncUrl() {
   const q = new URLSearchParams();
-  q.set("fx", currentEffect.id);
-  q.set("step", String(currentStepIdx + 1));
+  if (currentStepIdx !== currentEffect.defaultStep) q.set("step", String(currentStepIdx + 1));
   if (split.enabled !== currentEffect.defaultSplit) q.set("split", split.enabled ? "1" : "0");
   if (lang !== "en") q.set("lang", lang);
-  history.replaceState(null, "", `?${q.toString()}`);
+  const qs = q.toString();
+  const target = `${basePath}${currentEffect.id}/${qs ? `?${qs}` : ""}`;
+  if (location.protocol === "http:" || location.protocol === "https:") {
+    history.replaceState(null, "", target);
+  }
 }
 
 function currentStep() {
@@ -211,6 +216,7 @@ function updateCard() {
   const badge = activeEngine.getTechBadge(currentStepIdx);
 
   document.documentElement.lang = lang;
+  document.title = `${lang === "pl" ? currentEffect.pl : currentEffect.en} — FX Lab | gamedev.pl`;
   $("backLink").textContent = u.back;
   $("sourceLink").textContent = u.source;
   $("lang").textContent = lang === "en" ? "PL" : "EN";
