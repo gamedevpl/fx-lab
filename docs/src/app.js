@@ -26,6 +26,7 @@ const LOADERS = {
   splats: () => import("../effects/splats/index.js").then(m => m.createSplatsEffect),
   fire: () => import("../effects/fire/index.js").then(m => m.createFireEffect),
   water: () => import("../effects/water/index.js").then(m => m.createWaterEffect),
+  shadows: () => import("../effects/shadows/index.js").then(m => m.createShadowsEffect),
 };
 const engines = new Map();
 
@@ -75,6 +76,7 @@ function resetCamera() {
   if (!activeEngine) return;
   cam = { ...activeEngine.defaultCamera };
   userInteracted = false;
+  if (typeof activeEngine.onReset === "function") activeEngine.onReset();
 }
 
 function syncUrl() {
@@ -244,7 +246,8 @@ function updateCard() {
   }
 
   const isWaterLive = currentEffect.id === "water" && st.stage === 7;
-  $("hintLine").textContent = isWaterLive ? u.waterClickHint : u.dragHint;
+  const isShadows = currentEffect.id === "shadows";
+  $("hintLine").textContent = isWaterLive ? u.waterClickHint : (isShadows ? u.shadowsClickHint : u.dragHint);
   const linkLabel = u[currentEffect.videoLabelKey] || u.channelLink;
   $("filmLine").innerHTML = `${u.videoPrefix} <a href="${currentEffect.videoUrl}" target="_blank" rel="noopener">${linkLabel}</a>`;
 

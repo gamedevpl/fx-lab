@@ -52,7 +52,7 @@ const tools = [
   },
   {
     name: "trigger_action",
-    description: "Trigger the current step's interactive action (e.g. Sweep Sphere on F8, Drop Sphere on W8, Reveal Discs on S1, Wireframe on F3, Voxel Grid on F7).",
+    description: "Trigger the current step's interactive action (e.g. Sweep Sphere on F8, Drop Sphere on W8, Sweep Sun on SH8, Texel Grid on SH4, Wide Sun on SH5-SH7, Reveal Discs on S1, Wireframe on F3, Voxel Grid on F7).",
     run: () => FX.triggerAction() ? "Triggered the current step's interactive action." : "This step has no extra action button.",
   },
   {
@@ -60,7 +60,7 @@ const tools = [
     description: "What FX Lab is, where the code lives and its licence.",
     run: () => [
       "FX Lab is an interactive WebGL2 sandbox by GamedevPL showcasing real-time graphics effects from short technical breakdowns.",
-      "It includes Pixel-Art Gaussian Splats (5 shader steps), Evolution of Fire (8 eras from 1985 palette cycling to live 3D Navier-Stokes fluid), and Evolution of Water (8 eras from 1985 CLUT to live 128x128 shallow-water PDE and 3D splash).",
+      "It includes Pixel-Art Gaussian Splats (5 shader steps), Evolution of Fire (8 eras from 1985 palette cycling to live 3D Navier-Stokes fluid), Evolution of Water (8 eras from 1985 CLUT to live 128x128 shallow-water PDE and 3D splash), and Evolution of Shadows (8 eras from 1988 blob shadows and 88x88 shadow maps to PCSS, ray-traced area lights, and colored stained-glass GI).",
       "Plain JavaScript and raw WebGL2, zero external libraries. Source code: https://github.com/gamedevpl/fx-lab (MIT).",
     ].join("\n"),
   },
@@ -69,10 +69,10 @@ const tools = [
 const agent = createPageAgent({
   name: "mascot",
   instructions: [
-    "You are the gamedev.pl mascot on FX Lab, an interactive WebGL2 sandbox of graphics effects (Pixel-Art Gaussian Splats, Evolution of Fire, Evolution of Water).",
+    "You are the gamedev.pl mascot on FX Lab, an interactive WebGL2 sandbox of graphics effects (Pixel-Art Gaussian Splats, Evolution of Fire, Evolution of Water, Evolution of Shadows).",
     "Use the tools for every fact. Never invent steps or techniques the tools do not return.",
     "When the user asks to see an effect or technique, call show_step (and trigger_action or set_split when helpful).",
-    "Name steps by their id in backticks, like `S5`, `F8`, or `W8`.",
+    "Name steps by their id in backticks, like `S5`, `F8`, `W8`, or `SH8`.",
     "Answer in English, in one to four short sentences.",
     "If the tools do not answer the question, say you do not know.",
   ].join(" "),
