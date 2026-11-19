@@ -93,18 +93,36 @@ export function compileShader(gl, type, src) {
 }
 
 export function linkProgram(gl, vsSrc, fsSrc) {
-  const p = gl.createProgram();
-  const vs = compileShader(gl, gl.VERTEX_SHADER, vsSrc);
-  const fs = compileShader(gl, gl.FRAGMENT_SHADER, fsSrc);
-  gl.attachShader(p, vs);
-  gl.attachShader(p, fs);
-  gl.linkProgram(p);
-  gl.deleteShader(vs);
-  gl.deleteShader(fs);
-  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
-    throw new Error("Program link failed:\n" + gl.getProgramInfoLog(p));
+  return linkPrograms(gl, [[vsSrc, fsSrc]])[0];
+}
+
+// Compiles and links multiple programs in a batch so ANGLE/Metal can parallelize across cores.
+export function linkPrograms(gl, pairs) {
+  const entries = pairs.map(([vsSrc, fsSrc]) => {
+    const p = gl.createProgram();
+    const vs = gl.createShader(gl.VERTEX_SHADER);
+    const fs = gl.createShader(gl.FRAGMENT_SHADER);
+    gl.shaderSource(vs, vsSrc);
+    gl.shaderSource(fs, fsSrc);
+    gl.compileShader(vs);
+    gl.compileShader(fs);
+    gl.attachShader(p, vs);
+    gl.attachShader(p, fs);
+    gl.linkProgram(p);
+    return { p, vs, fs };
+  });
+
+  for (const { p, vs, fs } of entries) {
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+      const vsLog = gl.getShaderInfoLog(vs) || "";
+      const fsLog = gl.getShaderInfoLog(fs) || "";
+      const pLog = gl.getProgramInfoLog(p) || "";
+      throw new Error(`Program link failed:\n${pLog}\nVS: ${vsLog}\nFS: ${fsLog}`);
+    }
+    gl.deleteShader(vs);
+    gl.deleteShader(fs);
   }
-  return p;
+  return entries.map(e => e.p);
 }
 
 export function makeTex2D(gl, w, h, internalFmt, fmt, type, filter, data = null, wrap = gl.CLAMP_TO_EDGE) {

@@ -1,7 +1,7 @@
 // FX Lab controller: lazy-loaded WebGL2 effects, scalable catalog overlay, orbit/zoom camera,
 // draggable split-screen divider, URL deep-linking, and window.FXLAB API.
 
-import { EFFECTS, UI, getEffect } from "./catalog.js";
+import { EFFECTS, UI, REPO_TREE_BASE, getEffect } from "./catalog.js";
 import { clamp } from "./gl-utils.js";
 
 const canvas = document.getElementById("c");
@@ -21,17 +21,19 @@ if (!gl) {
   throw new Error("WebGL2 unavailable");
 }
 
-// Dynamic loaders: only the active effect module is fetched and compiled on load.
+// Dynamic loaders: each effect lives in its own self-contained docs/effects/<id>/ folder.
 const LOADERS = {
-  splats: () => import("./fx-splats.js").then(m => m.createSplatsEffect),
-  fire: () => import("./fx-fire.js").then(m => m.createFireEffect),
-  water: () => import("./fx-water.js").then(m => m.createWaterEffect),
+  splats: () => import("../effects/splats/index.js").then(m => m.createSplatsEffect),
+  fire: () => import("../effects/fire/index.js").then(m => m.createFireEffect),
+  water: () => import("../effects/water/index.js").then(m => m.createWaterEffect),
 };
 const engines = new Map();
 
 async function loadEngine(id) {
   if (!engines.has(id)) {
     const factory = await LOADERS[id]();
+    // Yield one frame so the browser paints the UI shell before synchronous WebGL shader compile.
+    await new Promise(r => requestAnimationFrame(r));
     engines.set(id, factory(gl));
   }
   return engines.get(id);
@@ -209,16 +211,18 @@ function updateSplitOverlay() {
 }
 
 function updateCard() {
-  if (!activeEngine) return;
   const u = UI[lang];
   const st = currentStep();
   const n = currentEffect.steps.length;
-  const badge = activeEngine.getTechBadge(currentStepIdx);
+  const ready = activeEngine && activeEngine.id === currentEffect.id;
+  const badge = ready ? activeEngine.getTechBadge(currentStepIdx) : u.loading;
 
   document.documentElement.lang = lang;
   document.title = `${lang === "pl" ? currentEffect.pl : currentEffect.en} — FX Lab | gamedev.pl`;
   $("backLink").textContent = u.back;
-  $("sourceLink").textContent = u.source;
+  const srcLink = $("sourceLink");
+  srcLink.textContent = u.source;
+  srcLink.href = REPO_TREE_BASE + currentEffect.sourcePath;
   $("lang").textContent = lang === "en" ? "PL" : "EN";
   $("prev").setAttribute("aria-label", u.prev);
   $("next").setAttribute("aria-label", u.next);
@@ -234,7 +238,7 @@ function updateCard() {
   if (st.action) {
     actBtn.hidden = false;
     actBtn.textContent = lang === "pl" ? st.action.pl : st.action.en;
-    actBtn.setAttribute("aria-pressed", st.action.toggle ? String(activeEngine.isActionActive(st.action.id)) : "false");
+    actBtn.setAttribute("aria-pressed", st.action.toggle && ready ? String(activeEngine.isActionActive(st.action.id)) : "false");
   } else {
     actBtn.hidden = true;
   }
@@ -277,19 +281,23 @@ window.addEventListener("resize", () => resizeCanvas(false));
 async function selectEffect(effectId, stepIdx = null, splitOpt = null) {
   const nextFx = getEffect(effectId);
   const seq = ++switchSeq;
-  const eng = await loadEngine(nextFx.id);
-  if (seq !== switchSeq) return;
-
   const changed = nextFx.id !== currentEffect.id || !activeEngine;
+
+  // Update visible card, picker, step strip and Source deeplink immediately before shader compile.
   currentEffect = nextFx;
-  activeEngine = eng;
   currentStepIdx = stepIdx === null ? currentEffect.defaultStep : clamp(stepIdx, 0, currentEffect.steps.length - 1);
   if (splitOpt !== null) split.enabled = !!splitOpt;
   else if (changed) split.enabled = currentEffect.defaultSplit;
+  syncUrl();
+  updateCard();
+
+  const eng = await loadEngine(nextFx.id);
+  if (seq !== switchSeq) return;
+
+  activeEngine = eng;
   resetCamera();
   activeEngine.enterStep(currentStepIdx);
   resizeCanvas(true);
-  syncUrl();
   updateCard();
 }
 
@@ -497,8 +505,8 @@ window.FXLAB = {
   },
 };
 
-// Boot initial effect & animation loop
-await selectEffect(currentEffect.id, currentStepIdx, split.enabled);
+// Boot initial effect non-blockingly so UI shell paints immediately.
+selectEffect(currentEffect.id, currentStepIdx, split.enabled);
 
 let prevNow = performance.now();
 function frame(now) {

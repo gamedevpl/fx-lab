@@ -1,9 +1,12 @@
 // Bilingual (EN / PL) catalog for all effects and stages in FX Lab.
 
+export const REPO_TREE_BASE = "https://github.com/gamedevpl/fx-lab/tree/main/";
+
 export const UI = {
   en: {
     back: "← gamedev.pl",
     source: "Source",
+    loading: "Compiling shaders…",
     effectsBtn: n => `Effects (${n})`,
     catalogTitle: "Effects",
     catalogSub: n => `${n} interactive WebGL2 effects · press E to open`,
@@ -31,6 +34,7 @@ export const UI = {
   pl: {
     back: "← gamedev.pl",
     source: "Kod",
+    loading: "Kompiluję shadery…",
     effectsBtn: n => `Efekty (${n})`,
     catalogTitle: "Efekty",
     catalogSub: n => `${n} interaktywne efekty WebGL2 · skrót E`,
@@ -60,6 +64,7 @@ export const UI = {
 export const EFFECTS = [
   {
     id: "splats",
+    sourcePath: "docs/effects/splats",
     category: "stylization",
     categoryEn: "Stylization",
     categoryPl: "Stylizacja",
@@ -171,6 +176,7 @@ export const EFFECTS = [
   },
   {
     id: "fire",
+    sourcePath: "docs/effects/fire",
     category: "fluids",
     categoryEn: "Volumetrics & Fluids",
     categoryPl: "Wolumeny i płyny",
@@ -332,6 +338,7 @@ export const EFFECTS = [
   },
   {
     id: "water",
+    sourcePath: "docs/effects/water",
     category: "fluids",
     categoryEn: "Surfaces & Fluids",
     categoryPl: "Powierzchnie i płyny",
@@ -476,8 +483,8 @@ export const EFFECTS = [
         tabPl: "Plusk na żywo",
         en: "Live Shallow-Water PDE & Splash",
         pl: "Równanie fali 2D i plusk 3D",
-        noteEn: "A live 128×128 zero-mean viscous wave solver with a 3D liquid crown, Worthington rebound jet and 48 droplets. Press Drop Sphere or click anywhere on the water!",
-        notePl: "Solver fali 128×128 z koroną 3D, strumieniem Worthingtona i 48 kroplami. Kliknij Wrzuć kulę albo kliknij w dowolne miejsce na tafli!",
+        noteEn: "A live 128×128 zero-mean viscous wave solver with a 3D liquid crown, Worthington rebound jet and ballistic droplets. Press Drop Sphere or click anywhere on the water!",
+        notePl: "Solver fali 128×128 z koroną 3D, strumieniem Worthingtona i kroplami wody. Kliknij Wrzuć kulę albo kliknij w dowolne miejsce na tafli!",
         stage: 7,
         compareLeft: 0,
         compareRight: 7,
