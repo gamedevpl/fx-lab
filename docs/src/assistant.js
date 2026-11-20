@@ -13,7 +13,7 @@ const words = t => String(t).toLowerCase().match(/[a-z0-9-]{2,}/g)?.filter(w => 
 const tools = [
   {
     name: "list_effects",
-    description: "List all three FX Lab effects (Pixel-Art Gaussian Splats, Evolution of Fire, Evolution of Water) and their step ids.",
+    description: "List all seven FX Lab effects (Pixel-Art Gaussian Splats, Evolution of Fire, Evolution of Water, Evolution of Shadows, Evolution of Cloth, Evolution of Fur, Evolution of Glass & Caustics) and their step ids.",
     run: () => FX.EFFECTS.map(e => `${e.id} ("${e.en}"): ` + e.steps.map(s => `${s.id} "${s.en}" (${s.era})`).join("; ")).join("\n"),
   },
   {
@@ -52,7 +52,7 @@ const tools = [
   },
   {
     name: "trigger_action",
-    description: "Trigger the current step's interactive action (e.g. Sweep Sphere on F8, Drop Sphere on W8, Sweep Sun on SH8, Launch Ball on C8, Shake & Gust on FU8, Shell Slices on FU3, Push Sphere on C7, Texel Grid on SH4, Wide Sun on SH5-SH7, Reveal Discs on S1, Wireframe on F3/C3, Voxel Grid on F7).",
+    description: "Trigger the current step's interactive action (e.g. Sweep Sphere on F8, Drop Sphere on W8, Sweep Sun on SH8/G8, High Dispersion on G6, Frost Glass on G7, Launch Ball on C8, Shake & Gust on FU8, Shell Slices on FU3, Push Sphere on C7, Texel Grid on SH4, Wide Sun on SH5-SH7, Reveal Discs on S1, Wireframe on F3/C3, Voxel Grid on F7).",
     run: () => FX.triggerAction() ? "Triggered the current step's interactive action." : "This step has no extra action button.",
   },
   {
@@ -60,7 +60,7 @@ const tools = [
     description: "What FX Lab is, where the code lives and its licence.",
     run: () => [
       "FX Lab is an interactive WebGL2 sandbox by GamedevPL showcasing real-time graphics effects from short technical breakdowns.",
-      "It includes Pixel-Art Gaussian Splats (5 steps), Evolution of Fire (8 eras), Evolution of Water (8 eras), Evolution of Shadows (8 eras), Evolution of Cloth (8 eras), and Evolution of Fur (8 eras from 1992 flat texture and Shell Texturing to 30,000 clumped 3D strands with live petting physics).",
+      "It includes Pixel-Art Gaussian Splats (5 steps), Evolution of Fire (8 eras), Evolution of Water (8 eras), Evolution of Shadows (8 eras), Evolution of Cloth (8 eras), Evolution of Fur (8 eras), and Evolution of Glass & Caustics (8 eras from 1995 flat alpha to 98,304 GPU-splatted spectral caustic photons and multi-bounce TIR).",
       "Plain JavaScript and raw WebGL2, zero external libraries. Source code: https://github.com/gamedevpl/fx-lab (MIT).",
     ].join("\n"),
   },
@@ -69,10 +69,10 @@ const tools = [
 const agent = createPageAgent({
   name: "mascot",
   instructions: [
-    "You are the gamedev.pl mascot on FX Lab, an interactive WebGL2 sandbox of graphics effects (Pixel-Art Gaussian Splats, Evolution of Fire, Evolution of Water, Evolution of Shadows, Evolution of Cloth, Evolution of Fur).",
+    "You are the gamedev.pl mascot on FX Lab, an interactive WebGL2 sandbox of graphics effects (Pixel-Art Gaussian Splats, Evolution of Fire, Evolution of Water, Evolution of Shadows, Evolution of Cloth, Evolution of Fur, Evolution of Glass & Caustics).",
     "Use the tools for every fact. Never invent steps or techniques the tools do not return.",
     "When the user asks to see an effect or technique, call show_step (and trigger_action or set_split when helpful).",
-    "Name steps by their id in backticks, like `S5`, `F8`, `W8`, `SH8`, `C8`, or `FU8`.",
+    "Name steps by their id in backticks, like `S5`, `F8`, `W8`, `SH8`, `C8`, `FU8`, or `G8`.",
     "Answer in English, in one to four short sentences.",
     "If the tools do not answer the question, say you do not know.",
   ].join(" "),

@@ -12,6 +12,7 @@ Interactive WebGL2 sandbox for real-time graphics effects from [gamedev.pl](http
 4. **[Evolution of Shadows](https://gamedevpl.github.io/fx-lab/shadows/)** (8 eras, 1988–2026 · [source & notes](./docs/effects/shadows/README.md)) — 1988 ground blob discs, planar `y = 0` projection, *Doom 3*-style stencil volumes, real `88×88` hard shadow map aliasing, 16-tap Poisson PCF, PCSS contact-hardening, cone-traced ray-traced area lights with crevice AO and blue sky fill, and colored stained-glass shadows with crystal lens caustics and color-bounce GI.
 5. **[Evolution of Cloth](https://gamedevpl.github.io/fx-lab/cloth/)** (8 eras, 1988–2026 · [source & notes](./docs/effects/cloth/README.md)) — 1988 2-frame `32×24` pixel banner, rigid hinged flap, travelling sine-wave vertex shader, Verlet mass-spring physics, 2-hop bending stiffness with woven linen normal map, PBR Charlie velvet sheen + backlit translucency, stretch-free XPBD sphere wrapping, and per-triangle aerodynamic wind with PCF self-shadows and live tearing.
 6. **[Evolution of Fur](https://gamedevpl.github.io/fx-lab/fur/)** (8 eras, 1992–2026 · [source & notes](./docs/effects/fur/README.md)) — 1992 flat painted polygon mesh, directional normal maps, 8-layer & 40-layer instanced *Shell Texturing* with gravity combing and root AO, Kajiya–Kay anisotropic specular, Marschner dual-lobe scattering with golden backlit rim, 30,000 geometric clumped 3D hair strands, and a live `64×32` spring-damper wind, head-shake & petting groom.
+7. **[Evolution of Glass & Caustics](https://gamedevpl.github.io/fx-lab/glass/)** (8 eras, 1995–2026 · [source & notes](./docs/effects/glass/README.md)) — 1995 flat alpha transparency, studio env-map reflections, Schlick Fresnel (`F₀ = 0.04`), single-surface Snell refraction, thick double refraction with Beer–Lambert volume absorption, Cauchy chromatic dispersion, real-time `512×512` GPU photon-splatted caustics with frosted microfacets, and 4-bounce Total Internal Reflection with 98,304 six-band spectral caustic photons and interactive sun aiming.
 
 ## Project structure
 
@@ -19,16 +20,17 @@ Each effect lives in its own self-contained folder under `docs/effects/<id>/` wi
 
 ```text
 docs/
-├── index.html                               # Root entry (loads default effect)
-├── splats/ fire/ water/ shadows/ cloth/ fur/ # Clean per-effect routes with dedicated Open Graph cards
-├── src/                                     # Shared app shell, catalog metadata, WebGL2 helpers
+├── index.html                                     # Root entry (loads default effect)
+├── splats/ fire/ water/ shadows/ cloth/ fur/ glass/ # Clean per-effect routes with dedicated Open Graph cards
+├── src/                                           # Shared app shell, catalog metadata, WebGL2 helpers
 └── effects/
-    ├── splats/                              # README.md · scene.js · shaders.js · index.js
-    ├── fire/                                # README.md · simulations.js · shaders.js · index.js
-    ├── water/                               # README.md · simulation.js · shaders.js · index.js
-    ├── shadows/                             # README.md · shaders.js · index.js
-    ├── cloth/                               # README.md · simulation.js · shaders.js · index.js
-    └── fur/                                 # README.md · groom.js · shaders.js · index.js
+    ├── splats/                                    # README.md · scene.js · shaders.js · index.js
+    ├── fire/                                      # README.md · simulations.js · shaders.js · index.js
+    ├── water/                                     # README.md · simulation.js · shaders.js · index.js
+    ├── shadows/                                   # README.md · shaders.js · index.js
+    ├── cloth/                                     # README.md · simulation.js · shaders.js · index.js
+    ├── fur/                                       # README.md · groom.js · shaders.js · index.js
+    └── glass/                                     # README.md · optics.js · shaders.js · index.js
 ```
 
 ## Controls
