@@ -99,12 +99,61 @@ function currentStep() {
   return currentEffect.steps[currentStepIdx];
 }
 
+function ensureRibbon() {
+  let rib = $("fxRibbon");
+  if (!rib) {
+    rib = document.createElement("div");
+    rib.id = "fxRibbon";
+    rib.className = "fx-ribbon";
+    rib.setAttribute("role", "navigation");
+    rib.setAttribute("aria-label", "Effects");
+    const hdr = document.querySelector("header");
+    const nav = hdr?.querySelector("nav");
+    if (hdr && nav) hdr.insertBefore(rib, nav);
+  }
+  return rib;
+}
+
 function renderPicker() {
+  const u = UI[lang];
   const fxIdx = EFFECTS.findIndex(e => e.id === currentEffect.id);
   $("pickerDot").style.background = currentEffect.accent || "var(--amber)";
-  $("pickerName").textContent = lang === "pl" ? currentEffect.pl : currentEffect.en;
+  $("pickerName").textContent = u.effectsBtn(EFFECTS.length);
   $("pickerCount").textContent = `${fxIdx + 1}/${EFFECTS.length}`;
   $("catalogBtn").setAttribute("aria-expanded", String(catalogOpen));
+
+  // Populate always-visible scrollable top effect switcher strip
+  const rib = ensureRibbon();
+  rib.innerHTML = "";
+  for (const fx of EFFECTS) {
+    const isCur = fx.id === currentEffect.id;
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "fx-pill";
+    b.dataset.fx = fx.id;
+    b.setAttribute("aria-current", String(isCur));
+    b.title = lang === "pl" ? fx.pl : fx.en;
+    const label = lang === "pl" ? fx.shortPl : fx.shortEn;
+    b.innerHTML = `<span class="fx-dot" style="background:${fx.accent || "var(--amber)"}"></span><span>${label}</span>`;
+    b.addEventListener("click", () => {
+      if (fx.id !== currentEffect.id) selectEffect(fx.id);
+    });
+    rib.appendChild(b);
+  }
+  const activePill = rib.querySelector('[aria-current="true"]');
+  if (activePill) activePill.scrollIntoView({ block: "nearest", inline: "nearest" });
+}
+
+function ensureCatalogScroll() {
+  const grid = $("catalogGrid");
+  if (!grid) return null;
+  if (!grid.parentElement?.classList.contains("catalog-scroll")) {
+    const wrap = document.createElement("div");
+    wrap.className = "catalog-scroll";
+    grid.parentElement.insertBefore(wrap, grid);
+    wrap.appendChild(grid);
+  }
+  return grid;
 }
 
 function renderCatalogModal() {
@@ -138,7 +187,7 @@ function renderCatalogModal() {
   }
 
   const q = filterQuery.trim().toLowerCase();
-  const grid = $("catalogGrid");
+  const grid = ensureCatalogScroll();
   grid.innerHTML = "";
   for (const fx of EFFECTS) {
     if (showFilters && filterCat !== "all" && fx.category !== filterCat) continue;
@@ -158,14 +207,18 @@ function renderCatalogModal() {
     const title = lang === "pl" ? fx.pl : fx.en;
     const summary = lang === "pl" ? fx.summaryPl : fx.summaryEn;
     const tagsHtml = (fx.tags || []).map(t => `<span>${t}</span>`).join("");
+    const thumbSrc = `${basePath}thumbs/${fx.id}.jpg`;
     btn.innerHTML = `
-      <div class="fx-card-top">
-        <span class="fx-card-meta">${catLbl} · ${stepsLbl}</span>
-        ${isCur ? `<span class="fx-card-active">${u.catalogActive}</span>` : ""}
+      <div class="fx-card-thumb"><img src="${thumbSrc}" loading="lazy" alt="${title}"></div>
+      <div class="fx-card-body">
+        <div class="fx-card-top">
+          <span class="fx-card-meta">${catLbl} · ${stepsLbl}</span>
+          ${isCur ? `<span class="fx-card-active">${u.catalogActive}</span>` : ""}
+        </div>
+        <h3>${title}</h3>
+        <p>${summary}</p>
+        <div class="fx-card-tags">${tagsHtml}</div>
       </div>
-      <h3>${title}</h3>
-      <p>${summary}</p>
-      <div class="fx-card-tags">${tagsHtml}</div>
     `;
     btn.addEventListener("click", () => {
       setCatalogOpen(false);
@@ -259,7 +312,9 @@ function updateCard() {
     ? u.waterClickHint
     : (isShadows ? u.shadowsClickHint : (isCloth ? u.clothClickHint : (isFurLive ? u.furClickHint : (isGlass ? u.glassClickHint : (isClouds ? u.cloudsClickHint : u.dragHint)))));
   const linkLabel = u[currentEffect.videoLabelKey] || u.channelLink;
-  $("filmLine").innerHTML = `${u.videoPrefix} <a href="${currentEffect.videoUrl}" target="_blank" rel="noopener">${linkLabel}</a>`;
+  const filmLine = $("filmLine");
+  filmLine.innerHTML = `<span>${u.videoPrefix} <a href="${currentEffect.videoUrl}" target="_blank" rel="noopener">${linkLabel}</a></span><span>·</span><button type="button" class="film-more" id="moreFxBtn">${u.moreEffects(EFFECTS.length)}</button>`;
+  $("moreFxBtn")?.addEventListener("click", () => setCatalogOpen(true));
 
   updateSplitOverlay();
   renderPicker();

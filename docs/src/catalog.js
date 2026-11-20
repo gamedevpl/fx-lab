@@ -7,7 +7,8 @@ export const UI = {
     back: "← gamedev.pl",
     source: "Source",
     loading: "Compiling shaders…",
-    effectsBtn: n => `Effects (${n})`,
+    effectsBtn: n => `All ${n}`,
+    moreEffects: n => `More effects (${n}) ↗`,
     catalogTitle: "Effects",
     catalogSub: n => `${n} interactive WebGL2 effects · press E to open`,
     catalogClose: "Close",
@@ -43,9 +44,16 @@ export const UI = {
     back: "← gamedev.pl",
     source: "Kod",
     loading: "Kompiluję shadery…",
-    effectsBtn: n => `Efekty (${n})`,
+    effectsBtn: n => `Wszystkie ${n}`,
+    moreEffects: n => `Więcej efektów (${n}) ↗`,
     catalogTitle: "Efekty",
-    catalogSub: n => `${n} interaktywne efekty WebGL2 · skrót E`,
+    catalogSub: n => {
+      const m10 = n % 10, m100 = n % 100;
+      const noun = n === 1 ? "interaktywny efekt"
+        : (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) ? "interaktywne efekty"
+        : "interaktywnych efektów";
+      return `${n} ${noun} WebGL2 · skrót E`;
+    },
     catalogClose: "Zamknij",
     catalogSearch: "Szukaj efektu lub techniki…",
     catalogAll: "Wszystkie",
