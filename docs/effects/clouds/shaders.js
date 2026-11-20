@@ -39,59 +39,76 @@ layout(location = 1) out vec4 outOccBloom; // RGB = HDR bloom + god-ray source, 
 ${CLOUDS_COMMON_GLSL}
 
 // ---------------------------------------------------------------------------
-// 3D Volumetric Cloud Field (Steps 5-8): GPU-baked 64^3 Perlin-Worley 3D texture!
-// Sculpted photographic cumulus puffs (like Flight Simulator / RDR2 — never smooth blobs!)
+// 3D Volumetric Cloud Field (Steps 5-8): GPU-baked 64^3 multi-scale 3D texture!
+// Realistic wind-sheared stratocumulus & towering cumulus banks (with Earth curvature
+// and 3 cascading detail octaves -> razor-crisp wisps even overhead, ZERO cotton balls!)
 // ---------------------------------------------------------------------------
-const float CLOUD_BOT = 1.75;
-const float CLOUD_TOP = 5.35;
+const float CLOUD_BOT = 2.45;
+const float CLOUD_TOP = 6.20;
 
-// Natural broken-cumulus weather coverage: lush, sculptural cumulus billows with clear sapphire sky gaps!
+// Macro weather map: broken sculpted cumulus islands (~52% sky coverage -> blue sky + blazing silver linings + god-rays!)
 float sampleCloudCoverage(vec2 xz, float stormAmt) {
-  vec2 drift = xz + vec2(uTime * 0.16, uTime * 0.04);
-  float wBase = fbm2(drift * 0.135 + vec2(2.6, 4.9));
-  float wBillow = noise2(drift * 0.27 - vec2(1.4, 2.3));
-  float midBand = exp(-pow((xz.y + 12.0) * 0.10, 2.0)) * 0.20;
-  float cov = mix(wBase, wBillow, 0.36) * 0.94 + midBand + 0.08 + stormAmt * 0.22;
-  return clamp(cov, 0.0, 0.90 + stormAmt * 0.09);
+  vec2 drift = xz + vec2(uTime * 0.18, uTime * 0.04);
+  vec2 wPos = vec2(drift.x * 0.072, drift.y * 0.098);
+  float warp = fbm2(wPos * 1.4 + vec2(4.2, -1.7)) - 0.5;
+  float wBase = fbm2(wPos + vec2(warp * 0.90, -warp * 0.58) + vec2(2.4, 4.2));
+  float wFine = noise2(wPos * 3.1 - vec2(1.4, 2.3));
+  // Open broken-cumulus balance so deep sapphire sky & golden sunbeams shine between towering cloud banks!
+  float cov = mix(wBase, wFine, 0.26) * 1.06 - 0.03 + stormAmt * 0.34;
+  return clamp(cov, 0.0, 0.96 + stormAmt * 0.04);
 }
 
-// Full 3D cloud density at world point p (bold, crisp cauliflower cumulus towers sculpted by 64^3 3D Worley!)
+// Curved planetary altitude fraction h in [0..1] (curves clouds majestically toward the distant horizon!)
+float cloudHeightFrac(vec3 p) {
+  float curv = dot(p.xz, p.xz) * 0.0038;
+  return (p.y + curv - CLOUD_BOT) / (CLOUD_TOP - CLOUD_BOT);
+}
+
+// Full 3D cloud density: 3 cascading scales + 3D wind-shear warp -> sculpted crisp cumulus towers!
 float sampleCloudDensity(vec3 p, float stormAmt, bool hiDetail) {
-  float h = (p.y - CLOUD_BOT) / (CLOUD_TOP - CLOUD_BOT);
+  float h = cloudHeightFrac(p);
   if (h <= 0.0 || h >= 1.0) return 0.0;
 
   float cov = sampleCloudCoverage(p.xz, stormAmt);
-  if (cov < 0.40) return 0.0;
+  if (cov < 0.43) return 0.0;
 
-  float hProf = smoothstep(0.0, 0.13, h) * smoothstep(1.0, 0.44 - stormAmt * 0.18, h);
+  // Flat condensation base + towering rounded convective domes (higher cov -> taller towers!)
+  float maxH = clamp((cov - 0.38) * 1.75 + stormAmt * 0.25, 0.36, 1.0);
+  float hProf = smoothstep(0.0, 0.11, h) * smoothstep(maxH, maxH * 0.52, h);
   if (hProf < 0.002) return 0.0;
 
-  vec3 windOff = vec3(uTime * 0.022, 0.0, uTime * 0.007);
-  vec3 sp = p * 0.155 + windOff + vec3(h * 0.07, 0.0, 0.0);
-  vec4 nBase = texture(uCloudTex3D, sp);
+  vec3 windOff = vec3(uTime * 0.016, 0.0, uTime * 0.004);
+  vec3 basePos = vec3(p.x * 0.068, p.y * 0.092, p.z * 0.078) + windOff + vec3(h * 0.14, 0.0, 0.0);
+  vec4 nMacro = texture(uCloudTex3D, basePos);
 
-  float baseShape = nBase.r * 0.56 + nBase.g * 0.30 + nBase.b * 0.14;
-  float thresh = mix(0.66, 0.34, clamp((cov - 0.40) / 0.52, 0.0, 1.0)) + h * 0.16;
-  float d = smoothstep(thresh, thresh + 0.15, baseShape) * hProf;
+  vec3 medPos = p * 0.175 + windOff * 1.8 + vec3(nMacro.a - 0.5, (nMacro.r - 0.5) * 0.35, nMacro.b - 0.5) * 0.20;
+  vec4 nMed = texture(uCloudTex3D, medPos);
 
-  if (hiDetail && d > 0.002) {
-    vec3 dp = p * 0.42 + windOff * 2.2;
-    vec4 nDet = texture(uCloudTex3D, dp);
-    float wDet = nDet.g * 0.60 + nDet.b * 0.40;
-    d = max(0.0, d - (1.0 - wDet) * 0.32 * (1.0 - d * 0.38));
+  // Sculpted organic FBM + turbulent multi-octave Worley billows (zero single-cell circles!)
+  float shape = nMacro.r * 0.52 + nMed.r * 0.26 + nMed.g * 0.22;
+  float thresh = mix(0.62, 0.33, clamp((cov - 0.43) / 0.52, 0.0, 1.0)) + h * 0.13;
+  float d = smoothstep(thresh, thresh + 0.16, shape) * hProf;
+
+  if (hiDetail && d > 0.0015) {
+    // High-frequency 3D wispy cauliflower carving (razor crisp even directly overhead!)
+    vec3 finePos = p * 0.45 + windOff * 3.0 + vec3(nMed.a - 0.5) * 0.14;
+    vec4 nFine = texture(uCloudTex3D, finePos);
+    float fineWisps = nFine.b * 0.56 + nFine.r * 0.44;
+    float erodeAmt = (1.0 - fineWisps) * (0.38 * (1.0 - d * 0.58));
+    d = max(0.0, d - erodeAmt);
   }
-  return d * (3.15 + stormAmt * 0.95);
+  return d * (3.65 + stormAmt * 1.15);
 }
 
 // Fast 6-tap light-march shadow transmittance toward the sun (Steps 6-8)
 float marchCloudLight(vec3 p, vec3 sunDir, float stormAmt) {
   float od = 0.0;
-  float stepLen = 0.28;
+  float stepLen = 0.36;
   for (int i = 0; i < 6; i++) {
     vec3 lp = p + sunDir * (stepLen * (float(i) + 0.55));
-    if (lp.y > CLOUD_TOP) break;
+    if (cloudHeightFrac(lp) > 1.0) break;
     od += sampleCloudDensity(lp, stormAmt, i < 2) * stepLen;
-    stepLen *= 1.30;
+    stepLen *= 1.32;
   }
   return od;
 }
@@ -196,16 +213,16 @@ void marchVolumetricClouds(
   finalCol = skyCol;
   if (rd.y <= 0.008) return;
 
-  // Ray-slab intersection with horizontal cloud deck [CLOUD_BOT, CLOUD_TOP]
+  // Ray-slab intersection with curved planetary cloud deck [CLOUD_BOT, CLOUD_TOP]
   float tBot = (CLOUD_BOT - ro.y) / rd.y;
   float tTop = (CLOUD_TOP - ro.y) / rd.y;
-  float t0 = max(0.2, min(tBot, tTop));
-  float t1 = min(44.0, max(tBot, tTop));
+  float t0 = max(0.5, min(tBot, tTop) * 0.72);
+  float t1 = min(62.0, max(tBot, tTop));
   if (t1 <= t0) return;
 
-  const int STEPS = 56;
+  const int STEPS = 72;
   float dt = (t1 - t0) / float(STEPS);
-  // Blue-noise-like interleaved gradient jitter kills slice banding completely!
+  // Subtle interleaved gradient jitter eliminates slice banding cleanly without visible noise grain!
   float t = t0 + dt * ign(gl_FragCoord.xy);
 
   float cosT = dot(rd, sunDir);
@@ -230,8 +247,8 @@ void marchVolumetricClouds(
   for (int i = 0; i < STEPS; i++) {
     vec3 p = ro + rd * t;
     float dens = sampleCloudDensity(p, stormAmt, true);
-    if (dens > 0.002) {
-      float h = clamp((p.y - CLOUD_BOT) / (CLOUD_TOP - CLOUD_BOT), 0.0, 1.0);
+    if (dens > 0.0015) {
+      float h = clamp(cloudHeightFrac(p), 0.0, 1.0);
       vec3 scatterLight = vec3(0.0);
 
       if (stage == 4) {
@@ -280,8 +297,8 @@ void marchVolumetricClouds(
     t += dt;
   }
 
-  // Gentle aerial perspective keeps mid-sky clouds crisp while softening very distant horizon clouds
-  float distFog = exp(-max(0.0, t0 - 8.0) * 0.025);
+  // Gentle aerial perspective softens very distant horizon clouds smoothly into sunset haze!
+  float distFog = exp(-max(0.0, t0 - 11.0) * 0.020);
   vec3 cloudFinal = mix(skyCol, accumLight + skyCol * trans, distFog);
 
   // Step 8 bonus: delicate high-altitude golden cirrus wisps high in the cobalt zenith!
@@ -300,26 +317,33 @@ void marchVolumetricClouds(
 }
 
 // ---------------------------------------------------------------------------
-// Alpine Horizon Peak & Distant Ridges (anchors cinematic scale + cloud shadows!)
+// Alpine Horizon Peak & Distant Ridges (monotonic small-step march + 5-step bisection -> 0 floating slivers!)
 // ---------------------------------------------------------------------------
 bool traceAlpineTerrain(vec3 ro, vec3 rd, out float tHit, out vec3 pHit) {
   tHit = -1.0;
   pHit = ro;
-  if (rd.y > 0.22) return false;
+  if (rd.y > 0.24) return false;
   float t = 1.6;
-  for (int i = 0; i < 42; i++) {
+  float prevT = t;
+  for (int i = 0; i < 96; i++) {
     vec3 p = ro + rd * t;
     float h = mountainHeight(p.xz);
-    float diff = p.y - h;
-    if (diff < 0.025) {
-      // One bisection refinement step for crisp silhouette ridges!
-      t -= diff * 0.5;
-      pHit = ro + rd * t;
-      tHit = t;
+    if (p.y <= h) {
+      float lo = prevT, hi = t;
+      for (int k = 0; k < 5; k++) {
+        float mid = 0.5 * (lo + hi);
+        vec3 pm = ro + rd * mid;
+        if (pm.y <= mountainHeight(pm.xz)) hi = mid;
+        else lo = mid;
+      }
+      tHit = hi;
+      pHit = ro + rd * hi;
       return true;
     }
-    t += max(0.08, diff * 0.58);
-    if (t > 24.0) break;
+    prevT = t;
+    // Guaranteed conservative monotonic step: never overshoots a steep Dolomite ridge!
+    t += 0.08 + 0.018 * t;
+    if (t > 32.0) break;
   }
   return false;
 }
@@ -407,10 +431,10 @@ void main() {
   // Tightly localized crepuscular god-ray emitter around the sun & sunlit cumulus gaps:
   // Only emits on volumetric Step 8 pixels so Split-Screen never bleeds glare from 1992 flat sky!
   float cosS = max(dot(rd, uSunDir), 0.0);
-  float sunCone = pow(cosS, 12.0) * 0.95 + pow(cosS, 64.0) * 1.15;
+  float sunCone = pow(cosS, 10.0) * 1.15 + pow(cosS, 56.0) * 1.25;
   vec3 sunCol = evalSunColor(uSunDir.y);
-  float gapMask = (st >= 7) ? smoothstep(0.22, 0.92, cloudTrans) : 0.0;
-  vec3 rayEmit = clamp(sunCol * gapMask * sunCone * smoothstep(-0.04, 0.04, rd.y), vec3(0.0), vec3(1.6));
+  float gapMask = (st >= 7) ? smoothstep(0.18, 0.88, cloudTrans) : 0.0;
+  vec3 rayEmit = clamp(sunCol * gapMask * sunCone * smoothstep(-0.04, 0.04, rd.y), vec3(0.0), vec3(1.85));
   outOccBloom = vec4(rayEmit, 1.0);
 }
 `;

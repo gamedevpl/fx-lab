@@ -7,8 +7,11 @@ export const VOL_RES = 64; // 64x64x64 tileable RGBA8 WebGL2 TEXTURE_3D (baked o
 export const DEFAULT_SUN_AZ = -0.18; // Slightly left of center -> golden god-rays stream diagonally over peaks!
 export const DEFAULT_SUN_EL = 0.22;  // ~12.5 deg elevation -> rich sapphire zenith + golden-apricot horizon!
 
-// GPU shader that bakes one Z-slice (uSlice in [0..63]) of a tileable 64x64x64 RGBA8 Perlin-Worley cloud volume:
-// R = Billowy Perlin-Worley base shape, G = Worley freq 8, B = Worley freq 14, A = Smooth Perlin FBM
+// GPU shader that bakes one Z-slice (uSlice in [0..63]) of a tileable 64x64x64 RGBA8 cloud noise volume:
+// R = 4-octave organic turbulent Perlin FBM (sweeping horizontal strata & ridges — ZERO round Worley dots!)
+// G = Multi-octave billowy Worley (freq 6 + 12 + 24) for natural cauliflower sub-structure
+// B = High-frequency wispy Worley-Perlin erosion (freq 12 + 24) for razor-crisp edges
+// A = Smooth 3D domain-warp field (twists clouds organically with atmospheric wind shear!)
 export const NOISE_BAKE_FS = `#version 300 es
 precision highp float;
 
@@ -25,7 +28,7 @@ vec3 hash33(vec3 p) {
   return fract(sin(p) * 43758.5453123);
 }
 
-// Tileable 3D value-gradient noise with integer period
+// Tileable 3D gradient noise with integer period
 float tileNoise(vec3 p, float period) {
   vec3 gp = p * period;
   vec3 i = floor(gp);
@@ -48,7 +51,7 @@ float tileNoise(vec3 p, float period) {
   return res * 0.5 + 0.5;
 }
 
-// Tileable 3D inverted Worley (cellular billows: 1.0 at cell centers -> crisp cauliflower puffs!)
+// Tileable 3D inverted Worley cellular billows
 float tileWorley(vec3 p, float period) {
   vec3 gp = p * period;
   vec3 id = floor(gp);
@@ -67,26 +70,34 @@ float tileWorley(vec3 p, float period) {
   return clamp(1.0 - sqrt(minD), 0.0, 1.0);
 }
 
-float remap(float v, float lo0, float hi0, float lo1, float hi1) {
-  return lo1 + clamp((v - lo0) / max(1e-5, hi0 - lo0), 0.0, 1.0) * (hi1 - lo1);
-}
-
 void main() {
   vec3 p = vec3(vUv, uZ);
 
-  // Tileable Perlin FBM across frequencies 4, 8, 16
-  float pfbm = tileNoise(p, 4.0) * 0.58 + tileNoise(p, 8.0) * 0.28 + tileNoise(p, 16.0) * 0.14;
+  // Domain-warped organic 4-octave Perlin FBM (sweeping natural cloud shapes, ZERO polka-dot balls!)
+  float wx = tileNoise(p + vec3(0.17, 0.31, 0.53), 4.0) - 0.5;
+  float wy = tileNoise(p + vec3(0.71, 0.13, 0.29), 4.0) - 0.5;
+  float wz = tileNoise(p + vec3(0.43, 0.67, 0.11), 4.0) - 0.5;
+  vec3 pw = fract(p + vec3(wx, wy, wz) * 0.12);
 
-  // Multi-octave tileable Worley billows (classic Schneider/Nubis Perlin-Worley recipe!)
-  float w4  = tileWorley(p, 4.0);
-  float w8  = tileWorley(p, 8.0);
-  float w14 = tileWorley(p, 14.0);
+  float perlinFbm =
+    tileNoise(pw,  3.0) * 0.46 +
+    tileNoise(pw,  6.0) * 0.28 +
+    tileNoise(pw, 12.0) * 0.16 +
+    tileNoise(pw, 24.0) * 0.10;
 
-  float wFbm = w4 * 0.625 + w8 * 0.25 + w14 * 0.125;
-  float perlinWorley = remap(pfbm, 0.0, 1.0, wFbm * 0.45, 1.0);
-  perlinWorley = clamp(mix(perlinWorley, w4 * 0.72 + pfbm * 0.28, 0.35), 0.0, 1.0);
+  // Multi-octave Worley billows (all high enough frequency that no single cell ever reads as a round ball!)
+  float w6  = tileWorley(pw,  6.0);
+  float w12 = tileWorley(p,  12.0);
+  float w20 = tileWorley(p,  20.0);
+  float worleyBillow = w6 * 0.50 + w12 * 0.32 + w20 * 0.18;
 
-  outColor = vec4(perlinWorley, w8, w14, pfbm);
+  // Fine high-frequency fibrous wisps
+  float wisps = w12 * 0.45 + w20 * 0.35 + tileNoise(p, 24.0) * 0.20;
+
+  // Smooth 3D warp signal
+  float warpField = tileNoise(p, 4.0) * 0.65 + tileNoise(p, 8.0) * 0.35;
+
+  outColor = vec4(clamp(perlinFbm, 0.0, 1.0), clamp(worleyBillow, 0.0, 1.0), clamp(wisps, 0.0, 1.0), clamp(warpField, 0.0, 1.0));
 }
 `;
 
