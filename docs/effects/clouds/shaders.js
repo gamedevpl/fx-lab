@@ -46,14 +46,13 @@ ${CLOUDS_COMMON_GLSL}
 const float CLOUD_BOT = 2.45;
 const float CLOUD_TOP = 6.20;
 
-// Macro weather map: broken sculpted cumulus islands (~52% sky coverage -> blue sky + blazing silver linings + god-rays!)
+// Macro weather map: broken sculpted cumulus islands (~52% sky coverage -> blue sky + crisp silver linings + god-rays!)
 float sampleCloudCoverage(vec2 xz, float stormAmt) {
-  vec2 drift = xz + vec2(uTime * 0.18, uTime * 0.04);
+  vec2 drift = xz + vec2(uTime * 0.34, uTime * 0.08);
   vec2 wPos = vec2(drift.x * 0.072, drift.y * 0.098);
   float warp = fbm2(wPos * 1.4 + vec2(4.2, -1.7)) - 0.5;
   float wBase = fbm2(wPos + vec2(warp * 0.90, -warp * 0.58) + vec2(2.4, 4.2));
   float wFine = noise2(wPos * 3.1 - vec2(1.4, 2.3));
-  // Open broken-cumulus balance so deep sapphire sky & golden sunbeams shine between towering cloud banks!
   float cov = mix(wBase, wFine, 0.26) * 1.06 - 0.03 + stormAmt * 0.34;
   return clamp(cov, 0.0, 0.96 + stormAmt * 0.04);
 }
@@ -64,20 +63,17 @@ float cloudHeightFrac(vec3 p) {
   return (p.y + curv - CLOUD_BOT) / (CLOUD_TOP - CLOUD_BOT);
 }
 
-// Full 3D cloud density: 3 cascading scales + 3D wind-shear warp -> sculpted crisp cumulus towers!
-float sampleCloudDensity(vec3 p, float stormAmt, bool hiDetail) {
+// Full 3D cloud density given pre-computed macro coverage cov (avoids redundant fbm2 calls in light march!)
+float sampleCloudDensityWithCov(vec3 p, float cov, float stormAmt, bool hiDetail) {
   float h = cloudHeightFrac(p);
-  if (h <= 0.0 || h >= 1.0) return 0.0;
-
-  float cov = sampleCloudCoverage(p.xz, stormAmt);
-  if (cov < 0.43) return 0.0;
+  if (h <= 0.0 || h >= 1.0 || cov < 0.42) return 0.0;
 
   // Flat condensation base + towering rounded convective domes (higher cov -> taller towers!)
-  float maxH = clamp((cov - 0.38) * 1.75 + stormAmt * 0.25, 0.36, 1.0);
+  float maxH = clamp((cov - 0.37) * 1.78 + stormAmt * 0.25, 0.36, 1.0);
   float hProf = smoothstep(0.0, 0.11, h) * smoothstep(maxH, maxH * 0.52, h);
   if (hProf < 0.002) return 0.0;
 
-  vec3 windOff = vec3(uTime * 0.016, 0.0, uTime * 0.004);
+  vec3 windOff = vec3(uTime * 0.028, 0.0, uTime * 0.007);
   vec3 basePos = vec3(p.x * 0.068, p.y * 0.092, p.z * 0.078) + windOff + vec3(h * 0.14, 0.0, 0.0);
   vec4 nMacro = texture(uCloudTex3D, basePos);
 
@@ -86,7 +82,7 @@ float sampleCloudDensity(vec3 p, float stormAmt, bool hiDetail) {
 
   // Sculpted organic FBM + turbulent multi-octave Worley billows (zero single-cell circles!)
   float shape = nMacro.r * 0.52 + nMed.r * 0.26 + nMed.g * 0.22;
-  float thresh = mix(0.62, 0.33, clamp((cov - 0.43) / 0.52, 0.0, 1.0)) + h * 0.13;
+  float thresh = mix(0.61, 0.33, clamp((cov - 0.42) / 0.52, 0.0, 1.0)) + h * 0.13;
   float d = smoothstep(thresh, thresh + 0.16, shape) * hProf;
 
   if (hiDetail && d > 0.0015) {
@@ -97,18 +93,18 @@ float sampleCloudDensity(vec3 p, float stormAmt, bool hiDetail) {
     float erodeAmt = (1.0 - fineWisps) * (0.38 * (1.0 - d * 0.58));
     d = max(0.0, d - erodeAmt);
   }
-  return d * (3.65 + stormAmt * 1.15);
+  return d * (3.75 + stormAmt * 1.15);
 }
 
-// Fast 6-tap light-march shadow transmittance toward the sun (Steps 6-8)
-float marchCloudLight(vec3 p, vec3 sunDir, float stormAmt) {
+// Fast 4-tap exponentially spaced light-march shadow transmittance toward the sun (Steps 6-8, 3x faster!)
+float marchCloudLight(vec3 p, vec3 sunDir, float cov, float stormAmt) {
   float od = 0.0;
-  float stepLen = 0.36;
-  for (int i = 0; i < 6; i++) {
-    vec3 lp = p + sunDir * (stepLen * (float(i) + 0.55));
+  const float dists[4] = float[4](0.24, 0.62, 1.32, 2.55);
+  const float weights[4] = float[4](0.32, 0.46, 0.80, 1.25);
+  for (int i = 0; i < 4; i++) {
+    vec3 lp = p + sunDir * dists[i];
     if (cloudHeightFrac(lp) > 1.0) break;
-    od += sampleCloudDensity(lp, stormAmt, i < 2) * stepLen;
-    stepLen *= 1.32;
+    od += sampleCloudDensityWithCov(lp, cov, stormAmt, false) * weights[i];
   }
   return od;
 }
@@ -123,7 +119,7 @@ vec3 render1992PixelClouds(vec3 rd, vec3 sunDir, vec3 skyCol) {
   vec2 qUV = floor(skyUV * vec2(44.0, 34.0)) / vec2(44.0, 34.0);
 
   // Two flat 2D parallax cloud sprite layers (zero 3D perspective foreshortening!)
-  vec2 p1 = vec2(qUV.x + uTime * 0.06, qUV.y);
+  vec2 p1 = vec2(qUV.x + uTime * 0.09, qUV.y);
   float c1 = 0.0;
   for (int i = 0; i < 4; i++) {
     float fi = float(i);
@@ -136,28 +132,29 @@ vec3 render1992PixelClouds(vec3 rd, vec3 sunDir, vec3 skyCol) {
   // Classic 2-tone pixel cloud shading (bright white top, flat periwinkle bottom)
   if (c1 > 0.5) {
     float topBand = step(0.62, fract(qUV.y * 3.2 + 0.2));
-    return mix(vec3(0.76, 0.85, 0.96), vec3(0.98, 0.99, 1.00), topBand);
+    return mix(vec3(0.72, 0.82, 0.94), vec3(0.98, 0.99, 1.00), topBand);
   }
   return skyCol;
 }
 
 // ---------------------------------------------------------------------------
-// STEP 2 (1997): Single Flat Scrolling Cloud Plane mapped overhead at y = 2.6
+// STEP 2 (1997): Single Flat Scrolling Cloud Plane mapped overhead at y = 2.45
 // ---------------------------------------------------------------------------
 vec3 render1997ScrollingPlane(vec3 ro, vec3 rd, vec3 sunDir, vec3 skyCol) {
-  if (rd.y <= 0.015) return skyCol;
-  float t = (2.75 - ro.y) / rd.y;
-  if (t <= 0.0 || t > 140.0) return skyCol;
+  if (rd.y <= 0.012) return skyCol;
+  float t = (2.45 - ro.y) / rd.y;
+  if (t <= 0.0 || t > 180.0) return skyCol;
   vec2 p = ro.xz + rd.xz * t;
-  vec2 uv = p * 0.105 + vec2(uTime * 0.05, uTime * 0.02);
+  vec2 uv = p * 0.135 + vec2(uTime * 0.14, uTime * 0.05);
 
-  // Classic N64/PS1 tiled FBM sheet (high-contrast patches stretch dramatically toward horizon!)
-  float n = fbm2(uv) * 0.72 + noise2(uv * 3.1 - vec2(uTime * 0.02)) * 0.28;
-  float alpha = smoothstep(0.48, 0.64, n) * smoothstep(0.015, 0.11, rd.y);
-  float lit = clamp(0.55 + 0.65 * (fbm2(uv + sunDir.xz * 0.09) - n) * 2.8, 0.35, 1.0);
-  vec3 cloudCol = mix(vec3(0.45, 0.54, 0.68), vec3(0.98, 0.98, 0.99), lit);
-  float distFade = exp(-t * 0.014);
-  return mix(skyCol, cloudCol, alpha * distFade * 0.94);
+  // Classic N64/PS1 tiled FBM sheet (bold, high-contrast patches visibly stretching flat toward the horizon!)
+  float n = fbm2(uv) * 0.68 + noise2(uv * 2.8 - vec2(uTime * 0.06, 0.0)) * 0.32;
+  float alpha = smoothstep(0.41, 0.57, n) * smoothstep(0.012, 0.075, rd.y);
+  float lit = clamp(0.48 + (fbm2(uv + sunDir.xz * 0.11) - n) * 3.2, 0.15, 1.0);
+  // Calibrated in linear space so crisp white/slate patches pop unmistakably against the cerulean retro sky!
+  vec3 cloudCol = mix(vec3(0.16, 0.23, 0.38), vec3(0.86, 0.90, 0.96), lit);
+  float distFade = exp(-t * 0.0085);
+  return mix(skyCol, cloudCol, alpha * distFade * 0.96);
 }
 
 // ---------------------------------------------------------------------------
@@ -165,14 +162,16 @@ vec3 render1997ScrollingPlane(vec3 ro, vec3 rd, vec3 sunDir, vec3 skyCol) {
 // ---------------------------------------------------------------------------
 vec3 render2002Billboards(vec3 ro, vec3 rd, vec3 sunDir, vec3 skyCol, float showCards) {
   vec3 col = skyCol;
-  // 10 deterministic 3D cloud-puff cards arranged back-to-front in the mid sky
-  for (int i = 0; i < 10; i++) {
+  // 12 deterministic 3D cloud-puff cards composed in 3 distinct banks across both 9:16 & 16:9 frames
+  for (int i = 0; i < 12; i++) {
     float fi = float(i);
-    float depth = 15.5 - fi * 0.72;
-    float px = (hash21(vec2(fi, 1.7)) - 0.5) * 12.0 + sin(uTime * 0.15 + fi) * 0.22;
-    float py = 2.4 + hash21(vec2(fi, 4.3)) * 2.4;
+    float depth = 16.0 - fi * 0.62;
+    // Arrange puffs into 3 clear clusters: left bank, high center bank, right mid bank
+    float cluster = mod(fi, 3.0) - 1.0; // -1, 0, +1
+    float px = cluster * 3.15 + (hash21(vec2(fi, 1.7)) - 0.5) * 2.5 + sin(uTime * 0.28 + fi * 1.1) * 0.28;
+    float py = 2.35 + (cluster == 0.0 ? 1.05 : 0.25) + hash21(vec2(fi, 4.3)) * 1.65;
     vec3 center = vec3(px, py, -depth);
-    float halfSz = 1.75 + hash21(vec2(fi, 9.1)) * 0.95;
+    float halfSz = 1.40 + hash21(vec2(fi, 9.1)) * 0.65;
 
     // Intersect ray with camera-facing quad centered at center (plane normal = -uCamFwd)
     float denom = dot(rd, -uCamFwd);
@@ -183,20 +182,22 @@ vec3 render2002Billboards(vec3 ro, vec3 rd, vec3 sunDir, vec3 skyCol, float show
     vec2 q = vec2(dot(hp, uCamRight), dot(hp, uCamUp)) / halfSz;
     if (abs(q.x) > 1.0 || abs(q.y) > 1.0) continue;
 
-    // Classic early-2000s round alpha puff sprite (crisp enough to read clearly, flat vs 3D volume!)
-    float r = length(q * vec2(0.88, 1.12));
+    // Crisp early-2000s round alpha puff sprite with clear shaded undersides (reads unmistakably vs flat plane!)
+    float r = length(q * vec2(0.92, 1.15));
     float puffNoise = fbm2(q * 2.6 + vec2(fi * 3.1, 1.2));
-    float a = smoothstep(0.92, 0.44, r + (puffNoise - 0.5) * 0.34) * 0.92;
-    float shade = clamp(0.42 + q.y * 0.52 + dot(normalize(vec3(q, 0.5)), sunDir) * 0.22, 0.22, 1.0);
-    vec3 cardCol = mix(vec3(0.44, 0.50, 0.62), vec3(0.98, 0.95, 0.90), shade);
+    float a = smoothstep(0.90, 0.42, r + (puffNoise - 0.5) * 0.32) * 0.94;
+    float shade = clamp(0.32 + q.y * 0.58 + dot(normalize(vec3(q, 0.5)), sunDir) * 0.22, 0.08, 1.0);
+    vec3 cardCol = mix(vec3(0.11, 0.16, 0.26), vec3(0.84, 0.84, 0.82), shade);
     col = mix(col, cardCol, a);
 
-    // Educational Show Cards overlay: crisp amber wireframe border around every flat billboard quad!
+    // Educational Show Cards overlay: bold dark-outlined amber wireframe around every flat billboard quad!
     if (showCards > 0.5) {
       float edge = max(abs(q.x), abs(q.y));
-      float border = smoothstep(0.952, 0.985, edge);
-      float diag = 1.0 - smoothstep(0.008, 0.018, abs(q.x - q.y));
-      col = mix(col, vec3(0.98, 0.72, 0.24), max(border * 0.96, diag * 0.30));
+      float halo = smoothstep(0.925, 0.955, edge);
+      float border = smoothstep(0.948, 0.982, edge);
+      float diag = 1.0 - smoothstep(0.010, 0.022, abs(q.x - q.y));
+      col = mix(col, vec3(0.04, 0.04, 0.08), halo * 0.65);
+      col = mix(col, vec3(1.15, 0.58, 0.06), max(border * 0.98, diag * 0.45));
     }
   }
   return col;
@@ -220,78 +221,78 @@ void marchVolumetricClouds(
   float t1 = min(62.0, max(tBot, tTop));
   if (t1 <= t0) return;
 
-  const int STEPS = 72;
+  const int STEPS = 56;
   float dt = (t1 - t0) / float(STEPS);
-  // Subtle interleaved gradient jitter eliminates slice banding cleanly without visible noise grain!
+  // Uniform step + gentle IGN jitter -> silky smooth edges with zero step-boundary stipple!
   float t = t0 + dt * ign(gl_FragCoord.xy);
 
   float cosT = dot(rd, sunDir);
   vec3 sunCol = evalSunColor(sunDir.y);
   float day = smoothstep(-0.02, 0.45, sunDir.y);
 
-  // Phase functions:
-  // Step 5 (2012): isotropic basic diffuse
-  // Step 6 (2016): forward-peaked Henyey-Greenstein silver lining!
-  // Steps 7-8 (2020-2026): dual-lobe HG (strong forward silver rim + soft back scatter)
-  float phaseFwd = hgPhase(cosT, 0.76);
+  // Phase functions (clamped forward lobe prevents whiteout clipping around sun!)
+  float phaseFwd = min(hgPhase(cosT, 0.74), 1.35);
   float phaseBack = hgPhase(cosT, -0.24);
-  float phase = (stage <= 4) ? 0.34 : mix(phaseBack, phaseFwd, 0.74) * 2.35;
+  float phase = (stage <= 4) ? 0.30 : mix(phaseBack, phaseFwd, 0.72) * 1.65;
 
-  // Sky ambient colors illuminating cloud bottoms & crests
-  vec3 skyTopAmb = mix(vec3(0.20, 0.26, 0.44), vec3(0.36, 0.56, 0.88), day);
-  vec3 skyBotAmb = mix(vec3(0.14, 0.11, 0.16), vec3(0.16, 0.22, 0.32), day);
+  // Sky ambient colors illuminating cloud bottoms & crests (calibrated linear HDR!)
+  vec3 skyTopAmb = mix(vec3(0.10, 0.14, 0.28), vec3(0.18, 0.32, 0.58), day);
+  vec3 skyBotAmb = mix(vec3(0.06, 0.05, 0.09), vec3(0.07, 0.10, 0.17), day);
 
   vec3 accumLight = vec3(0.0);
   float trans = 1.0;
 
   for (int i = 0; i < STEPS; i++) {
     vec3 p = ro + rd * t;
-    float dens = sampleCloudDensity(p, stormAmt, true);
-    if (dens > 0.0015) {
-      float h = clamp(cloudHeightFrac(p), 0.0, 1.0);
-      vec3 scatterLight = vec3(0.0);
+    float h = cloudHeightFrac(p);
+    if (h > 0.0 && h < 1.0) {
+      float cov = sampleCloudCoverage(p.xz, stormAmt);
+      if (cov >= 0.42) {
+        float dens = sampleCloudDensityWithCov(p, cov, stormAmt, true);
+        if (dens > 0.0015) {
+          vec3 scatterLight = vec3(0.0);
 
-      if (stage == 4) {
-        // STEP 5 (2012): 3D Perlin-Worley volume with simple height-gradient diffuse (chalky, zero self-shadows!)
-        float basicLit = mix(0.28, 0.92, pow(h, 0.85));
-        scatterLight = vec3(0.84, 0.86, 0.90) * basicLit + mix(skyBotAmb, skyTopAmb, h) * 0.22;
-      } else {
-        float lightOD = marchCloudLight(p, sunDir, stormAmt);
-        float beer = exp(-lightOD * 1.85);
+          if (stage == 4) {
+            // STEP 5 (2012): 3D Perlin-Worley volume with simple height-gradient diffuse (chalky matte, zero self-shadows!)
+            float basicLit = mix(0.16, 0.72, pow(h, 0.85));
+            scatterLight = vec3(0.76, 0.80, 0.86) * basicLit + mix(skyBotAmb, skyTopAmb, h) * 0.25;
+          } else {
+            float lightOD = marchCloudLight(p, sunDir, cov, stormAmt);
+            float beer = exp(-lightOD * 1.85);
 
-        if (stage == 5) {
-          // STEP 6 (2016): Beer-Lambert single scattering + blazing HG silver lining!
-          // (Deep stark slate-black cloud bellies contrast dramatically with glowing sunlit rims!)
-          vec3 direct = sunCol * beer * (0.35 + phase * 1.45);
-          vec3 amb = mix(vec3(0.05, 0.07, 0.13), skyTopAmb * 0.65, h);
-          scatterLight = direct + amb;
-        } else {
-          // STEPS 7-8 (2020-2026): Multi-Scattering Octave Sum + Beer-Powder + warm painterly bounce!
-          float powder = 1.0 - exp(-lightOD * 2.4);
-          float ms0 = beer * mix(1.0, powder * 1.65, 0.42);
-          float ms1 = exp(-lightOD * 0.45) * 0.46;
-          float ms2 = exp(-lightOD * 0.16) * 0.22;
-          float p0 = mix(phaseBack, phaseFwd, 0.76) * 2.30;
-          float p1 = mix(0.30, hgPhase(cosT, 0.35) * 1.4, 0.55);
-          float p2 = 0.26;
+            if (stage == 5) {
+              // STEP 6 (2016): Beer-Lambert single scattering + crisp HG silver lining!
+              vec3 direct = sunCol * beer * (0.28 + phase * 1.10);
+              vec3 amb = mix(vec3(0.025, 0.036, 0.072), skyTopAmb * 0.58, h);
+              scatterLight = direct + amb;
+            } else {
+              // STEPS 7-8 (2020-2026): Multi-Scattering Octave Sum + Beer-Powder + warm painterly bounce!
+              float powder = 1.0 - exp(-lightOD * 2.4);
+              float ms0 = beer * mix(1.0, powder * 1.55, 0.44);
+              float ms1 = exp(-lightOD * 0.45) * 0.38;
+              float ms2 = exp(-lightOD * 0.16) * 0.18;
+              float p0 = mix(phaseBack, phaseFwd, 0.74) * 1.55;
+              float p1 = mix(0.26, min(hgPhase(cosT, 0.35), 0.90) * 1.15, 0.55);
+              float p2 = 0.22;
 
-          vec3 direct = sunCol * (ms0 * (0.40 + p0) + ms1 * p1 * vec3(1.08, 0.92, 0.78) + ms2 * p2 * vec3(1.16, 0.80, 0.62));
-          float depthAO = mix(0.38, 1.0, smoothstep(0.0, 0.62, h));
-          // Storm Front deepens underside shadows dramatically!
-          float stormDark = mix(1.0, 0.48, stormAmt);
-          vec3 amb = mix(skyBotAmb * 1.15 * stormDark, skyTopAmb * 1.15, h) * depthAO;
-          scatterLight = direct + amb;
+              vec3 direct = sunCol * (ms0 * (0.30 + p0) + ms1 * p1 * vec3(1.08, 0.88, 0.72) + ms2 * p2 * vec3(1.16, 0.74, 0.54));
+              float depthAO = mix(0.34, 1.0, smoothstep(0.0, 0.62, h));
+              float stormDark = mix(1.0, 0.44, stormAmt);
+              vec3 amb = mix(skyBotAmb * 1.10 * stormDark, skyTopAmb * 1.10, h) * depthAO;
+              scatterLight = direct + amb;
+            }
+          }
+
+          // Energy-conserving analytical integration across step dt (Frostbite / Sebastian Hillaire formula!)
+          float stepTrans = exp(-dens * dt * 1.48);
+          vec3 stepInteg = (scatterLight - scatterLight * stepTrans);
+          accumLight += trans * stepInteg;
+          trans *= stepTrans;
+          if (trans < 0.015) {
+            trans = 0.0;
+            break;
+          }
         }
-      }
-
-      // Energy-conserving analytical integration across step dt (Frostbite / Sebastian Hillaire formula!)
-      float stepTrans = exp(-dens * dt * 1.42);
-      vec3 stepInteg = (scatterLight - scatterLight * stepTrans);
-      accumLight += trans * stepInteg;
-      trans *= stepTrans;
-      if (trans < 0.015) {
-        trans = 0.0;
-        break;
       }
     }
     t += dt;
@@ -305,10 +306,10 @@ void marchVolumetricClouds(
   if (stage >= 7 && rd.y > 0.14 && trans > 0.05) {
     float tCir = (9.5 - ro.y) / rd.y;
     vec2 cPos = ro.xz + rd.xz * tCir;
-    vec2 cUv = cPos * 0.048 + vec2(uTime * 0.015, -uTime * 0.008);
+    vec2 cUv = cPos * 0.048 + vec2(uTime * 0.024, -uTime * 0.010);
     float wisp = fbm2(vec2(cUv.x * 2.6 + fbm2(cUv * 1.9), cUv.y * 0.8));
-    float cirA = smoothstep(0.58, 0.84, wisp) * smoothstep(0.14, 0.30, rd.y) * 0.38 * trans;
-    vec3 cirCol = mix(skyTopAmb * 1.1, sunCol * 1.25, 0.72);
+    float cirA = smoothstep(0.56, 0.82, wisp) * smoothstep(0.14, 0.30, rd.y) * 0.42 * trans;
+    vec3 cirCol = mix(skyTopAmb * 1.25, sunCol * 0.95, 0.72);
     cloudFinal = mix(cloudFinal, cirCol, cirA);
   }
 
@@ -322,10 +323,10 @@ void marchVolumetricClouds(
 bool traceAlpineTerrain(vec3 ro, vec3 rd, out float tHit, out vec3 pHit) {
   tHit = -1.0;
   pHit = ro;
-  if (rd.y > 0.24) return false;
+  if (rd.y > 0.20) return false;
   float t = 1.6;
   float prevT = t;
-  for (int i = 0; i < 96; i++) {
+  for (int i = 0; i < 68; i++) {
     vec3 p = ro + rd * t;
     float h = mountainHeight(p.xz);
     if (p.y <= h) {
@@ -342,7 +343,7 @@ bool traceAlpineTerrain(vec3 ro, vec3 rd, out float tHit, out vec3 pHit) {
     }
     prevT = t;
     // Guaranteed conservative monotonic step: never overshoots a steep Dolomite ridge!
-    t += 0.08 + 0.018 * t;
+    t += 0.10 + 0.024 * t;
     if (t > 32.0) break;
   }
   return false;
@@ -421,8 +422,8 @@ void main() {
 
     // Restrained atmospheric aerial perspective keeps foreground peaks crisp & dark!
     float fogT = 1.0 - exp(-max(0.0, tTerr - 4.5) * (st <= 2 ? 0.042 : 0.052));
-    vec3 fogCol = (st <= 2) ? vec3(0.42, 0.56, 0.72) : skyCol;
-    col = mix(terrCol, fogCol, fogT * 0.62);
+    vec3 fogCol = (st <= 2) ? vec3(0.14, 0.28, 0.50) : skyCol;
+    col = mix(terrCol, fogCol, fogT * 0.58);
     cloudTrans = 0.0; // Opaque mountains cleanly block crepuscular god-rays!
   }
 
@@ -431,10 +432,10 @@ void main() {
   // Tightly localized crepuscular god-ray emitter around the sun & sunlit cumulus gaps:
   // Only emits on volumetric Step 8 pixels so Split-Screen never bleeds glare from 1992 flat sky!
   float cosS = max(dot(rd, uSunDir), 0.0);
-  float sunCone = pow(cosS, 10.0) * 1.15 + pow(cosS, 56.0) * 1.25;
+  float sunCone = pow(cosS, 14.0) * 0.72 + pow(cosS, 64.0) * 0.85;
   vec3 sunCol = evalSunColor(uSunDir.y);
-  float gapMask = (st >= 7) ? smoothstep(0.18, 0.88, cloudTrans) : 0.0;
-  vec3 rayEmit = clamp(sunCol * gapMask * sunCone * smoothstep(-0.04, 0.04, rd.y), vec3(0.0), vec3(1.85));
+  float gapMask = (st >= 7) ? smoothstep(0.20, 0.88, cloudTrans) : 0.0;
+  vec3 rayEmit = clamp(sunCol * gapMask * sunCone * smoothstep(-0.04, 0.04, rd.y), vec3(0.0), vec3(1.15));
   outOccBloom = vec4(rayEmit, 1.0);
 }
 `;
@@ -460,10 +461,10 @@ void main() {
     outColor = vec4(0.0);
     return;
   }
-  const int SAMPLES = 40;
+  const int SAMPLES = 32;
   vec2 delta = (vUv - uSunUv) * (0.94 / float(SAMPLES));
   vec2 uv = vUv - delta * ign(gl_FragCoord.xy);
-  float decay = 0.955;
+  float decay = 0.952;
   float weight = 1.0;
   vec3 accum = vec3(0.0);
 
@@ -477,7 +478,7 @@ void main() {
 
   float distSun = length((vUv - uSunUv) * vec2(1.0, 0.85));
   float radialFade = exp(-distSun * 1.35);
-  outColor = vec4(accum * (0.015 * uSunVis * radialFade), 1.0);
+  outColor = vec4(accum * (0.017 * uSunVis * radialFade), 1.0);
 }
 `;
 
@@ -522,7 +523,7 @@ void main() {
 
   // Apply crepuscular volumetric god-rays strictly on Step 8 (cleanly sliced at the split divider!)
   if (st >= 7) {
-    col += texture(uGodRays, vUv).rgb * 0.92;
+    col += texture(uGodRays, vUv).rgb * 0.68;
   }
 
   // ACES filmic tone mapping (skip on 1992 VGA Step 1 so retro quantized bands stay punchy!)

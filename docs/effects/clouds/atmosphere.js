@@ -134,17 +134,18 @@ float hgPhase(float cosTheta, float g) {
   return (1.0 - g2) / (4.0 * 3.14159265 * pow(max(0.001, 1.0 + g2 - 2.0 * g * cosTheta), 1.5));
 }
 
-// Physical sun color temperature reacting smoothly to solar elevation (noon white -> golden amber -> deep sunset crimson)
+// Physical sun color temperature reacting smoothly to solar elevation (noon warm-white -> golden amber -> deep sunset crimson)
 vec3 evalSunColor(float sunEl) {
   float day = smoothstep(-0.02, 0.42, sunEl);
   float gold = smoothstep(-0.04, 0.18, sunEl);
-  vec3 dusk = vec3(1.65, 0.42, 0.14);
-  vec3 warm = vec3(1.95, 1.24, 0.68);
-  vec3 noon = vec3(1.75, 1.66, 1.50);
+  vec3 dusk = vec3(1.35, 0.36, 0.12);
+  vec3 warm = vec3(1.45, 0.88, 0.46);
+  vec3 noon = vec3(1.28, 1.18, 1.04);
   return mix(mix(dusk, warm, gold), noon, day);
 }
 
 // Physical Nishita-inspired Rayleigh + Mie atmospheric sky dome (Steps 4-8)
+// Calibrated in linear HDR before ACES so sky stays rich & saturated without blowing out clouds to white!
 vec3 evalPhysicalSky(vec3 rd, vec3 sunDir, out vec3 sunDiskOut) {
   float sunEl = sunDir.y;
   float y = max(rd.y, 0.0);
@@ -154,44 +155,44 @@ vec3 evalPhysicalSky(vec3 rd, vec3 sunDir, out vec3 sunDiskOut) {
   float day = smoothstep(0.02, 0.50, sunEl);
   float sunset = smoothstep(-0.04, 0.24, sunEl) * (1.0 - smoothstep(0.16, 0.58, sunEl));
 
-  // Deep saturated Rayleigh sapphire zenith -> rich golden-apricot sunset horizon!
-  vec3 zenDay   = vec3(0.032, 0.145, 0.560);
-  vec3 zenGold  = vec3(0.025, 0.088, 0.310);
-  vec3 zenDusk  = vec3(0.012, 0.028, 0.115);
+  // Deep saturated Rayleigh sapphire zenith -> rich warm apricot-gold sunset horizon
+  vec3 zenDay   = vec3(0.015, 0.072, 0.320);
+  vec3 zenGold  = vec3(0.012, 0.045, 0.195);
+  vec3 zenDusk  = vec3(0.008, 0.018, 0.085);
   vec3 zenith   = mix(mix(zenDusk, zenGold, smoothstep(-0.05, 0.14, sunEl)), zenDay, day);
 
-  vec3 midDay   = vec3(0.12, 0.36, 0.76);
-  vec3 midGold  = vec3(0.18, 0.28, 0.54);
-  vec3 midDusk  = vec3(0.14, 0.12, 0.26);
+  vec3 midDay   = vec3(0.048, 0.175, 0.450);
+  vec3 midGold  = vec3(0.078, 0.135, 0.310);
+  vec3 midDusk  = vec3(0.068, 0.058, 0.155);
   vec3 midSky   = mix(mix(midDusk, midGold, smoothstep(-0.05, 0.14, sunEl)), midDay, day);
 
-  vec3 horDay   = vec3(0.50, 0.70, 0.88);
-  vec3 horGold  = vec3(1.18, 0.52, 0.20);
-  vec3 horDusk  = vec3(0.56, 0.18, 0.16);
+  vec3 horDay   = vec3(0.200, 0.340, 0.500);
+  vec3 horGold  = vec3(0.580, 0.245, 0.085);
+  vec3 horDusk  = vec3(0.320, 0.095, 0.085);
   vec3 horizon  = mix(mix(horDusk, horGold, smoothstep(-0.05, 0.12, sunEl)), horDay, day);
 
-  vec3 sky = mix(horizon, mix(midSky, zenith, smoothstep(0.12, 0.65, y)), smoothstep(0.0, 0.32, y));
+  vec3 sky = mix(horizon, mix(midSky, zenith, smoothstep(0.10, 0.60, y)), smoothstep(0.0, 0.28, y));
 
-  // Focused sunset warmth concentrated along the solar azimuth belt
+  // Focused sunset warmth concentrated along the solar azimuth belt (controlled so clouds pop cleanly!)
   vec2 rdH = normalize(vec2(rd.x, rd.z) + vec2(1e-5));
   vec2 sunH = normalize(vec2(sunDir.x, sunDir.z) + vec2(1e-5));
-  float azAlign = pow(max(0.0, dot(rdH, sunH)), 3.2);
-  float belt = exp(-y * 10.5) * azAlign * (0.20 + 0.95 * sunset);
-  sky += vec3(1.25, 0.40, 0.10) * belt;
+  float azAlign = pow(max(0.0, dot(rdH, sunH)), 3.5);
+  float belt = exp(-y * 11.5) * azAlign * (0.16 + 0.65 * sunset);
+  sky += vec3(0.62, 0.21, 0.05) * belt;
 
-  // Crisp localized Mie forward-scattering solar aureole (tight, keeps cobalt zenith & cloud contrast rich!)
+  // Tight localized Mie forward-scattering solar aureole (never washes out surrounding clouds!)
   vec3 sunCol = evalSunColor(sunEl);
-  float mieGlow = pow(max(cosT, 0.0), 14.0) * (0.22 + 0.32 * sunset) + pow(max(cosT, 0.0), 72.0) * 0.62;
+  float mieGlow = pow(max(cosT, 0.0), 22.0) * (0.12 + 0.18 * sunset) + pow(max(cosT, 0.0), 110.0) * 0.42;
   sky += sunCol * mieGlow * smoothstep(-0.08, 0.03, rd.y);
 
   // Crisp solar disc
   float sunDisc = smoothstep(0.9985, 0.9994, cosT) * smoothstep(-0.02, 0.02, rd.y);
-  sunDiskOut = sunCol * sunDisc * 8.5;
+  sunDiskOut = sunCol * sunDisc * 4.5;
   sky += sunDiskOut;
 
   // Below-horizon valley continuation
   if (rd.y < 0.0) {
-    vec3 valleyMist = mix(horizon * 0.48, vec3(0.05, 0.07, 0.12), clamp(-rd.y * 5.0, 0.0, 1.0));
+    vec3 valleyMist = mix(horizon * 0.45, vec3(0.03, 0.045, 0.085), clamp(-rd.y * 5.0, 0.0, 1.0));
     sky = mix(sky, valleyMist, smoothstep(0.0, -0.05, rd.y));
   }
   return sky;
@@ -203,21 +204,21 @@ vec3 evalRetroSky(vec3 rd, vec3 sunDir, int stage) {
   if (stage == 0) {
     // 1992 VGA/SNES quantized 10-band cyan-to-cobalt gradient!
     float q = floor(h * 10.0) / 10.0;
-    vec3 low = vec3(0.46, 0.78, 0.96);
-    vec3 top = vec3(0.08, 0.25, 0.74);
+    vec3 low = vec3(0.32, 0.68, 0.92);
+    vec3 top = vec3(0.05, 0.18, 0.64);
     vec3 col = mix(low, top, pow(q, 0.72));
     float sDot = dot(rd, sunDir);
-    if (sDot > 0.9965) col = vec3(1.0, 0.96, 0.48);
+    if (sDot > 0.9965) col = vec3(1.0, 0.94, 0.42);
     return col;
   }
-  // 1997-2002 painted skybox gradient (rich classic blue, lacks physical golden Rayleigh/Mie atmosphere!)
-  vec3 hor = vec3(0.50, 0.70, 0.88);
-  vec3 mid = vec3(0.18, 0.42, 0.76);
-  vec3 zen = vec3(0.07, 0.18, 0.50);
-  vec3 col = mix(hor, mix(mid, zen, smoothstep(0.22, 0.85, h)), smoothstep(0.0, 0.50, h));
+  // 1997-2002 classic linear cerulean skybox gradient (deep enough after ACES+gamma so white clouds pop crisply!)
+  vec3 hor = vec3(0.14, 0.30, 0.56);
+  vec3 mid = vec3(0.045, 0.145, 0.42);
+  vec3 zen = vec3(0.015, 0.055, 0.24);
+  vec3 col = mix(hor, mix(mid, zen, smoothstep(0.18, 0.80, h)), smoothstep(0.0, 0.42, h));
   float sDot = max(dot(rd, sunDir), 0.0);
-  col += vec3(1.0, 0.94, 0.76) * pow(sDot, 56.0) * 0.40;
-  col += vec3(1.5, 1.4, 1.1) * smoothstep(0.9985, 0.9994, sDot);
+  col += vec3(0.85, 0.78, 0.60) * pow(sDot, 96.0) * 0.24;
+  col += vec3(1.35, 1.25, 0.95) * smoothstep(0.9985, 0.9994, sDot);
   return col;
 }
 

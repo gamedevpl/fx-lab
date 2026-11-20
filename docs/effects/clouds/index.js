@@ -115,7 +115,7 @@ export function createCloudsEffect(gl) {
 
   return {
     id: "clouds",
-    maxPixels: 820000,
+    maxPixels: 560000,
     defaultCamera: {
       yaw: 0.0,
       pitch: -0.17, // Gentle upward skyward view framing alpine peak at bottom + towering clouds above!
