@@ -406,10 +406,10 @@ export function buildBladeGeometry() {
   return { vertices: verts, indices };
 }
 
-// 22,000 GPU-instanced grass blades packed into two vec4 instance attributes:
+// 28,000 slender GPU-instanced grass blades packed into two vec4 instance attributes:
 // instPosH: (x, y, z, height)
 // instMeta: (yaw, width, lean, colorHash)
-export function buildBladeInstances(count = 22000) {
+export function buildBladeInstances(count = 28000) {
   const rng = mulberry32(20260420);
   const posH = new Float32Array(count * 4);
   const meta = new Float32Array(count * 4);
@@ -425,13 +425,13 @@ export function buildBladeInstances(count = 22000) {
     if (isClearedForProp(x, z, 0.02)) continue;
 
     const y = hillHeight(x, z) - 0.02;
-    // Natural meadow height clumps (taller lush tufts in rolling patches, gently shorter near island edge)
+    // Fine natural meadow grass proportions (slender blades, zero chunky shrub fronds!)
     const patch = 0.5 + 0.5 * Math.sin(x * 1.1 + 0.5) * Math.cos(z * 1.05 - 0.4);
     const edgeTaper = rad > MEADOW_R - 0.75 ? Math.max(0.45, (MEADOW_R - 0.12 - rad) / 0.65) : 1.0;
-    const h = (0.34 + patch * 0.24 + rng() * 0.22) * edgeTaper;
-    const w = 0.044 + rng() * 0.024;
+    const h = (0.26 + patch * 0.16 + rng() * 0.16) * edgeTaper;
+    const w = 0.030 + rng() * 0.017;
     const yaw = rng() * Math.PI * 2;
-    const lean = 0.16 + rng() * 0.34;
+    const lean = 0.14 + rng() * 0.24;
     const colHash = rng();
 
     const o = placed * 4;
@@ -542,8 +542,8 @@ export function buildFlowerInstances(count = 650) {
     if (isClearedForProp(x, z, 0.14)) continue;
 
     const y = hillHeight(x, z) - 0.015;
-    const h = 0.42 + rng() * 0.30;
-    const scale = 0.85 + rng() * 0.50;
+    const h = 0.32 + rng() * 0.22;
+    const scale = 0.80 + rng() * 0.42;
     const yaw = rng() * Math.PI * 2;
     const seed = rng();
 

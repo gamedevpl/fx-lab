@@ -625,9 +625,8 @@ void main() {
   float aaBoost = 1.0 + clamp((camDist - 4.0) * 0.055, 0.0, 0.48);
   float width = baseW * (1.0 - pow(t, 1.45)) * aaBoost;
 
-  // Natural curved arc along blade height
-  vec2 bendXZ = fwd * (lean * height * t * t);
-  float yLocal = height * t;
+  // Natural rigid-length tilt vector (sin/cos arc guarantees blades NEVER stretch into giant shrub fronds!)
+  vec2 tiltXZ = fwd * lean;
   float waveCrest = 0.0;
   float flatAmt = 0.0;
 
@@ -635,43 +634,46 @@ void main() {
   if (uStage >= 4) {
     vec2 w = evalMeadowWind(base.xz, uWindPhase, uGust, waveCrest);
     float jitter = 0.85 + 0.30 * sin(cHash * 25.0 + uWindPhase * 6.2831853 * 12.0);
-    bendXZ += w * (height * t * t * 1.15 * jitter);
+    tiltXZ += w * (0.95 * jitter);
   }
 
-  // Step 8 (2026): Crisp 128x128 persistent wake trail + exact analytical sphere-blade parting (ZERO clipping!)
+  // Step 8 (2026): Crisp ball-width wake trail + tight analytical sphere parting (rigid blade length preserved!)
   if (uStage >= 7) {
     vec2 tuv = base.xz / uTrailSpan + 0.5;
     if (tuv.x > 0.005 && tuv.x < 0.995 && tuv.y > 0.005 && tuv.y < 0.995) {
       vec3 tr = texture(uTrailTex, tuv).rgb;
-      vec2 push = (tr.rg * 2.0 - 1.0) * 1.95;
+      vec2 push = (tr.rg * 2.0 - 1.0);
       flatAmt = clamp(tr.b, 0.0, 1.0);
-      // Damp wind sway when crushed flat into the ground, lay blades cleanly outward along wake
-      bendXZ = mix(bendXZ, push * (height * (0.48 * t + 0.72 * t * t)), smoothstep(0.0, 0.65, flatAmt));
-      yLocal *= mix(1.0, 0.14, flatAmt * (0.40 + 0.60 * t));
+      // Gently bend crushed blades along trail direction (max ~58 deg -> clean lawn track, zero flattened bushes!)
+      tiltXZ = mix(tiltXZ, push * 1.15, smoothstep(0.0, 0.75, flatAmt) * 0.82);
     }
-    // Exact analytical collision right around the rolling orb perimeter so ZERO blades poke into the sphere!
+    // Tight physical sphere contact right around the rolling orb perimeter (collR = 1.48 * R)
     vec2 away = base.xz - uOrbPos.xz;
     float d = length(away);
-    float collR = uOrbRadius * 2.55;
+    float collR = uOrbRadius * 1.52;
     if (d < collR) {
       vec2 dir = (d > 1e-4) ? (away / d) : fwd;
-      float prox = 1.0 - smoothstep(uOrbRadius * 0.55, collR, d);
-      float pushOut = (uOrbRadius * 1.15 - min(d, uOrbRadius * 1.15)) + prox * height * 1.05;
-      bendXZ = mix(bendXZ, dir * (pushOut * (0.45 * t + 0.75 * t * t)), prox);
-      yLocal *= mix(1.0, 0.10, prox * smoothstep(0.0, 0.35, t));
-      flatAmt = max(flatAmt, prox);
+      float prox = 1.0 - smoothstep(uOrbRadius * 0.35, collR, d);
+      // Smoothly tilt blade away from sphere surface (up to ~76 deg directly underneath, tapering to 0 at collR)
+      tiltXZ = mix(tiltXZ, dir * 1.32, prox);
+      flatAmt = max(flatAmt, prox * 0.85);
     }
   }
 
-  // Arc-length preservation: strong wind / flattening naturally lowers blade tips instead of stretching!
-  float bLen = length(bendXZ);
-  float arcDrop = sqrt(max(0.14, 1.0 - min(0.86, (bLen / max(0.08, height)) * 0.54)));
-  yLocal *= arcDrop;
+  // Exact trigonometric arc-length preservation: sqrt(horiz^2 + vert^2) === height * t ALWAYS!
+  float tLen = length(tiltXZ);
+  float tiltAng = min(tLen, 1.34); // cap at ~76 deg so blades stay slender & never over-stretch!
+  vec2 tiltDir = (tLen > 1e-4) ? (tiltXZ / tLen) : fwd;
+  float ang = tiltAng * (0.28 * t + 0.72 * t * t);
+  float arcLen = height * t;
+  float horiz = arcLen * sin(ang);
+  float yLocal = arcLen * cos(ang);
+  vec2 bendXZ = tiltDir * horiz;
 
   vec3 pos = base + vec3(bendXZ.x + right.x * side * width, yLocal, bendXZ.y + right.y * side * width);
 
-  // Analytical curved tangent & tubular V-crease normal so sunlight glides smoothly across wind waves!
-  vec3 tang = normalize(vec3(bendXZ.x * 2.0 + fwd.x * 0.05, max(0.08, yLocal), bendXZ.y * 2.0 + fwd.y * 0.05));
+  // Exact analytical tangent along curved arc + tubular V-crease normal
+  vec3 tang = normalize(vec3(tiltDir.x * sin(ang), max(0.10, cos(ang)), tiltDir.y * sin(ang)));
   vec3 nBase = normalize(cross(vec3(right.x, 0.0, right.y), tang));
   if (nBase.y < 0.0) nBase = -nBase;
   vec3 nCreased = normalize(mix(nBase, vec3(0.0, 1.0, 0.0), 0.22) + vec3(right.x, 0.0, right.y) * (side * 0.42));
@@ -775,10 +777,10 @@ void main() {
   // Crisp anisotropic grazing specular glint along wind waves
   float spec = pow(ndh, 36.0) * (0.18 + 0.34 * vWaveCrest) * pow(vH, 1.5) * sunVis;
 
-  // Crushed/parted trail shading: pressed-down blades sit deeper in shade & reveal a clear lush wake track!
-  float trackShade = mix(1.0, 0.56, vFlat * (1.0 - vH * 0.35));
+  // Subtle pressed-grass lawn-stripe contrast (clean mown-path look without dark pits!)
+  float trackShade = mix(1.0, 0.80, vFlat * (1.0 - vH * 0.45));
   vec3 col = albedo * rootAO * trackShade * (skyAmb * 1.05 + sunCol * (0.18 + 0.95 * ndl) * sunVis)
-           + sssCol * mix(1.0, 0.35, vFlat)
+           + sssCol * mix(1.0, 0.65, vFlat)
            + sunCol * spec * 0.52;
   outColor = vec4(col, 1.0);
 }
@@ -830,36 +832,37 @@ void main() {
   vec3 rotP = vec3(lp.x * c - lp.z * s, lp.y, lp.x * s + lp.z * c);
   vec3 rotN = normalize(vec3(aLocalNorm.x * c - aLocalNorm.z * s, aLocalNorm.y, aLocalNorm.x * s + aLocalNorm.z * c));
 
-  // Identical wind + trail bend so flowers sway and part organically inside the grass!
+  // Identical rigid-length trigonometric wind + trail bend so flowers sway and part cleanly with the grass!
   float wc;
   vec2 w = evalMeadowWind(base.xz, uWindPhase, uGust, wc);
   float jitter = 0.88 + 0.24 * sin(seed * 20.0 + uWindPhase * 6.2831853 * 12.0);
-  vec2 bendXZ = w * (h * t * t * 1.15 * jitter);
-  float yLocal = rotP.y;
+  vec2 tiltXZ = w * (0.95 * jitter);
 
   if (uStage >= 7) {
     vec2 tuv = base.xz / uTrailSpan + 0.5;
     if (tuv.x > 0.005 && tuv.x < 0.995 && tuv.y > 0.005 && tuv.y < 0.995) {
       vec3 tr = texture(uTrailTex, tuv).rgb;
-      vec2 push = (tr.rg * 2.0 - 1.0) * 1.95;
+      vec2 push = (tr.rg * 2.0 - 1.0);
       float flatAmt = clamp(tr.b, 0.0, 1.0);
-      bendXZ = mix(bendXZ, push * (h * (0.48 * t + 0.72 * t * t)), smoothstep(0.0, 0.65, flatAmt));
-      yLocal *= mix(1.0, 0.18, flatAmt * (0.40 + 0.60 * t));
+      tiltXZ = mix(tiltXZ, push * 1.10, smoothstep(0.0, 0.75, flatAmt) * 0.80);
     }
     vec2 away = base.xz - uOrbPos.xz;
     float d = length(away);
-    float collR = uOrbRadius * 2.55;
+    float collR = uOrbRadius * 1.52;
     if (d < collR) {
       vec2 dir = (d > 1e-4) ? (away / d) : vec2(c, s);
-      float prox = 1.0 - smoothstep(uOrbRadius * 0.55, collR, d);
-      float pushOut = (uOrbRadius * 1.15 - min(d, uOrbRadius * 1.15)) + prox * h * 1.05;
-      bendXZ = mix(bendXZ, dir * (pushOut * (0.45 * t + 0.75 * t * t)), prox);
-      yLocal *= mix(1.0, 0.14, prox * smoothstep(0.0, 0.35, t));
+      float prox = 1.0 - smoothstep(uOrbRadius * 0.35, collR, d);
+      tiltXZ = mix(tiltXZ, dir * 1.28, prox);
     }
   }
 
-  float bLen = length(bendXZ);
-  yLocal *= sqrt(max(0.20, 1.0 - min(0.80, (bLen / max(0.08, h)) * 0.50)));
+  float tLen = length(tiltXZ);
+  float tiltAng = min(tLen, 1.30);
+  vec2 tiltDir = (tLen > 1e-4) ? (tiltXZ / tLen) : vec2(c, s);
+  float ang = tiltAng * (0.28 * t + 0.72 * t * t);
+  float arcLen = rotP.y;
+  vec2 bendXZ = tiltDir * (arcLen * sin(ang));
+  float yLocal = arcLen * cos(ang);
 
   vec3 worldPos = base + vec3(rotP.x + bendXZ.x, yLocal, rotP.z + bendXZ.y);
   vWorldPos = worldPos;

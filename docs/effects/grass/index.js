@@ -122,9 +122,9 @@ export function createGrassEffect(gl) {
     [0, 3, 7, 0], [1, 3, 7, 3], [2, 1, 7, 6],
   ], true);
 
-  // 22,000 GPU-instanced curved 3D grass blades
+  // 28,000 slender GPU-instanced curved 3D grass blades
   const bladeGeo = buildBladeGeometry();
-  const bladeInst = buildBladeInstances(22000);
+  const bladeInst = buildBladeInstances(28000);
   const vaoBlades = gl.createVertexArray();
   gl.bindVertexArray(vaoBlades);
   const bVbo = gl.createBuffer();
@@ -375,7 +375,7 @@ export function createGrassEffect(gl) {
           clickTarget = r > maxR ? [(hit[0] / r) * maxR, (hit[1] / r) * maxR] : hit;
           orbBoost = 1.0;
         }
-        stampTrail(hit[0], hit[1], 1.10, 1.0, 0.90, 0.84, 0.54);
+        stampTrail(hit[0], hit[1], ORB_R * 1.45, 0.92, 0.85, 0.84, 0.54);
         uploadTrail();
       }
       gustPulse = Math.max(gustPulse, 0.78);
@@ -385,7 +385,7 @@ export function createGrassEffect(gl) {
         "1992 · PIXEL TILE",
         showCardsOn ? "1996 · X-CARDS EXPOSED" : "1996 · ALPHA X-CARDS",
         "2001 · 10 SHELL LAYERS",
-        showWireOn ? "2007 · 22K BLADE MESH" : "2007 · 22K 3D BLADES",
+        showWireOn ? "2007 · 28K BLADE MESH" : "2007 · 28K 3D BLADES",
         "2012 · WIND + ROOT AO",
         "2017 · BACKLIT SSS",
         "2022 · FLOWERS + CLOUDS",
@@ -401,9 +401,9 @@ export function createGrassEffect(gl) {
       gustPulse *= Math.exp(-dt * 1.15);
       orbBoost *= Math.exp(-dt * 1.05);
 
-      // Longer spring-back decay (~5s curved ribbon trail snaking behind the rolling orb!)
-      const bendDecay = Math.exp(-dt * 0.36);
-      const flatDecay = Math.exp(-dt * 0.22);
+      // Natural spring-back decay (~2.8s ball-width curved lawn wake, springs gracefully back upright!)
+      const bendDecay = Math.exp(-dt * 0.68);
+      const flatDecay = Math.exp(-dt * 0.52);
       for (let i = 0; i < N; i++) {
         trBX[i] *= bendDecay;
         trBZ[i] *= bendDecay;
@@ -471,7 +471,7 @@ export function createGrassEffect(gl) {
       orbPos = nextPos;
 
       if (step && step.stage >= 7) {
-        stampTrail(orbPos[0], orbPos[2], 0.96, 1.0, 0.98, dx, dz);
+        stampTrail(orbPos[0], orbPos[2], ORB_R * 1.38, 1.0, 0.92, dx, dz);
       }
       uploadTrail();
     },
