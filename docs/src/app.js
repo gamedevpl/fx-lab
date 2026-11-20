@@ -32,6 +32,7 @@ const LOADERS = {
   fur: () => import("../effects/fur/index.js").then(m => m.createFurEffect),
   glass: () => import("../effects/glass/index.js").then(m => m.createGlassEffect),
   clouds: () => import("../effects/clouds/index.js").then(m => m.createCloudsEffect),
+  grass: () => import("../effects/grass/index.js").then(m => m.createGrassEffect),
 };
 const engines = new Map();
 const moduleCache = new Map();
@@ -429,9 +430,10 @@ function updateCard() {
   const isFurLive = currentEffect.id === "fur" && st.stage === 7;
   const isGlass = currentEffect.id === "glass";
   const isClouds = currentEffect.id === "clouds";
+  const isGrass = currentEffect.id === "grass" && st.stage >= 4;
   $("hintLine").textContent = isWaterLive
     ? u.waterClickHint
-    : (isShadows ? u.shadowsClickHint : (isCloth ? u.clothClickHint : (isFurLive ? u.furClickHint : (isGlass ? u.glassClickHint : (isClouds ? u.cloudsClickHint : u.dragHint)))));
+    : (isShadows ? u.shadowsClickHint : (isCloth ? u.clothClickHint : (isFurLive ? u.furClickHint : (isGlass ? u.glassClickHint : (isClouds ? u.cloudsClickHint : (isGrass ? u.grassClickHint : u.dragHint))))));
   const linkLabel = u[currentEffect.videoLabelKey] || u.channelLink;
   const filmLine = $("filmLine");
   filmLine.innerHTML = `<span>${u.videoPrefix} <a href="${currentEffect.videoUrl}" target="_blank" rel="noopener">${linkLabel}</a></span><span>·</span><button type="button" class="film-more" id="moreFxBtn">${u.moreEffects(EFFECTS.length)}</button>`;

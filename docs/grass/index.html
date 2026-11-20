@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en" data-fx="grass">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Evolution of Grass &amp; Foliage (1992–2026) — FX Lab | gamedev.pl</title>
+<meta name="description" content="Eight eras of real-time grass and foliage rendering live in WebGL2: 1992 flat pixel tile, 1996 crossed alpha X-cards, 2001 stacked shell layers, 2007 22,000 GPU-instanced 3D blades, 2012 travelling wind waves &amp; root AO, 2017 backlit SSS, 2022 swaying wildflowers &amp; cloud shadows, and 2026 live spring-back trampling trails.">
+<link rel="canonical" href="https://gamedevpl.github.io/fx-lab/grass/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://gamedevpl.github.io/fx-lab/grass/">
+<meta property="og:title" content="Evolution of Grass &amp; Foliage (1992–2026) — FX Lab">
+<meta property="og:description" content="Explore 8 eras of real-time game grass live in WebGL2 — from 1992 pixel tiles and 1996 crossed X-cards to 22,000 GPU-instanced wind-swept blades, wildflowers, and live spring-back trampling trails.">
+<meta property="og:image" content="https://gamedevpl.github.io/fx-lab/og-grass.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Evolution of Grass &amp; Foliage (1992–2026) — FX Lab">
+<meta name="twitter:description" content="8 eras of grass &amp; foliage in raw WebGL2 — click anywhere on the sunlit meadow to part 22,000 live blades and trigger wind gusts.">
+<meta name="twitter:image" content="https://gamedevpl.github.io/fx-lab/og-grass.png">
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
+<link rel="modulepreload" href="../src/app.js">
+<link rel="modulepreload" href="../src/catalog.js">
+<link rel="modulepreload" href="../src/icons.js">
+<link rel="modulepreload" href="../src/gl-utils.js">
+<link rel="modulepreload" href="../effects/grass/index.js">
+<link rel="modulepreload" href="../effects/grass/scene.js">
+<link rel="modulepreload" href="../effects/grass/shaders.js">
+<link rel="stylesheet" href="../ask/ask.css">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<main>
+  <canvas id="c" aria-label="Interactive WebGL2 graphics effect viewport"></canvas>
+
+  <header>
+    <div class="brand">
+      <a id="backLink" href="https://gamedev.pl" target="_blank" rel="noopener">← gamedev.pl</a>
+      <h1>FX <em>LAB</em></h1>
+    </div>
+
+    <nav>
+      <button id="catalogBtn" class="fx-picker" type="button" aria-haspopup="dialog" aria-expanded="false">
+        <span class="fx-dot" id="pickerDot" aria-hidden="true"></span>
+        <span class="fx-name" id="pickerName">All 9</span>
+        <span class="fx-count" id="pickerCount">9/9</span>
+        <span class="fx-caret" aria-hidden="true">▾</span>
+      </button>
+      <a id="sourceLink" class="source" href="https://github.com/gamedevpl/fx-lab/tree/main/docs/effects/grass" target="_blank" rel="noopener">Source</a>
+      <button id="lang" type="button" aria-label="Switch language">PL</button>
+    </nav>
+  </header>
+
+  <section class="stage" id="stage">
+    <div class="split-ui" id="splitUi" hidden>
+      <div class="split-tags" id="splitTags">
+        <span class="tag left" id="splitLeftTag"></span>
+        <span class="tag right" id="splitRightTag"></span>
+      </div>
+      <div class="split-hit" id="splitHit" role="slider" tabindex="0" aria-label="Split comparison position" aria-valuemin="8" aria-valuemax="92" aria-valuenow="50">
+        <div class="split-line"></div>
+        <div class="split-grip" aria-hidden="true"></div>
+      </div>
+    </div>
+
+    <article class="card" id="card">
+      <p class="kicker" id="kicker"></p>
+      <h2 id="stepTitle"></h2>
+      <p id="stepNote"></p>
+      <div class="row">
+        <button id="prev" type="button" aria-label="Previous step">◀</button>
+        <span id="count">08 / 08</span>
+        <button id="next" type="button" aria-label="Next step">▶</button>
+        <button id="splitBtn" type="button" aria-pressed="false">Split: OFF</button>
+        <button id="actionBtn" type="button" hidden></button>
+        <button id="pauseBtn" type="button">Pause</button>
+        <button id="resetBtn" type="button" title="Reset camera (R)">Reset</button>
+      </div>
+      <p class="hint" id="hintLine"></p>
+      <p class="film" id="filmLine"></p>
+    </article>
+  </section>
+
+  <footer>
+    <div class="chapters" id="stepsBar" role="tablist" aria-label="Steps"></div>
+  </footer>
+</main>
+
+<div class="catalog-backdrop" id="catalogModal" role="dialog" aria-modal="true" aria-labelledby="catalogTitle" hidden>
+  <div class="catalog-box">
+    <div class="catalog-head">
+      <div>
+        <h2 id="catalogTitle">Effects</h2>
+        <p id="catalogSub"></p>
+      </div>
+      <button id="catalogClose" class="catalog-close" type="button" aria-label="Close">×</button>
+    </div>
+    <div class="catalog-filters" id="catalogFilters" hidden>
+      <input id="catalogSearch" type="search" autocomplete="off">
+      <div class="catalog-cats" id="catalogCats"></div>
+    </div>
+    <div class="catalog-grid" id="catalogGrid"></div>
+  </div>
+</div>
+
+<div id="nogl" hidden>
+  <b id="noglTitle">WebGL2 is required</b>
+  <p id="noglBody"></p>
+</div>
+
+<script type="module" src="../src/app.js"></script>
+<script type="module">
+if ("LanguageModel" in self || self.__fxLabModel) {
+  import("../src/assistant.js").catch(() => {});
+}
+</script>
+</body>
+</html>

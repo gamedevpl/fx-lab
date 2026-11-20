@@ -114,6 +114,20 @@ const ICONS = {
     `<rect x="2" y="9" width="8" height="1" fill="#6f90c2"/>` +
     `<rect x="5" y="4" width="3" height="1" fill="#ffffff"/>` +
     `<rect x="3" y="5" width="4" height="1" fill="#ffffff"/>`,
+
+  // Lush pixel meadow tuft with curving emerald blades & sunny yellow wildflower blossom
+  grass:
+    `<rect x="2" y="9" width="8" height="2" fill="#5c3d28"/>` +
+    `<rect x="1" y="6" width="1" height="2" fill="#4ec946"/>` +
+    `<rect x="2" y="7" width="1" height="2" fill="#2d9938"/>` +
+    `<rect x="3" y="4" width="1" height="5" fill="#5fd94b"/>` +
+    `<rect x="4" y="3" width="1" height="2" fill="#9bf257"/>` +
+    `<rect x="5" y="5" width="1" height="4" fill="#2d9938"/>` +
+    `<rect x="6" y="4" width="1" height="5" fill="#4ec946"/>` +
+    `<rect x="8" y="6" width="1" height="3" fill="#2d9938"/>` +
+    `<rect x="9" y="5" width="1" height="2" fill="#7be851"/>` +
+    `<rect x="7" y="1" width="3" height="3" fill="#ffd84d"/>` +
+    `<rect x="8" y="2" width="1" height="1" fill="#ff841f"/>`,
 };
 
 const FALLBACK_ICON =
