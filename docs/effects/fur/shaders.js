@@ -388,7 +388,7 @@ void main() {
 `;
 
 // ============================================================================
-// GEOMETRIC 3D STRAND SHADER (Steps 7-8: 24,000 instanced 5-segment tapered ribbons!)
+// GEOMETRIC 3D STRAND SHADER (Steps 7-8: 30,000 instanced 5-segment tapered ribbons!)
 // ============================================================================
 export const STRAND_VS = `#version 300 es
 precision highp float;
@@ -445,9 +445,11 @@ void main() {
   if (uStage >= 7) {
     vec4 g = texture(uTexGroom, vec2(uG, vG));
     vec3 field = (g.rgb * 2.0 - 1.0);
-    // High-frequency individual strand flutter riding on top of the clump groom field
+    // High-frequency individual strand flutter riding on top of the clump groom field.
+    // Shorter facial strands around the eyes/snout are physically stiffer so eyes stay clear in gusts.
+    float flex = smoothstep(0.16, 0.33, len);
     float flutter = sin(uTime * 11.5 + seed * 120.0 + root.x * 5.0) * (0.04 + 0.12 * g.a);
-    dynDisp = field * 0.92 + vec3(flutter, flutter * 0.4, -flutter * 0.6);
+    dynDisp = (field * 0.96 + vec3(flutter, flutter * 0.4, -flutter * 0.6)) * flex;
   }
 
   // Evaluate curved 3D spine point P(t) and exact analytical tangent T(t) = dP/dt!
