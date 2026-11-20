@@ -13,7 +13,7 @@ Eight eras of real-time game grass and foliage rendered live in raw WebGL2 on a 
 | **G5** | 2012 | **Travelling Wind Waves & Root AO** | Multi-octave curl wind fronts with arc-length-preserving bending, dark earthy root ambient occlusion, and V-crease blade specular sheen across wave crests. |
 | **G6** | 2017 | **Backlit SSS & Painterly Meadow** | Warm golden translucent subsurface scattering through backlit blade tips paired with painterly macro meadow color variation. |
 | **G7** | 2022 | **Wildflowers, Cloud Shadows & Pollen** | 650 swaying 3D wildflowers (buttercups, daisies, cornflowers, poppies) synced to the wind field, drifting overhead cloud shadows, and sunlit floating pollen motes. Press **Wind Gust**! |
-| **G8** | 2026 | **Live Interactive Meadow & Trails** | Real-time 64×64 persistent bend/spring trail field parted by a rolling carved brass-and-oak orb and mouse/touch clicks, leaving flattened curved wakes that spring back upright. |
+| **G8** | 2026 | **Live Interactive Meadow & Trails** | Real-time 128×128 persistent bend/spring trail field plus exact analytical sphere-blade parting driven by a rolling carved brass-and-oak orb and mouse/touch clicks. |
 
 ## Files
 

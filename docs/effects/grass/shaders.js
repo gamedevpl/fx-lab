@@ -589,6 +589,8 @@ layout(location = 2) in vec4 aInstMeta;  // x: yaw, y: width, z: lean, w: colorH
 
 uniform mat4 uViewProj;
 uniform vec3 uCamPos;
+uniform vec3 uOrbPos;
+uniform float uOrbRadius;
 uniform float uWindPhase;
 uniform float uGust;
 uniform int uStage;
@@ -599,6 +601,7 @@ out float vH;
 out float vSide;
 out float vColorHash;
 out float vWaveCrest;
+out float vFlat;
 out vec3 vWorldPos;
 out vec3 vNorm;
 
@@ -626,36 +629,49 @@ void main() {
   vec2 bendXZ = fwd * (lean * height * t * t);
   float yLocal = height * t;
   float waveCrest = 0.0;
+  float flatAmt = 0.0;
 
   // Step 5+ (2012-2026): Dynamic sweeping multi-octave wind waves!
   if (uStage >= 4) {
     vec2 w = evalMeadowWind(base.xz, uWindPhase, uGust, waveCrest);
-    // Individual micro-phase flutter so neighboring blades never move in lockstep
     float jitter = 0.85 + 0.30 * sin(cHash * 25.0 + uWindPhase * 6.2831853 * 12.0);
     bendXZ += w * (height * t * t * 1.15 * jitter);
   }
 
-  // Step 8 (2026): Persistent live interactive trail / orb trampling bend!
+  // Step 8 (2026): Crisp 128x128 persistent wake trail + exact analytical sphere-blade parting (ZERO clipping!)
   if (uStage >= 7) {
     vec2 tuv = base.xz / uTrailSpan + 0.5;
-    if (tuv.x > 0.01 && tuv.x < 0.99 && tuv.y > 0.01 && tuv.y < 0.99) {
+    if (tuv.x > 0.005 && tuv.x < 0.995 && tuv.y > 0.005 && tuv.y < 0.995) {
       vec3 tr = texture(uTrailTex, tuv).rgb;
-      vec2 push = (tr.rg * 2.0 - 1.0) * 1.65;
-      float flatAmt = clamp(tr.b, 0.0, 1.0);
-      bendXZ += push * (height * (0.35 * t + 0.75 * t * t));
-      yLocal *= mix(1.0, 0.24, flatAmt * (0.45 + 0.55 * t));
+      vec2 push = (tr.rg * 2.0 - 1.0) * 1.95;
+      flatAmt = clamp(tr.b, 0.0, 1.0);
+      // Damp wind sway when crushed flat into the ground, lay blades cleanly outward along wake
+      bendXZ = mix(bendXZ, push * (height * (0.48 * t + 0.72 * t * t)), smoothstep(0.0, 0.65, flatAmt));
+      yLocal *= mix(1.0, 0.14, flatAmt * (0.40 + 0.60 * t));
+    }
+    // Exact analytical collision right around the rolling orb perimeter so ZERO blades poke into the sphere!
+    vec2 away = base.xz - uOrbPos.xz;
+    float d = length(away);
+    float collR = uOrbRadius * 2.55;
+    if (d < collR) {
+      vec2 dir = (d > 1e-4) ? (away / d) : fwd;
+      float prox = 1.0 - smoothstep(uOrbRadius * 0.55, collR, d);
+      float pushOut = (uOrbRadius * 1.15 - min(d, uOrbRadius * 1.15)) + prox * height * 1.05;
+      bendXZ = mix(bendXZ, dir * (pushOut * (0.45 * t + 0.75 * t * t)), prox);
+      yLocal *= mix(1.0, 0.10, prox * smoothstep(0.0, 0.35, t));
+      flatAmt = max(flatAmt, prox);
     }
   }
 
   // Arc-length preservation: strong wind / flattening naturally lowers blade tips instead of stretching!
   float bLen = length(bendXZ);
-  float arcDrop = sqrt(max(0.18, 1.0 - min(0.82, (bLen / max(0.08, height)) * 0.52)));
+  float arcDrop = sqrt(max(0.14, 1.0 - min(0.86, (bLen / max(0.08, height)) * 0.54)));
   yLocal *= arcDrop;
 
   vec3 pos = base + vec3(bendXZ.x + right.x * side * width, yLocal, bendXZ.y + right.y * side * width);
 
   // Analytical curved tangent & tubular V-crease normal so sunlight glides smoothly across wind waves!
-  vec3 tang = normalize(vec3(bendXZ.x * 2.0 + fwd.x * 0.05, max(0.12, yLocal), bendXZ.y * 2.0 + fwd.y * 0.05));
+  vec3 tang = normalize(vec3(bendXZ.x * 2.0 + fwd.x * 0.05, max(0.08, yLocal), bendXZ.y * 2.0 + fwd.y * 0.05));
   vec3 nBase = normalize(cross(vec3(right.x, 0.0, right.y), tang));
   if (nBase.y < 0.0) nBase = -nBase;
   vec3 nCreased = normalize(mix(nBase, vec3(0.0, 1.0, 0.0), 0.22) + vec3(right.x, 0.0, right.y) * (side * 0.42));
@@ -664,6 +680,7 @@ void main() {
   vSide = side;
   vColorHash = cHash;
   vWaveCrest = waveCrest;
+  vFlat = flatAmt;
   vWorldPos = pos;
   vNorm = nCreased;
 
@@ -679,6 +696,7 @@ in float vH;
 in float vSide;
 in float vColorHash;
 in float vWaveCrest;
+in float vFlat;
 in vec3 vWorldPos;
 in vec3 vNorm;
 
@@ -757,8 +775,10 @@ void main() {
   // Crisp anisotropic grazing specular glint along wind waves
   float spec = pow(ndh, 36.0) * (0.18 + 0.34 * vWaveCrest) * pow(vH, 1.5) * sunVis;
 
-  vec3 col = albedo * rootAO * (skyAmb * 1.05 + sunCol * (0.18 + 0.95 * ndl) * sunVis)
-           + sssCol
+  // Crushed/parted trail shading: pressed-down blades sit deeper in shade & reveal a clear lush wake track!
+  float trackShade = mix(1.0, 0.56, vFlat * (1.0 - vH * 0.35));
+  vec3 col = albedo * rootAO * trackShade * (skyAmb * 1.05 + sunCol * (0.18 + 0.95 * ndl) * sunVis)
+           + sssCol * mix(1.0, 0.35, vFlat)
            + sunCol * spec * 0.52;
   outColor = vec4(col, 1.0);
 }
@@ -778,6 +798,8 @@ layout(location = 3) in vec4 aInstPosH; // xyz: base, w: stalk height
 layout(location = 4) in vec4 aInstMeta; // x: yaw, y: headScale, z: species 0..3, w: seed
 
 uniform mat4 uViewProj;
+uniform vec3 uOrbPos;
+uniform float uOrbRadius;
 uniform float uWindPhase;
 uniform float uGust;
 uniform int uStage;
@@ -817,12 +839,22 @@ void main() {
 
   if (uStage >= 7) {
     vec2 tuv = base.xz / uTrailSpan + 0.5;
-    if (tuv.x > 0.01 && tuv.x < 0.99 && tuv.y > 0.01 && tuv.y < 0.99) {
+    if (tuv.x > 0.005 && tuv.x < 0.995 && tuv.y > 0.005 && tuv.y < 0.995) {
       vec3 tr = texture(uTrailTex, tuv).rgb;
-      vec2 push = (tr.rg * 2.0 - 1.0) * 1.65;
+      vec2 push = (tr.rg * 2.0 - 1.0) * 1.95;
       float flatAmt = clamp(tr.b, 0.0, 1.0);
-      bendXZ += push * (h * (0.35 * t + 0.75 * t * t));
-      yLocal *= mix(1.0, 0.28, flatAmt * (0.45 + 0.55 * t));
+      bendXZ = mix(bendXZ, push * (h * (0.48 * t + 0.72 * t * t)), smoothstep(0.0, 0.65, flatAmt));
+      yLocal *= mix(1.0, 0.18, flatAmt * (0.40 + 0.60 * t));
+    }
+    vec2 away = base.xz - uOrbPos.xz;
+    float d = length(away);
+    float collR = uOrbRadius * 2.55;
+    if (d < collR) {
+      vec2 dir = (d > 1e-4) ? (away / d) : vec2(c, s);
+      float prox = 1.0 - smoothstep(uOrbRadius * 0.55, collR, d);
+      float pushOut = (uOrbRadius * 1.15 - min(d, uOrbRadius * 1.15)) + prox * h * 1.05;
+      bendXZ = mix(bendXZ, dir * (pushOut * (0.45 * t + 0.75 * t * t)), prox);
+      yLocal *= mix(1.0, 0.14, prox * smoothstep(0.0, 0.35, t));
     }
   }
 

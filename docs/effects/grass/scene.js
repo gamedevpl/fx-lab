@@ -9,10 +9,10 @@
 import { mulberry32, norm3 } from "../../src/gl-utils.js";
 
 export const MEADOW_R = 4.65;
-export const TRAIL_RES = 64;
-export const TRAIL_SPAN = 9.8; // covers [-4.9, +4.9] world XZ
+export const TRAIL_RES = 128;
+export const TRAIL_SPAN = 9.8; // covers [-4.9, +4.9] world XZ (~7.6 cm/texel crisp trail!)
 export const STONE_POS = [-1.12, 0, -0.62];
-export const ORB_R = 0.34;
+export const ORB_R = 0.40;
 
 export const STEP_STONES = [
   { x: -0.45, z: 0.25, r: 0.34, rot: 0.4 },
@@ -39,20 +39,23 @@ export function hillNormal(x, z) {
   return norm3(-hx, 2 * e, -hz);
 }
 
-// Compute smooth terrain-clamped meadow orb position along an elliptical figure-8 path
+// Wide, hero-framed sunlit meadow promenade (5 lively laps per 36s cycle — always in front of hilltop crest!)
 export function sampleOrbPath(uPhase) {
-  const a = uPhase * Math.PI * 2.0 * 2.0; // 2 clean loops per 36s video cycle
-  const x = 0.58 + 2.05 * Math.sin(a);
-  const z = 0.42 + 1.48 * Math.sin(a * 0.5 + 0.65) * Math.cos(a * 0.5 - 0.2) * 1.55;
-  // Keep clear of the standing runestone
-  const dx = x - STONE_POS[0], dz = z - STONE_POS[2];
+  // Stays in x in [-1.75..+1.98], z in [-0.28..+2.00]: 100% visible in both 9:16 & 16:9, sweeping foreground at Hook & Finale!
+  const a = 0.10 + uPhase * Math.PI * 2.0 * 5.0;
+  let ox = 0.12 + 1.84 * Math.cos(a);
+  let oz = 0.86 + 1.14 * Math.sin(a);
+  // Smooth gentle detour around the standing runestone & companion boulder
+  const sx = STONE_POS[0] - 0.14, sz = STONE_POS[2] + 0.04;
+  const dx = ox - sx, dz = oz - sz;
   const d = Math.hypot(dx, dz);
-  let ox = x, oz = z;
-  if (d < 1.18 && d > 1e-4) {
-    ox = STONE_POS[0] + (dx / d) * 1.18;
-    oz = STONE_POS[2] + (dz / d) * 1.18;
+  const minD = 1.42;
+  if (d < minD && d > 1e-4) {
+    const push = (minD - d);
+    ox += (dx / d) * push;
+    oz += (dz / d) * push;
   }
-  const oy = hillHeight(ox, oz) + ORB_R * 0.94;
+  const oy = hillHeight(ox, oz) + ORB_R * 1.01;
   return [ox, oy, oz];
 }
 

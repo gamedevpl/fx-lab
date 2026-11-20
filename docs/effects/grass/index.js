@@ -293,6 +293,8 @@ export function createGrassEffect(gl) {
   let orbPhase = 0;
   let orbPos = sampleOrbPath(0);
   let orbRot = new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]);
+  let orbVel = [0, 0];
+  let clickTarget = null;
   let orbBoost = 0;
   let showCardsOn = false;
   let showWireOn = false;
@@ -322,6 +324,9 @@ export function createGrassEffect(gl) {
       showWireOn = false;
       gustPulse = 0;
       orbBoost = 0;
+      clickTarget = null;
+      orbVel = [0, 0];
+      orbPos = sampleOrbPath(orbPhase);
       trBX.fill(0); trBZ.fill(0); trFlat.fill(0);
       uploadTrail();
     },
@@ -363,10 +368,17 @@ export function createGrassEffect(gl) {
         }
       }
       if (hit) {
-        stampTrail(hit[0], hit[1], 1.15, 1.0, 0.92, 0.84, 0.54);
+        if (step.stage >= 7) {
+          // Steer the rolling orb directly toward the clicked point on the meadow!
+          const r = Math.hypot(hit[0], hit[1]);
+          const maxR = MEADOW_R - 0.55;
+          clickTarget = r > maxR ? [(hit[0] / r) * maxR, (hit[1] / r) * maxR] : hit;
+          orbBoost = 1.0;
+        }
+        stampTrail(hit[0], hit[1], 1.10, 1.0, 0.90, 0.84, 0.54);
         uploadTrail();
       }
-      gustPulse = Math.max(gustPulse, 0.85);
+      gustPulse = Math.max(gustPulse, 0.78);
     },
     getTechBadge(stepIdx) {
       return [
@@ -389,32 +401,77 @@ export function createGrassEffect(gl) {
       gustPulse *= Math.exp(-dt * 1.15);
       orbBoost *= Math.exp(-dt * 1.05);
 
-      // Exponential spring-back decay of flattened meadow trails (~3.8s visible curved wake!)
-      const bendDecay = Math.exp(-dt * 0.62);
-      const flatDecay = Math.exp(-dt * 0.30);
+      // Longer spring-back decay (~5s curved ribbon trail snaking behind the rolling orb!)
+      const bendDecay = Math.exp(-dt * 0.36);
+      const flatDecay = Math.exp(-dt * 0.22);
       for (let i = 0; i < N; i++) {
         trBX[i] *= bendDecay;
         trBZ[i] *= bendDecay;
         trFlat[i] *= flatDecay;
       }
 
-      // Advance rolling brass-wood orb along meadow path and stamp its springy wake
-      const orbSpeed = (1.0 / 36.0) * (1.0 + orbBoost * 1.85);
+      // Advance rolling brass-wood orb: either steering smoothly toward user clickTarget or cruising meadow promenade!
+      const orbSpeed = (1.0 / 36.0) * (1.0 + orbBoost * 1.45);
       orbPhase = (orbPhase + dt * orbSpeed) % 1.0;
-      const nextPos = sampleOrbPath(orbPhase);
+      let targetXZ;
+      if (clickTarget) {
+        const dClick = Math.hypot(clickTarget[0] - orbPos[0], clickTarget[1] - orbPos[2]);
+        if (dClick < 0.32) {
+          clickTarget = null;
+          const pathP = sampleOrbPath(orbPhase);
+          targetXZ = [pathP[0], pathP[2]];
+        } else {
+          targetXZ = clickTarget;
+        }
+      } else {
+        const pathP = sampleOrbPath(orbPhase);
+        targetXZ = [pathP[0], pathP[2]];
+      }
+
+      const toX = targetXZ[0] - orbPos[0];
+      const toZ = targetXZ[1] - orbPos[2];
+      const toDist = Math.hypot(toX, toZ);
+      let nextX = orbPos[0], nextZ = orbPos[2];
+      if (clickTarget) {
+        const maxSpd = 3.2;
+        const desiredVx = (toX / Math.max(1e-4, toDist)) * Math.min(maxSpd, toDist * 3.8);
+        const desiredVz = (toZ / Math.max(1e-4, toDist)) * Math.min(maxSpd, toDist * 3.8);
+        const blend = 1.0 - Math.exp(-dt * 6.5);
+        orbVel[0] += (desiredVx - orbVel[0]) * blend;
+        orbVel[1] += (desiredVz - orbVel[1]) * blend;
+        nextX += orbVel[0] * dt;
+        nextZ += orbVel[1] * dt;
+      } else {
+        // Smoothly pull back onto promenade curve after a user click without teleporting
+        const pull = 1.0 - Math.exp(-dt * 4.5);
+        nextX = orbPos[0] + toX * pull;
+        nextZ = orbPos[2] + toZ * pull;
+        orbVel[0] = (nextX - orbPos[0]) / Math.max(1e-4, dt);
+        orbVel[1] = (nextZ - orbPos[2]) / Math.max(1e-4, dt);
+      }
+
+      // Keep clear of standing monolith
+      const sdx = nextX - (-1.26), sdz = nextZ - (-0.58);
+      const sd = Math.hypot(sdx, sdz);
+      if (sd < 1.25 && sd > 1e-4) {
+        nextX = -1.26 + (sdx / sd) * 1.25;
+        nextZ = -0.58 + (sdz / sd) * 1.25;
+      }
+
+      const nextPos = [nextX, hillHeight(nextX, nextZ) + ORB_R * 1.01, nextZ];
       const dx = nextPos[0] - orbPos[0];
       const dz = nextPos[2] - orbPos[2];
       const distMoved = Math.hypot(dx, dz);
       if (distMoved > 1e-5) {
-        const up = [0, 1, 0];
         const vel = [dx / distMoved, 0, dz / distMoved];
-        const axis = norm3(...cross3(up, vel));
+        const axis = norm3(...cross3([0, 1, 0], vel));
+        // True zero-slip rolling traction (arc length / radius)!
         orbRot = rotateMat3Axis(orbRot, axis[0], axis[1], axis[2], distMoved / ORB_R);
       }
       orbPos = nextPos;
 
       if (step && step.stage >= 7) {
-        stampTrail(orbPos[0], orbPos[2], 1.02, 1.0, 0.98, dx, dz);
+        stampTrail(orbPos[0], orbPos[2], 0.96, 1.0, 0.98, dx, dz);
       }
       uploadTrail();
     },
@@ -507,6 +564,7 @@ export function createGrassEffect(gl) {
           gl.uniform3fv(gl.getUniformLocation(progBlade, "uCamPos"), basis.pos);
           gl.uniform3fv(gl.getUniformLocation(progBlade, "uSunDir"), SUN_DIR);
           gl.uniform3fv(gl.getUniformLocation(progBlade, "uOrbPos"), orbPos);
+          gl.uniform1f(gl.getUniformLocation(progBlade, "uOrbRadius"), ORB_R);
           gl.uniform1f(gl.getUniformLocation(progBlade, "uWindPhase"), windPhase);
           gl.uniform1f(gl.getUniformLocation(progBlade, "uGust"), gustPulse);
           gl.uniform1i(gl.getUniformLocation(progBlade, "uStage"), stage);
@@ -526,6 +584,7 @@ export function createGrassEffect(gl) {
           gl.uniform3fv(gl.getUniformLocation(progFlower, "uSunDir"), SUN_DIR);
           gl.uniform3fv(gl.getUniformLocation(progFlower, "uCamPos"), basis.pos);
           gl.uniform3fv(gl.getUniformLocation(progFlower, "uOrbPos"), orbPos);
+          gl.uniform1f(gl.getUniformLocation(progFlower, "uOrbRadius"), ORB_R);
           gl.uniform1f(gl.getUniformLocation(progFlower, "uWindPhase"), windPhase);
           gl.uniform1f(gl.getUniformLocation(progFlower, "uGust"), gustPulse);
           gl.uniform1i(gl.getUniformLocation(progFlower, "uStage"), stage);
