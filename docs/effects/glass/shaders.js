@@ -642,7 +642,7 @@ void main() {
   vec2 ndc = vUv * 2.0 - 1.0;
   vec3 rd = normalize(uCamFwd + ndc.x * uAspect * uTanHalfFov * uCamRight + ndc.y * uTanHalfFov * uCamUp);
 
-  bool useLeft = (uSplitX > 0.005 && uSplitX < 0.995) && (vUv.x < uSplitX);
+  bool useLeft = (uSplitX >= 0.995) || ((uSplitX > 0.005) && (vUv.x < uSplitX));
   int st = useLeft ? uStageLeft : uStageRight;
   bool opLeft = useLeft && (uOpaqueLeft > 0.5);
 
