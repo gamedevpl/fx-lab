@@ -128,6 +128,23 @@ const ICONS = {
     `<rect x="9" y="5" width="1" height="2" fill="#7be851"/>` +
     `<rect x="7" y="1" width="3" height="3" fill="#ffd84d"/>` +
     `<rect x="8" y="2" width="1" height="1" fill="#ff841f"/>`,
+
+  // Iconic pixel Cornell Box (crimson left wall, teal right wall, ceiling softbox, glowing sphere & light ray)
+  pathtracing:
+    `<rect x="1" y="1" width="10" height="10" fill="#2b2b3d"/>` +
+    `<rect x="1" y="1" width="2" height="10" fill="#d92b3a"/>` +
+    `<rect x="1" y="2" width="1" height="8" fill="#ff5c6c"/>` +
+    `<rect x="9" y="1" width="2" height="10" fill="#18a882"/>` +
+    `<rect x="10" y="2" width="1" height="8" fill="#3be0b3"/>` +
+    `<rect x="4" y="1" width="4" height="1" fill="#fff5cc"/>` +
+    `<rect x="3" y="9" width="6" height="2" fill="#8f8b84"/>` +
+    `<rect x="3" y="9" width="3" height="1" fill="#c77d7d"/>` +
+    `<rect x="6" y="9" width="3" height="1" fill="#6fb5a8"/>` +
+    `<rect x="5" y="2" width="1" height="2" fill="#ffd84d"/>` +
+    `<rect x="4" y="5" width="4" height="4" fill="#f5b841"/>` +
+    `<rect x="5" y="5" width="2" height="2" fill="#fff3c4"/>` +
+    `<rect x="7" y="4" width="1" height="1" fill="#ffe066"/>` +
+    `<rect x="8" y="3" width="1" height="1" fill="#7ef2e2"/>`,
 };
 
 const FALLBACK_ICON =

@@ -14,7 +14,8 @@ Interactive WebGL2 sandbox for real-time graphics effects from [gamedev.pl](http
 6. **[Evolution of Fur](https://gamedevpl.github.io/fx-lab/fur/)** (8 eras, 1992–2026 · [source & notes](./docs/effects/fur/README.md)) — 1992 flat painted polygon mesh, directional normal maps, 8-layer & 40-layer instanced *Shell Texturing* with gravity combing and root AO, Kajiya–Kay anisotropic specular, Marschner dual-lobe scattering with golden backlit rim, 30,000 geometric clumped 3D hair strands, and a live `64×32` spring-damper wind, head-shake & petting groom.
 7. **[Evolution of Glass & Caustics](https://gamedevpl.github.io/fx-lab/glass/)** (8 eras, 1995–2026 · [source & notes](./docs/effects/glass/README.md)) — 1995 flat alpha transparency, studio env-map reflections, Schlick Fresnel (`F₀ = 0.04`), single-surface Snell refraction, thick double refraction with Beer–Lambert volume absorption, Cauchy chromatic dispersion, real-time `512×512` GPU photon-splatted caustics with frosted microfacets, and 4-bounce Total Internal Reflection with 98,304 six-band spectral caustic photons and interactive sun aiming.
 8. **[Evolution of Clouds & Sky](https://gamedevpl.github.io/fx-lab/clouds/)** (8 eras, 1992–2026 · [source & notes](./docs/effects/clouds/README.md)) — 1992 banded sky with 2D pixel sprites, 1997 skybox scrolling cloud plane, 2002 camera-facing 3D billboard puffs, physical Rayleigh & Mie atmosphere, GPU-baked `64³` tileable Perlin–Worley 3D volumetric raymarching, Beer–Lambert self-shadowing with Henyey–Greenstein silver lining, Nubis-style multi-scattering powder with storm anvil toggle, and real-time crepuscular god-rays with interactive time-of-day sun placement.
-9. **[Evolution of Grass & Foliage](https://gamedevpl.github.io/fx-lab/grass/)** (8 eras, 1992–2026 · [source & notes](./docs/effects/grass/README.md)) — 1992 flat pixel tile, 1996 crossed alpha-cutout X-cards (with wireframe toggle), 2001 10-layer stacked shell grass, 22,000 GPU-instanced 3D curved blades, multi-octave travelling wind waves & root AO, backlit golden subsurface scattering, 650 swaying 3D wildflowers with drifting cloud shadows & sunlit pollen, and a live 64×64 spring-damper trampling trail field parted by a rolling carved orb and mouse clicks.
+9. **[Evolution of Grass & Foliage](https://gamedevpl.github.io/fx-lab/grass/)** (8 eras, 1992–2026 · [source & notes](./docs/effects/grass/README.md)) — 1992 flat pixel tile, 1996 crossed alpha-cutout X-cards (with wireframe toggle), 2001 10-layer stacked shell grass, 28,000 GPU-instanced 3D curved blades, multi-octave travelling wind waves & root AO, backlit golden subsurface scattering, 650 swaying 3D wildflowers with drifting cloud shadows & sunlit pollen, and a live 128×128 spring-damper trampling trail field parted by a rolling carved orb and mouse clicks.
+10. **[Evolution of Path Tracing](https://gamedevpl.github.io/fx-lab/pathtracing/)** (8 eras, 1975–2026 · [source & notes](./docs/effects/pathtracing/README.md)) — 1975 Blinn–Phong local rasterization, 1980 Whitted ray tracing (hard shadows, chrome mirror & Snell crystal glass), 1984 Cook distributed ray tracing (soft area shadows, glossy gold, thin-lens DoF & swinging pendulum motion blur), 1986 Kajiya 1 SPP unbiased Monte Carlo path tracing, multi-SPP progressive temporal accumulation, importance sampling + NEE + Veach MIS, ReSTIR multi-light RIS + 4-pass edge-stopping À-Trous SVGF denoising, and 2026 interactive real-time browser path tracing.
 
 ## Project structure
 
@@ -22,19 +23,20 @@ Each effect lives in its own self-contained folder under `docs/effects/<id>/` wi
 
 ```text
 docs/
-├── index.html                                             # Root entry (loads default effect)
-├── splats/ fire/ water/ shadows/ cloth/ fur/ glass/ clouds/ grass/ # Clean per-effect routes with dedicated Open Graph cards
-├── src/                                                   # Shared app shell, catalog metadata, WebGL2 helpers
+├── index.html                                                           # Root entry (loads default effect)
+├── splats/ fire/ water/ shadows/ cloth/ fur/ glass/ clouds/ grass/ pathtracing/ # Clean per-effect routes with dedicated Open Graph cards
+├── src/                                                                 # Shared app shell, catalog metadata, WebGL2 helpers
 └── effects/
-    ├── splats/                                            # README.md · scene.js · shaders.js · index.js
-    ├── fire/                                              # README.md · simulations.js · shaders.js · index.js
-    ├── water/                                             # README.md · simulation.js · shaders.js · index.js
-    ├── shadows/                                           # README.md · shaders.js · index.js
-    ├── cloth/                                             # README.md · simulation.js · shaders.js · index.js
-    ├── fur/                                               # README.md · groom.js · shaders.js · index.js
-    ├── glass/                                             # README.md · optics.js · shaders.js · index.js
-    ├── clouds/                                            # README.md · atmosphere.js · shaders.js · index.js
-    └── grass/                                             # README.md · scene.js · shaders.js · index.js
+    ├── splats/                                                          # README.md · scene.js · shaders.js · index.js
+    ├── fire/                                                            # README.md · simulations.js · shaders.js · index.js
+    ├── water/                                                           # README.md · simulation.js · shaders.js · index.js
+    ├── shadows/                                                         # README.md · shaders.js · index.js
+    ├── cloth/                                                           # README.md · simulation.js · shaders.js · index.js
+    ├── fur/                                                             # README.md · groom.js · shaders.js · index.js
+    ├── glass/                                                           # README.md · optics.js · shaders.js · index.js
+    ├── clouds/                                                          # README.md · atmosphere.js · shaders.js · index.js
+    ├── grass/                                                           # README.md · scene.js · shaders.js · index.js
+    └── pathtracing/                                                     # README.md · shaders.js · index.js
 ```
 
 ## Controls
