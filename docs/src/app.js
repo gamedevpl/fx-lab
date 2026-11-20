@@ -3,6 +3,7 @@
 
 import { EFFECTS, UI, REPO_TREE_BASE, getEffect } from "./catalog.js";
 import { clamp } from "./gl-utils.js";
+import { getEffectIconSvg } from "./icons.js";
 
 const canvas = document.getElementById("c");
 const gl = canvas.getContext("webgl2", {
@@ -33,12 +34,27 @@ const LOADERS = {
   clouds: () => import("../effects/clouds/index.js").then(m => m.createCloudsEffect),
 };
 const engines = new Map();
+const moduleCache = new Map();
+let loadingEffectId = null;
+
+function prefetchEffect(id) {
+  if (!LOADERS[id] || engines.has(id) || moduleCache.has(id)) return;
+  const p = LOADERS[id]().catch(err => {
+    moduleCache.delete(id);
+    throw err;
+  });
+  moduleCache.set(id, p);
+}
+
+const nextFrame = () => new Promise(r => requestAnimationFrame(r));
 
 async function loadEngine(id) {
   if (!engines.has(id)) {
-    const factory = await LOADERS[id]();
-    // Yield one frame so the browser paints the UI shell before synchronous WebGL shader compile.
-    await new Promise(r => requestAnimationFrame(r));
+    prefetchEffect(id);
+    const factory = await moduleCache.get(id);
+    // Double rAF guarantees the browser paints & composites the pixel loader before synchronous GLSL compile.
+    await nextFrame();
+    await nextFrame();
     engines.set(id, factory(gl));
   }
   return engines.get(id);
@@ -99,17 +115,107 @@ function currentStep() {
   return currentEffect.steps[currentStepIdx];
 }
 
+function ensureLoader() {
+  let el = $("fxLoader");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "fxLoader";
+    el.className = "fx-loader";
+    el.setAttribute("role", "status");
+    el.setAttribute("aria-live", "polite");
+    el.hidden = true;
+    document.querySelector("main")?.appendChild(el);
+  }
+  return el;
+}
+
+function renderLoader(fx) {
+  const el = ensureLoader();
+  if (!fx) {
+    el.classList.remove("visible");
+    clearTimeout(el._hideTimer);
+    el._hideTimer = setTimeout(() => {
+      if (!loadingEffectId) el.hidden = true;
+    }, 170);
+    return;
+  }
+  clearTimeout(el._hideTimer);
+  const u = UI[lang];
+  const title = lang === "pl" ? fx.pl : fx.en;
+  el.style.setProperty("--fx-accent", fx.accent || "#eea75e");
+  el.innerHTML = `
+    <div class="fx-loader-box">
+      <div class="fx-loader-ico">${getEffectIconSvg(fx.id, "fx-ico fx-ico-lg")}</div>
+      <div class="fx-loader-meta">
+        <b>${title}</b>
+        <span>${u.loadingTitle}</span>
+        <div class="fx-loader-bar" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+    </div>
+  `;
+  el.hidden = false;
+  requestAnimationFrame(() => el.classList.add("visible"));
+}
+
+function updateRibbonOverflow() {
+  const rib = $("fxRibbon");
+  if (!rib) return;
+  const maxScroll = Math.max(0, rib.scrollWidth - rib.clientWidth);
+  const hasLeft = rib.scrollLeft > 4;
+  const hasRight = maxScroll - rib.scrollLeft > 4;
+  rib.classList.toggle("has-left", hasLeft);
+  rib.classList.toggle("has-right", hasRight);
+  const prev = $("fxRibPrev"), next = $("fxRibNext");
+  if (prev) prev.hidden = !hasLeft;
+  if (next) next.hidden = !hasRight;
+}
+
 function ensureRibbon() {
   let rib = $("fxRibbon");
   if (!rib) {
+    const wrap = document.createElement("div");
+    wrap.id = "fxRibbonWrap";
+    wrap.className = "fx-ribbon-wrap";
+
+    const prev = document.createElement("button");
+    prev.id = "fxRibPrev";
+    prev.type = "button";
+    prev.className = "fx-scroll-btn prev";
+    prev.textContent = "‹";
+    prev.hidden = true;
+    prev.addEventListener("click", () => {
+      rib.scrollBy({ left: -240, behavior: "smooth" });
+    });
+
     rib = document.createElement("div");
     rib.id = "fxRibbon";
     rib.className = "fx-ribbon";
     rib.setAttribute("role", "navigation");
     rib.setAttribute("aria-label", "Effects");
+    rib.addEventListener("scroll", updateRibbonOverflow, { passive: true });
+    rib.addEventListener("wheel", ev => {
+      if (rib.scrollWidth <= rib.clientWidth) return;
+      if (Math.abs(ev.deltaY) > Math.abs(ev.deltaX)) {
+        ev.preventDefault();
+        rib.scrollLeft += ev.deltaY;
+      }
+    }, { passive: false });
+
+    const next = document.createElement("button");
+    next.id = "fxRibNext";
+    next.type = "button";
+    next.className = "fx-scroll-btn next";
+    next.textContent = "›";
+    next.hidden = true;
+    next.addEventListener("click", () => {
+      rib.scrollBy({ left: 240, behavior: "smooth" });
+    });
+
+    wrap.append(prev, rib, next);
     const hdr = document.querySelector("header");
     const nav = hdr?.querySelector("nav");
-    if (hdr && nav) hdr.insertBefore(rib, nav);
+    if (hdr && nav) hdr.insertBefore(wrap, nav);
+    window.addEventListener("resize", updateRibbonOverflow);
   }
   return rib;
 }
@@ -117,31 +223,44 @@ function ensureRibbon() {
 function renderPicker() {
   const u = UI[lang];
   const fxIdx = EFFECTS.findIndex(e => e.id === currentEffect.id);
-  $("pickerDot").style.background = currentEffect.accent || "var(--amber)";
+  const dot = $("pickerDot");
+  dot.style.background = "transparent";
+  dot.style.boxShadow = "none";
+  dot.innerHTML = getEffectIconSvg(currentEffect.id, "fx-ico fx-ico-sm");
   $("pickerName").textContent = u.effectsBtn(EFFECTS.length);
   $("pickerCount").textContent = `${fxIdx + 1}/${EFFECTS.length}`;
   $("catalogBtn").setAttribute("aria-expanded", String(catalogOpen));
 
-  // Populate always-visible scrollable top effect switcher strip
+  // Populate always-visible scrollable top effect switcher strip with crisp pixel-art icons
   const rib = ensureRibbon();
+  const prevBtn = $("fxRibPrev"), nextBtn = $("fxRibNext");
+  if (prevBtn) prevBtn.setAttribute("aria-label", u.scrollLeft);
+  if (nextBtn) nextBtn.setAttribute("aria-label", u.scrollRight);
+
+  const prevScroll = rib.scrollLeft;
   rib.innerHTML = "";
   for (const fx of EFFECTS) {
     const isCur = fx.id === currentEffect.id;
+    const isLoad = fx.id === loadingEffectId;
     const b = document.createElement("button");
     b.type = "button";
-    b.className = "fx-pill";
+    b.className = "fx-pill" + (isLoad ? " is-loading" : "");
     b.dataset.fx = fx.id;
     b.setAttribute("aria-current", String(isCur));
     b.title = lang === "pl" ? fx.pl : fx.en;
     const label = lang === "pl" ? fx.shortPl : fx.shortEn;
-    b.innerHTML = `<span class="fx-dot" style="background:${fx.accent || "var(--amber)"}"></span><span>${label}</span>`;
+    b.innerHTML = `${getEffectIconSvg(fx.id)}<span>${label}</span>`;
+    b.addEventListener("pointerenter", () => prefetchEffect(fx.id));
+    b.addEventListener("focus", () => prefetchEffect(fx.id));
     b.addEventListener("click", () => {
       if (fx.id !== currentEffect.id) selectEffect(fx.id);
     });
     rib.appendChild(b);
   }
+  rib.scrollLeft = prevScroll;
   const activePill = rib.querySelector('[aria-current="true"]');
   if (activePill) activePill.scrollIntoView({ block: "nearest", inline: "nearest" });
+  requestAnimationFrame(updateRibbonOverflow);
 }
 
 function ensureCatalogScroll() {
@@ -215,11 +334,13 @@ function renderCatalogModal() {
           <span class="fx-card-meta">${catLbl} · ${stepsLbl}</span>
           ${isCur ? `<span class="fx-card-active">${u.catalogActive}</span>` : ""}
         </div>
-        <h3>${title}</h3>
+        <h3 class="fx-card-title">${getEffectIconSvg(fx.id, "fx-ico")}<span>${title}</span></h3>
         <p>${summary}</p>
         <div class="fx-card-tags">${tagsHtml}</div>
       </div>
     `;
+    btn.addEventListener("pointerenter", () => prefetchEffect(fx.id));
+    btn.addEventListener("focus", () => prefetchEffect(fx.id));
     btn.addEventListener("click", () => {
       setCatalogOpen(false);
       selectEffect(fx.id);
@@ -350,23 +471,37 @@ async function selectEffect(effectId, stepIdx = null, splitOpt = null) {
   const nextFx = getEffect(effectId);
   const seq = ++switchSeq;
   const changed = nextFx.id !== currentEffect.id || !activeEngine;
+  const needsCompile = !engines.has(nextFx.id);
 
-  // Update visible card, picker, step strip and Source deeplink immediately before shader compile.
+  // Update visible card, picker, step strip, loader and Source deeplink immediately before shader compile.
   currentEffect = nextFx;
   currentStepIdx = stepIdx === null ? currentEffect.defaultStep : clamp(stepIdx, 0, currentEffect.steps.length - 1);
   if (splitOpt !== null) split.enabled = !!splitOpt;
   else if (changed) split.enabled = currentEffect.defaultSplit;
+  if (needsCompile) {
+    loadingEffectId = nextFx.id;
+    renderLoader(nextFx);
+  }
   syncUrl();
   updateCard();
 
-  const eng = await loadEngine(nextFx.id);
-  if (seq !== switchSeq) return;
+  try {
+    const eng = await loadEngine(nextFx.id);
+    if (seq !== switchSeq) return;
 
-  activeEngine = eng;
-  resetCamera();
-  activeEngine.enterStep(currentStepIdx);
-  resizeCanvas(true);
-  updateCard();
+    activeEngine = eng;
+    resetCamera();
+    activeEngine.enterStep(currentStepIdx);
+    resizeCanvas(true);
+    // Render one frame immediately before fading out the loader so the new scene is already live underneath!
+    activeEngine.render(renderW, renderH, currentStep(), split, cam);
+  } finally {
+    if (seq === switchSeq) {
+      loadingEffectId = null;
+      renderLoader(null);
+      updateCard();
+    }
+  }
 }
 
 function selectStep(idx) {
