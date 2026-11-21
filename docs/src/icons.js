@@ -193,6 +193,20 @@ const ICONS = {
     `<rect x="9" y="7" width="1" height="3" fill="#a86419"/>` +
     `<rect x="4" y="7" width="1" height="2" fill="#b31c5e"/>` +
     `<rect x="7" y="7" width="2" height="2" fill="#637ba6"/>`,
+
+  // Carved stone pillar: flat edge on left vs jagged 3D displaced bricks sticking out on right + warm torch highlight
+  surface:
+    `<rect x="1" y="1" width="10" height="10" fill="#121c30"/>` +
+    `<rect x="3" y="2" width="5" height="8" fill="#6e6357"/>` +
+    `<rect x="3" y="2" width="2" height="2" fill="#a89882"/>` +
+    `<rect x="6" y="2" width="3" height="2" fill="#e6b06b"/>` +
+    `<rect x="3" y="4" width="5" height="1" fill="#2c2826"/>` +
+    `<rect x="3" y="5" width="3" height="2" fill="#8c7d6b"/>` +
+    `<rect x="6" y="5" width="4" height="2" fill="#f5c678"/>` +
+    `<rect x="3" y="7" width="5" height="1" fill="#2c2826"/>` +
+    `<rect x="3" y="8" width="4" height="2" fill="#a89882"/>` +
+    `<rect x="7" y="8" width="2" height="2" fill="#d9964e"/>` +
+    `<rect x="10" y="3" width="1" height="1" fill="#ffcf5c"/>`,
 };
 
 const FALLBACK_ICON =

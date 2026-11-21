@@ -37,6 +37,7 @@ const LOADERS = {
   toon: () => import("../effects/toon/index.js").then(m => m.createToonEffect),
   aa: () => import("../effects/aa/index.js").then(m => m.createAaEffect),
   reflections: () => import("../effects/reflections/index.js").then(m => m.createReflectionsEffect),
+  surface: () => import("../effects/surface/index.js").then(m => m.createSurfaceEffect),
 };
 const engines = new Map();
 const moduleCache = new Map();
@@ -264,7 +265,7 @@ function renderPicker() {
   }
   rib.scrollLeft = prevScroll;
   const activePill = rib.querySelector('[aria-current="true"]');
-  if (activePill) activePill.scrollIntoView({ block: "nearest", inline: "nearest" });
+  if (activePill) activePill.scrollIntoView({ block: "nearest", inline: "center" });
   requestAnimationFrame(updateRibbonOverflow);
 }
 
@@ -439,9 +440,10 @@ function updateCard() {
   const isToon = currentEffect.id === "toon";
   const isAa = currentEffect.id === "aa";
   const isReflections = currentEffect.id === "reflections";
+  const isSurface = currentEffect.id === "surface";
   $("hintLine").textContent = isWaterLive
     ? u.waterClickHint
-    : (isShadows ? u.shadowsClickHint : (isCloth ? u.clothClickHint : (isFurLive ? u.furClickHint : (isGlass ? u.glassClickHint : (isClouds ? u.cloudsClickHint : (isGrass ? u.grassClickHint : (isPathtracing ? u.pathtracingClickHint : (isToon ? u.toonClickHint : (isAa ? u.aaClickHint : (isReflections ? u.reflectionsClickHint : u.dragHint))))))))));
+    : (isShadows ? u.shadowsClickHint : (isCloth ? u.clothClickHint : (isFurLive ? u.furClickHint : (isGlass ? u.glassClickHint : (isClouds ? u.cloudsClickHint : (isGrass ? u.grassClickHint : (isPathtracing ? u.pathtracingClickHint : (isToon ? u.toonClickHint : (isAa ? u.aaClickHint : (isReflections ? u.reflectionsClickHint : (isSurface ? u.surfaceClickHint : u.dragHint)))))))))));
   const linkLabel = u[currentEffect.videoLabelKey] || u.channelLink;
   const filmLine = $("filmLine");
   filmLine.innerHTML = `<span>${u.videoPrefix} <a href="${currentEffect.videoUrl}" target="_blank" rel="noopener">${linkLabel}</a></span><span>·</span><button type="button" class="film-more" id="moreFxBtn">${u.moreEffects(EFFECTS.length)}</button>`;
