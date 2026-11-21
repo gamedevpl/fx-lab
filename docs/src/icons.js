@@ -177,6 +177,22 @@ const ICONS = {
     `<rect x="7" y="2" width="1" height="1" fill="#46e8c8"/>` +
     `<rect x="5" y="4" width="1" height="1" fill="#4f6d9e"/>` +
     `<rect x="5" y="2" width="1" height="8" fill="#ff5c77"/>`,
+
+  // Neon cyan & amber archway mirrored upside-down inside a dark wet puddle with magenta accent
+  reflections:
+    `<rect x="1" y="1" width="10" height="5" fill="#10182b"/>` +
+    `<rect x="1" y="6" width="10" height="5" fill="#080d18"/>` +
+    `<rect x="1" y="6" width="10" height="1" fill="#1c2c47"/>` +
+    `<rect x="3" y="1" width="6" height="1" fill="#2bf0ff"/>` +
+    `<rect x="2" y="2" width="1" height="4" fill="#ff9e2c"/>` +
+    `<rect x="9" y="2" width="1" height="4" fill="#ff9e2c"/>` +
+    `<rect x="4" y="3" width="1" height="3" fill="#ff2e88"/>` +
+    `<rect x="7" y="4" width="2" height="2" fill="#d9e6ff"/>` +
+    `<rect x="3" y="10" width="6" height="1" fill="#149cb0"/>` +
+    `<rect x="2" y="7" width="1" height="3" fill="#a86419"/>` +
+    `<rect x="9" y="7" width="1" height="3" fill="#a86419"/>` +
+    `<rect x="4" y="7" width="1" height="2" fill="#b31c5e"/>` +
+    `<rect x="7" y="7" width="2" height="2" fill="#637ba6"/>`,
 };
 
 const FALLBACK_ICON =
