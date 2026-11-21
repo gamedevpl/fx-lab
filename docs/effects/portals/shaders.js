@@ -745,7 +745,7 @@ vec3 shadeViewfinder(vec3 ro, vec3 rd) {
   float t = 0.04; bool hitIsPhoto = false; vec2 hit = vec2(-1.0);
   for (int i = 0; i < 86; i++) {
     vec3 p = ro + rd * t;
-    bool inP = uPhotoStamp >= 0.5 && insidePhotoFrustum(p);
+    bool inP = uPhotoStamp >= 0.5 && (p.z < -2.42 || insidePhotoFrustum(p));
     vec2 h = inP ? mapPhotoWorld(p) : mapDarkRoom(p);
     if (h.x < 0.003) { hit = vec2(t, h.y); hitIsPhoto = inP; break; }
     t += max(min(h.x * 0.88, 0.25), 0.005);
