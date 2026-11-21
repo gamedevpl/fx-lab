@@ -713,15 +713,13 @@ vec3 shadeViewfinder(vec3 ro, vec3 rd) {
   }
 
   vec3 p = ro + rd * hit.x;
-  if (uPhotoStamp >= 0.5) {
+  if (uPhotoStamp >= 0.5 && !hitIsPhoto) {
     float depth = 2.9 - p.z;
     if (depth > 1.32 && depth < 14.0) {
       float dx = abs(abs(p.x) - depth * 0.38);
       float dy = abs(abs(p.y - 1.55) - depth * 0.30);
-      float dz = abs(depth - 1.35);
-      if ((dx < 0.035 && abs(p.y - 1.55) <= depth * 0.30 + 0.035) ||
-          (dy < 0.035 && abs(p.x) <= depth * 0.38 + 0.035) ||
-          (dz < 0.04 && abs(p.x) <= depth * 0.38 + 0.035 && abs(p.y - 1.55) <= depth * 0.30 + 0.035)) {
+      if ((dx < 0.045 && abs(p.y - 1.55) <= depth * 0.30 + 0.045) ||
+          (dy < 0.045 && abs(p.x) <= depth * 0.38 + 0.045)) {
         return vec3(1.0, 0.96, 0.88) * 1.15;
       }
     }
