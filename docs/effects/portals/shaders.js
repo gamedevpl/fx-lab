@@ -24,6 +24,7 @@ uniform vec2 uOrangeOff;    // Interactive clickable portal offset [x, y]
 uniform float uShiftState;  // Continuous unwrapped orbit angle (radians) for Antichamber 5-room 360-deg Riemann sheet!
 uniform float uPhotoStamp;  // Viewfinder photo-stamp blend (0=floating 2D Polaroid, 1=stamped into real 3D!)
 uniform float uInHall;      // CodeParade explicit interior flag (1.0 when FPP camera is inside the 24m hall!)
+uniform int uPortalParity;  // Flips 0 <-> 1 on every exact 5.30m portal pass -> ZERO Blue/Orange flash!
 
 const float PI = 3.14159265359;
 const float TAU = 6.28318530718;
@@ -167,7 +168,7 @@ vec2 mapApertureChamber(vec3 p, bool rtxMode) {
   float dL = p.x + 2.65; if (dL < d) { d = dL; mat = 2.0; }
   float dR = 2.65 - p.x; if (dR < d) { d = dR; mat = 2.0; }
 
-  float ribZ = abs(fract((p.z + 2.65) / 1.75) - 0.5) * 1.75;
+  float ribZ = abs(fract((p.z + 2.65) / 1.76667) - 0.5) * 1.76667;
   float dRib = min(
     sdBox(vec3(p.x + 2.58, p.y - 1.72, ribZ), vec3(0.10, 1.72, 0.09)),
     sdBox(vec3(p.x - 2.58, p.y - 1.72, ribZ), vec3(0.10, 1.72, 0.09)));
@@ -180,10 +181,11 @@ vec2 mapApertureChamber(vec3 p, bool rtxMode) {
   float dCube = sdRoundBox(cp, vec3(0.34), 0.045);
   if (dCube < d) { d = dCube; mat = 6.0; }
 
-  // Glowing energy orb zipping through the portal loop cleanly to the side of the camera path!
-  float orbPhase = fract(uTime * 0.35);
-  float orbZ = mix(2.35, -2.35, orbPhase);
-  float dOrb = length(p - vec3(0.58 + sin(orbPhase * TAU) * 0.10, 1.72, orbZ)) - 0.11;
+  // Truly infinite seamless glowing orb wrapping modulo exact 5.30m chamber depth across the portal plane!
+  float orbZ = 2.65 - fract(uTime * 0.42) * 5.30;
+  float dzOrb = mod(p.z - orbZ + 2.65, 5.30) - 2.65;
+  float orbX = 0.40 + sin(uTime * 0.85) * 0.08;
+  float dOrb = length(vec3(p.x - orbX, p.y - 1.66, dzOrb)) - 0.11;
   if (dOrb < d) { d = dOrb; mat = 7.0; }
 
   if (rtxMode) {
@@ -219,16 +221,16 @@ float softShadowAperture(vec3 ro, vec3 rd, float tMax, float k, bool rtxMode) {
 
 float portalOvalDist(vec2 xy, vec2 cen, vec2 rad) { return length((xy - cen) / rad); }
 
-vec3 shadeApertureSurface(vec3 p, vec3 n, float matId, bool rtxMode, vec2 blueCen, vec2 orangeCen, vec2 pRad) {
+vec3 shadeApertureSurface(vec3 p, vec3 n, float matId, bool rtxMode, bool frontIsOrange, vec2 blueCen, vec2 orangeCen, vec2 pRad) {
   int m = int(floor(matId + 0.5));
   vec3 alb = vec3(0.42, 0.46, 0.54);
   if (m == 0) {
-    float g = max(smoothstep(0.46, 0.495, abs(fract(p.x * 0.95) - 0.5)), smoothstep(0.46, 0.495, abs(fract(p.z * 0.95) - 0.5)));
+    float g = max(smoothstep(0.46, 0.495, abs(fract(p.x * 0.9434) - 0.5)), smoothstep(0.46, 0.495, abs(fract((p.z + 2.65) * 0.9434) - 0.5)));
     alb = mix(rtxMode ? vec3(0.11, 0.14, 0.20) : vec3(0.18, 0.22, 0.29), vec3(0.06, 0.08, 0.12), g * 0.72);
   } else if (m == 1) alb = vec3(0.14, 0.17, 0.24);
   else if (m == 2 || m == 3 || m == 4) {
-    vec2 uv = (m == 2) ? p.zy : p.xy;
-    float g = max(smoothstep(0.47, 0.495, abs(fract(uv.x * 0.85) - 0.5)), smoothstep(0.47, 0.495, abs(fract(uv.y * 0.85) - 0.5)));
+    vec2 uv = (m == 2) ? vec2((p.z + 2.65) * 0.7547, p.y * 0.85) : (p.xy * 0.85);
+    float g = max(smoothstep(0.47, 0.495, abs(fract(uv.x) - 0.5)), smoothstep(0.47, 0.495, abs(fract(uv.y) - 0.5)));
     vec3 panel = p.y < 1.05 ? vec3(0.11, 0.14, 0.20) : (rtxMode ? vec3(0.24, 0.28, 0.36) : vec3(0.38, 0.43, 0.50));
     alb = mix(panel, vec3(0.07, 0.09, 0.14), g * 0.72);
   } else if (m == 5) alb = vec3(0.10, 0.12, 0.18);
@@ -242,15 +244,18 @@ vec3 shadeApertureSurface(vec3 p, vec3 n, float matId, bool rtxMode, vec2 blueCe
   vec3 light = (rtxMode ? vec3(0.05, 0.07, 0.12) : vec3(0.11, 0.14, 0.20)) * (0.55 + 0.45 * n.y);
   light += vec3(0.95, 0.94, 0.92) * (max(dot(n, ld), 0.0) * sh * (rtxMode ? 1.1 : 4.2) / (1.5 + dL * dL * 0.36));
 
+  vec3 colNegZ = frontIsOrange ? vec3(1.65, 0.48, 0.05) : vec3(0.06, 0.66, 1.55);
+  vec3 colPosZ = frontIsOrange ? vec3(0.06, 0.66, 1.55) : vec3(1.65, 0.48, 0.05);
+
   vec3 blueP = vec3(blueCen.x, blueCen.y, -2.58);
   vec3 toB = blueP - p; float dB = length(toB);
-  light += vec3(0.06, 0.66, 1.55) * (max(dot(n, toB / max(dB, 1e-4)), 0.0) * 0.78 + 0.22) * ((rtxMode ? 4.4 : 3.8) / (0.85 + dB * dB * 0.50));
+  light += colNegZ * (max(dot(n, toB / max(dB, 1e-4)), 0.0) * 0.78 + 0.22) * ((rtxMode ? 4.4 : 3.8) / (0.85 + dB * dB * 0.50));
 
   vec3 orgP = vec3(orangeCen.x, orangeCen.y, 2.58);
   vec3 toO = orgP - p; float dO = length(toO);
-  light += vec3(1.65, 0.48, 0.05) * (max(dot(n, toO / max(dO, 1e-4)), 0.0) * 0.78 + 0.22) * ((rtxMode ? 4.2 : 3.6) / (0.85 + dO * dO * 0.50));
+  light += colPosZ * (max(dot(n, toO / max(dO, 1e-4)), 0.0) * 0.78 + 0.22) * ((rtxMode ? 4.2 : 3.6) / (0.85 + dO * dO * 0.50));
 
-  // STAGE 6 (Portal RTX): Golden sunbeam + razor shadows pouring STRAIGHT OUT of the Blue Portal!
+  // STAGE 6 (Portal RTX): Golden sunbeam + razor shadows pouring STRAIGHT OUT of the portal!
   if (rtxMode) {
     vec3 virtualSun = vec3(blueCen.x - 0.48, blueCen.y + 0.52, -5.6);
     vec3 toV = virtualSun - p; float dV = length(toV); vec3 vd = toV / max(dV, 1e-4);
@@ -270,81 +275,83 @@ vec3 shadeApertureSurface(vec3 p, vec3 n, float matId, bool rtxMode, vec2 blueCe
 
 vec3 shadePortalsAperture(vec3 ro, vec3 rd, int mode, bool actionOn) {
   bool rtxMode = (mode == 2);
-  int maxDepth = (mode == 0) ? 2 : (mode == 1 ? (actionOn ? 1 : 10) : 8);
+  int maxDepth = (mode == 0) ? 2 : (mode == 1 ? (actionOn ? 1 : 10) : 9);
   vec2 blueCen = vec2(-0.08, 1.50);
   vec2 orangeCen = (mode == 0)
     ? vec2(-0.08, 1.50)
     : vec2(clamp(-0.08 + uOrangeOff.x, -1.15, 0.95), clamp(1.50 + uOrangeOff.y, 1.15, 2.05));
   vec2 pRad = (mode == 0) ? vec2(0.90, 1.18) : vec2(0.98, 1.26);
 
-  vec3 curRo = ro; vec3 curRd = rd; vec3 tint = vec3(1.0);
+  vec3 curRo = ro; vec3 curRd = rd;
+  float totalDist = 0.0;
   vec3 outCol = vec3(0.04, 0.06, 0.10);
 
   for (int bounce = 0; bounce < 11; bounce++) {
-    float t = 0.03; vec2 hit = vec2(-1.0);
-    for (int i = 0; i < 72; i++) {
+    bool frontIsOrange = (mode != 0) && (((bounce + uPortalParity) & 1) == 1);
+    float t = 0.004; vec2 hit = vec2(-1.0);
+    for (int i = 0; i < 76; i++) {
       vec2 h = mapApertureChamber(curRo + curRd * t, rtxMode);
-      if (h.x < 0.0025) { hit = vec2(t, h.y); break; }
-      t += max(h.x * 0.9, 0.003);
+      if (h.x < 0.0022) { hit = vec2(t, h.y); break; }
+      t += max(h.x * 0.9, 0.0025);
       if (t > 16.0) break;
     }
     if (hit.x < 0.0) break;
 
+    totalDist += hit.x;
     vec3 p = curRo + curRd * hit.x;
     int m = int(floor(hit.y + 0.5));
 
     if (m == 3 || m == 4) {
-      bool isBlue = (m == 3);
-      vec2 cen = isBlue ? blueCen : orangeCen;
+      bool isNegZ = (m == 3);
+      vec2 cen = isNegZ ? blueCen : orangeCen;
       float oval = portalOvalDist(p.xy, cen, pRad);
+      bool rimIsOrange = isNegZ ? frontIsOrange : !frontIsOrange;
 
       if (oval >= 0.91 && oval <= 1.15) {
         float core = smoothstep(1.15, 1.01, oval) * smoothstep(0.89, 0.98, oval);
-        // Alternate Electric Blue & Fiery Orange rim hue on alternating recursive hops so BOTH iconic colors pop down the tunnel!
-        bool showOrangeRim = (!isBlue) || ((bounce & 1) == 1 && mode != 0);
         vec3 rimCol = (mode == 0)
           ? vec3(0.16, 1.38, 0.88)
-          : (showOrangeRim ? vec3(2.25, 0.34, 0.02) : vec3(0.04, 0.72, 2.35));
-        outCol = rimCol * (0.88 + core * 1.15) * tint;
+          : (rimIsOrange ? vec3(2.25, 0.34, 0.02) : vec3(0.04, 0.72, 2.35));
+        float distFade = exp(-totalDist * 0.012);
+        outCol = rimCol * (0.88 + core * 1.15) * distFade;
         break;
       }
 
       if (oval < 0.91) {
         if (bounce >= maxDepth) {
-          outCol = ((bounce & 1) == 1 ? vec3(0.55, 0.18, 0.03) : vec3(0.04, 0.24, 0.55)) * tint;
+          outCol = (rimIsOrange ? vec3(0.55, 0.18, 0.03) : vec3(0.04, 0.24, 0.55)) * exp(-totalDist * 0.014);
           break;
         }
         vec2 local = p.xy - cen;
         if (mode == 0) {
           vec2 rl = rot2(0.66) * local;
-          curRo = vec3(orangeCen.x + rl.x, orangeCen.y + rl.y, isBlue ? 2.58 : -2.58);
+          curRo = vec3(orangeCen.x + rl.x, orangeCen.y + rl.y, isNegZ ? 2.644 : -2.644);
           vec2 rdxy = rot2(0.66) * curRd.xy;
           curRd = normalize(vec3(rdxy.x, rdxy.y, curRd.z));
         } else {
-          vec2 dstCen = isBlue ? orangeCen : blueCen;
-          curRo = vec3(dstCen.x + local.x, dstCen.y + local.y, isBlue ? 2.58 : -2.58);
-          vec2 xz = rot2(isBlue ? 0.065 : -0.065) * curRd.xz;
-          curRd = normalize(vec3(xz.x, curRd.y, xz.y));
+          // Exact 5.30m wall-to-wall seamless teleport -> ZERO distance jump & ZERO angle snap!
+          vec2 dstCen = isNegZ ? orangeCen : blueCen;
+          curRo = vec3(dstCen.x + local.x, dstCen.y + local.y, isNegZ ? 2.646 : -2.646);
         }
-        tint *= (mode == 2 ? vec3(0.97, 0.96, 0.96) : vec3(0.94, 0.95, 0.97));
         continue;
       }
     }
 
     vec3 n = normalAperture(p, rtxMode);
-    vec3 col = shadeApertureSurface(p, n, hit.y, rtxMode, blueCen, orangeCen, pRad);
+    vec3 col = shadeApertureSurface(p, n, hit.y, rtxMode, frontIsOrange, blueCen, orangeCen, pRad);
 
-    if (rtxMode && bounce == 0) {
-      float beamT = clamp(hit.x, 0.0, 5.2);
+    // Continuous RTX volumetric sunbeam & floor reflection across chambers (bounce <= 2 -> zero pop-in on crossing!)
+    if (rtxMode && bounce <= 2) {
+      float beamT = clamp(hit.x, 0.0, 5.3);
       vec3 midP = curRo + curRd * (beamT * 0.55);
       float bDist = portalOvalDist(midP.xy, blueCen + vec2(0.15, -0.25), pRad * 1.15);
-      col += vec3(1.30, 0.78, 0.28) * (smoothstep(1.15, 0.1, bDist) * smoothstep(2.6, -2.5, midP.z) * 0.16);
+      col += vec3(1.30, 0.78, 0.28) * (smoothstep(1.15, 0.1, bDist) * smoothstep(2.65, -2.55, midP.z) * 0.16);
     }
 
-    if (rtxMode && m == 0 && bounce == 0) {
+    if (rtxMode && m == 0 && bounce <= 2) {
       vec3 reflRd = reflect(curRd, n);
-      vec3 reflRo = p + n * 0.03;
-      float rt = 0.04; vec2 rh = vec2(-1.0);
+      vec3 reflRo = p + n * 0.025;
+      float rt = 0.03; vec2 rh = vec2(-1.0);
       for (int j = 0; j < 44; j++) {
         vec2 h2 = mapApertureChamber(reflRo + reflRd * rt, true);
         if (h2.x < 0.004) { rh = vec2(rt, h2.y); break; }
@@ -357,17 +364,19 @@ vec3 shadePortalsAperture(vec3 ro, vec3 rd, int mode, bool actionOn) {
         vec3 rCol = vec3(0.0);
         if (rm == 3 && portalOvalDist(rp.xy, blueCen, pRad) < 1.14) {
           float ov = portalOvalDist(rp.xy, blueCen, pRad);
-          rCol = ov > 0.89 ? vec3(0.14, 1.05, 2.35) : vec3(0.48, 0.58, 0.76);
+          vec3 pGlow = frontIsOrange ? vec3(2.25, 0.45, 0.05) : vec3(0.14, 1.05, 2.35);
+          rCol = ov > 0.89 ? pGlow : vec3(0.48, 0.58, 0.76);
         } else {
           vec3 rn = normalAperture(rp, true);
-          rCol = shadeApertureSurface(rp, rn, rh.y, true, blueCen, orangeCen, pRad);
+          rCol = shadeApertureSurface(rp, rn, rh.y, true, frontIsOrange, blueCen, orangeCen, pRad);
         }
         float fres = 0.14 + 0.44 * pow(1.0 - max(dot(n, -curRd), 0.0), 3.0);
         col = mix(col, rCol, fres);
       }
     }
 
-    outCol = col * tint;
+    // Smooth continuous distance attenuation instead of discrete per-bounce tint -> ZERO brightness jump on portal crossing!
+    outCol = col * exp(-totalDist * 0.012);
     break;
   }
   return outCol;
@@ -561,29 +570,29 @@ vec3 shadeExteriorColor(vec3 ro, vec3 rd, float tStart) {
 }
 
 vec3 shadeCodeParade(vec3 ro, vec3 rd) {
-  bool startInside = uInHall > 0.5 || (ro.z < 0.66 && abs(ro.x) < 1.15 && ro.y < 2.60);
+  bool startInside = uInHall > 0.5 || (ro.z <= 0.66 && abs(ro.x) < 1.15 && ro.y < 2.60);
 
-  // Case 1: Camera is INSIDE the 24m hall! (Can also look BACK out the doorway at z = +0.68 into the sunny plaza!)
+  // Case 1: Camera is INSIDE the 24m hall! (Zero dead zone at z = 0.66 -> zero doorway flash!)
   if (startInside) {
     float tExit = 1e9;
-    if (rd.z > 0.01) {
+    if (rd.z > 0.002) {
       float te = (0.68 - ro.z) / rd.z;
-      if (te > 0.01) {
+      if (te >= 0.0) {
         vec3 ep = ro + rd * te;
         if (abs(ep.x) < 1.06 && ep.y > 0.0 && ep.y < 2.55) tExit = te;
       }
     }
-    float tIn = 0.03; vec2 hitIn = vec2(-1.0);
+    float tIn = 0.002; vec2 hitIn = vec2(-1.0);
     for (int i = 0; i < 82; i++) {
       vec3 p = ro + rd * tIn;
       if (p.z > 0.68) break;
       vec2 h = mapInsideHall(p);
       if (h.x < 0.003) { hitIn = vec2(tIn, h.y); break; }
-      tIn += max(h.x * 0.9, 0.005);
+      tIn += max(h.x * 0.9, 0.004);
       if (tIn > min(tExit, 28.0)) break;
     }
     if (tExit < 1e8 && (hitIn.x < 0.0 || tExit < hitIn.x)) {
-      return shadeExteriorColor(ro, rd, tExit + 0.04);
+      return shadeExteriorColor(ro, rd, tExit + 0.02);
     }
     if (hitIn.x > 0.0) {
       vec3 p = ro + rd * hitIn.x;
@@ -608,29 +617,29 @@ vec3 shadeCodeParade(vec3 ro, vec3 rd) {
     return vec3(0.12, 0.18, 0.28);
   }
 
-  // Case 2: Camera is OUTSIDE -> check if ray crosses front doorway portal (z = +0.66) before hitting exterior stone!
+  // Case 2: Camera is OUTSIDE -> check if ray crosses front doorway portal (z = +0.66) with ZERO dead zone (td >= 0.0)!
   float tDoor = 1e9;
-  if (ro.z > 0.66 && rd.z < -0.01) {
+  if (ro.z > 0.66 && rd.z < -0.002) {
     float td = (0.66 - ro.z) / rd.z;
-    if (td > 0.01) {
+    if (td >= 0.0) {
       vec3 dp = ro + rd * td;
       if (abs(dp.x) < 1.06 && dp.y > 0.0 && dp.y < 2.55) tDoor = td;
     }
   }
-  float tExt = 0.04; vec2 hitExt = vec2(-1.0);
+  float tExt = 0.004; vec2 hitExt = vec2(-1.0);
   for (int i = 0; i < 68; i++) {
     vec2 h = mapExteriorCourtyard(ro + rd * tExt);
     if (h.x < 0.0025) { hitExt = vec2(tExt, h.y); break; }
     tExt += max(h.x * 0.9, 0.004);
     if (tExt > min(tDoor, 28.0)) break;
   }
-  if (tDoor < 1e8 && (hitExt.x < 0.0 || tDoor < hitExt.x)) {
-    float tIn = tDoor + 0.02; vec2 hitIn = vec2(-1.0);
-    for (int i = 0; i < 82; i++) {
+  if (tDoor < 1e8 && (hitExt.x < 0.0 || tDoor <= hitExt.x)) {
+    float tIn = max(tDoor, 0.0) + 0.002; vec2 hitIn = vec2(-1.0);
+    for (int i = 0; i < 112; i++) {
       vec2 h = mapInsideHall(ro + rd * tIn);
       if (h.x < 0.003) { hitIn = vec2(tIn, h.y); break; }
       tIn += max(h.x * 0.9, 0.005);
-      if (tIn > 30.0) break;
+      if (tIn > 32.0) break;
     }
     if (hitIn.x > 0.0) {
       vec3 p = ro + rd * hitIn.x;
@@ -652,6 +661,7 @@ vec3 shadeCodeParade(vec3 ro, vec3 rd) {
       vec3 col = alb * (0.32 + 0.78 * ribLight * (0.6 + 0.4 * max(n.y, 0.0))) + vec3(0.18, 0.82, 1.0) * depthGlow * 0.45;
       return mix(col, vec3(0.10, 0.20, 0.34), (1.0 - exp(-max(0.0, -p.z) * 0.045)) * 0.60);
     }
+    return vec3(1.55, 1.15, 0.65);
   }
   return shadeExteriorColor(ro, rd, 0.04);
 }

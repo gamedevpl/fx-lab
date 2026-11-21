@@ -17,7 +17,7 @@ export function createPortalsEffect(gl) {
     "uCamPos", "uCamRight", "uCamUp", "uCamFwd",
     "uTanHalfFov", "uAspect", "uTime", "uRes",
     "uSplitX", "uStageLeft", "uStageRight", "uDebugOn",
-    "uOrangeOff", "uShiftState", "uPhotoStamp", "uInHall",
+    "uOrangeOff", "uShiftState", "uPhotoStamp", "uInHall", "uPortalParity",
   ]);
   const vao = gl.createVertexArray();
 
@@ -124,6 +124,7 @@ export function createPortalsEffect(gl) {
       const stage = step.stage;
       let basis;
       let inHall = 0.0;
+      let portalParity = 0;
       let shiftState = antiAngle + cam.yaw;
 
       if (stage === 0 || stage === 1) {
@@ -131,10 +132,14 @@ export function createPortalsEffect(gl) {
       } else if (stage === 2) {
         basis = cameraBasisFromOrbit(cam.yaw + 0.14 + Math.sin(simTime * 0.48) * 0.14, cam.pitch + 0.02, clamp(cam.dist * 0.74, 1.75, 2.38), cam.lookY);
       } else if (stage === 3 || stage === 6) {
-        // Seamless FPP Fly-Through right into the Electric Blue Portal (z: +2.3 -> -2.55 wraps to +2.3!)
-        const loopZ = 2.25 - ((simTime * 1.15) % 4.75);
-        const eye = [-0.08 + Math.sin(simTime * 0.6) * 0.18 + Math.sin(cam.yaw) * 0.65, 1.48 + cam.pitch * 0.6, loopZ];
-        const target = [-0.08 + Math.sin(cam.yaw) * -1.4, 1.46 - cam.pitch * 0.5, loopZ - 3.0];
+        // TRULY INFINITE exact 5.30m wall-to-wall FPP fly-through (parity flips 0<->1 on every exact crossing -> ZERO color/position jump!)
+        const travel = simTime * 1.45;
+        const passIdx = Math.floor(travel / 5.30);
+        portalParity = passIdx & 1;
+        const loopZ = 2.646 - (travel - passIdx * 5.30) * (5.292 / 5.30);
+        const cx = -0.10 + Math.sin(simTime * 0.6) * 0.18 + Math.sin(cam.yaw) * 0.42;
+        const eye = [cx, 1.48 + cam.pitch * 0.5, loopZ];
+        const target = [cx + Math.sin(cam.yaw) * -1.1, 1.48 - cam.pitch * 0.4, loopZ - 3.5];
         basis = basisFromLookAt(eye, target);
       } else if (stage === 4) {
         // True 5-Room 360-deg FPP Walk around the central monolith at radius 1.85m (sculptures at r=2.88m -> zero clipping!)
@@ -218,6 +223,7 @@ export function createPortalsEffect(gl) {
       gl.uniform1f(u.uShiftState, shiftState);
       gl.uniform1f(u.uPhotoStamp, photoAmt);
       gl.uniform1f(u.uInHall, inHall);
+      gl.uniform1i(u.uPortalParity, portalParity);
 
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
       gl.bindVertexArray(null);
