@@ -400,9 +400,9 @@ void main() {
     float sy = clamp(rd.y * 1.45 + 0.20, 0.0, 1.0);
     vec3 sky = mix(vec3(0.78, 0.90, 0.98), vec3(0.24, 0.56, 0.90), pow(sy, 0.72));
     if (uMode == 5) {
-      // Obra Dinn 1-bit sky (clean phosphor dither!)
+      // Obra Dinn 1-bit sky (exact screen-matched dot density!)
       vec2 spAng = vec2(atan(rd.x, rd.z), asin(clamp(rd.y, -1.0, 1.0)));
-      vec2 dCoord = uLockDither > 0.5 ? spAng * 165.0 : gl_FragCoord.xy;
+      vec2 dCoord = uLockDither > 0.5 ? spAng * 540.0 : gl_FragCoord.xy;
       float bit = step(bayer4(dCoord), 0.72 - sy * 0.35);
       sky = mix(vec3(0.14, 0.16, 0.13), vec3(0.92, 0.90, 0.80), bit);
     }
@@ -456,7 +456,7 @@ void main() {
 
   vec3 lit;
   if (m == 7) {
-    lit = vec3(1.15, 0.90, 0.38);
+    lit = (uMode == 5) ? vec3(0.92, 0.90, 0.80) : vec3(1.15, 0.90, 0.38);
   } else if (uMode == 3 || uMode == 7) {
     // Dead Cells (3) & t3ssel8r (7): crisp hue-shifted 3-band pixel-art cel lighting!
     float illum = ndl * (0.28 + 0.72 * sh);
@@ -473,9 +473,8 @@ void main() {
   } else if (uMode == 5) {
     // 2018 Return of the Obra Dinn (Lucas Pope): 1-BIT MONOCHROME WORLD/SPHERE-LOCKED DITHER!!
     float lum = clamp(dot(alb, vec3(0.299, 0.587, 0.114)) * (0.24 + 0.95 * ndl * (0.25 + 0.75 * sh)) + lampGlow * 0.25, 0.0, 1.0);
-    // World/sphere-locked dither coordinate (Lucas Pope devlog #32!) vs swimming screen-space gl_FragCoord.xy!
     vec2 spAng = vec2(atan(rd.x, rd.z), asin(clamp(rd.y, -1.0, 1.0)));
-    vec2 dCoord = uLockDither > 0.5 ? (spAng * 175.0) : gl_FragCoord.xy;
+    vec2 dCoord = uLockDither > 0.5 ? (spAng * 540.0) : gl_FragCoord.xy;
     float bit = step(bayer4(dCoord), lum);
     lit = mix(vec3(0.14, 0.16, 0.13), vec3(0.92, 0.90, 0.80), bit);
   } else {
