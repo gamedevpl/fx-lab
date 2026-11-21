@@ -20,6 +20,7 @@ Interactive WebGL2 sandbox for real-time graphics effects from [gamedev.pl](http
 12. **[Evolution of Anti-Aliasing & Temporal Upscaling](https://gamedevpl.github.io/fx-lab/aa/)** (8 eras, 1990–2026 · [source & notes](./docs/effects/aa/README.md)) — 1990 Haeberli & Akeley 4×4 SSAA, 1993 hardware 4× MSAA (smooth geometry edges with remaining specular aliasing), 2011 Timothy Lottes FXAA, 2012 Jorge Jimenez SMAA (sharp textures while subpixel wires still break up), 2010–2013 Early TAA (*Halo: Reach* / *Crysis 2* / *UE4*) showing motion ghosting, 2014 Motion Vectors + Catmull-Rom + YCoCg AABB clipping (Lottes 2011 / Malan 2012 / Karis SIGGRAPH 2014), Toksvig/Kaplanyan Specular AA, and FSR 2 / TSR-style 50%-axis (25% pixels) Halton(2,3) temporal upscaling with a clickable 4× pixel magnifier loupe.
 13. **[Evolution of Reflections](https://gamedevpl.github.io/fx-lab/reflections/)** (8 eras, 1976–2026 · [source & notes](./docs/effects/reflections/README.md)) — 1976 Blinn & Newell equirectangular environment mapping, 1996 *Duke Nukem 3D* / *Unreal* planar portal mirror, 1999 GeForce 256 / DX7 hardware cubemaps, 2011 *Crysis 2* DX11 real screen-space reflections (SSR) exposing behind-pillar occlusion holes and off-screen clipping, 2012 parallax-corrected cubemaps (Bjorke 2004 · popularized by Lagarde & Zanuttini, SIGGRAPH 2012), 2013 Brian Karis Split-Sum roughness IBL, 2018 *Battlefield V* DXR ray-traced reflections, and *UE5 Lumen* / *Cyberpunk 2077 RT Overdrive* multi-bounce glossy reflections with contact hardening and temporal denoising.
 14. **[Evolution of Surface Detail](https://gamedevpl.github.io/fx-lab/surface/)** (8 eras, 1978–2026 · [source & notes](./docs/effects/surface/README.md)) — 1978 Blinn Bump Mapping, 1998 Normal Mapping (Cohen & Cignoni 1998 · *Evolva* / *Giants* 2000 · *Doom 3* 2004), 2001 Kaneko / Welsh Parallax Mapping, 2005 Policarpo Relief Mapping, 2006 Tatarchuk Parallax Occlusion Mapping (POM) with live heightfield soft self-shadows (flat silhouette), 2009 programmable DX11 Tessellation & Displacement with wireframe toggle (true jagged 3D silhouette!), 2018–2020 NVIDIA Turing / DX12 Ultimate Meshlets, and 2022–2026 UE5 Nanite-style virtualized micropolygon clusters (emulated in WebGL2 via dense vertex-displaced meshes).
+15. **[Evolution of Fog & Volumetric Lighting](https://gamedevpl.github.io/fx-lab/fog/)** (8 eras, 1997–2026 · [source & notes](./docs/effects/fog/README.md)) — 1997 *Turok* / 1999 *Silent Hill* distance depth fog (masking far-clipping), 2002 Hoffman & Preetham analytical Rayleigh/Mie aerial perspective, 2004 pre-2007 shadow-map 3D light-shaft slices, 2007 Kenny Mitchell (*GPU Gems 3* Ch. 13) screen-space radial god rays smoothly fading out when looking away, 2009 Tóth & Umenhoffer 3D raymarched volumetric shadows with interleaved sampling toggle, 2014 Bart Wronski temporal froxel fog (emulated in WebGL2, with Froxel Grid overlay), 2015 Sébastien Hillaire / Frostbite heterogeneous swirling mist & local colored lanterns, and 2020–2026 Hillaire (EGSR 2020) multi-scattering with stained-glass cathedral sunbeams sliced by a turning iron clockwork gear.
 
 ## Project structure
 
@@ -27,24 +28,25 @@ Each effect lives in its own self-contained folder under `docs/effects/<id>/` wi
 
 ```text
 docs/
-├── index.html                                                                                         # Root entry (loads default effect)
-├── splats/ fire/ water/ shadows/ cloth/ fur/ glass/ clouds/ grass/ pathtracing/ toon/ aa/ reflections/ surface/ # Clean per-effect routes with dedicated Open Graph cards
-├── src/                                                                                               # Shared app shell, catalog metadata, WebGL2 helpers
+├── index.html                                                                                              # Root entry (loads default effect)
+├── splats/ fire/ water/ shadows/ cloth/ fur/ glass/ clouds/ grass/ pathtracing/ toon/ aa/ reflections/ surface/ fog/ # Clean per-effect routes with dedicated Open Graph cards
+├── src/                                                                                                    # Shared app shell, catalog metadata, WebGL2 helpers
 └── effects/
-    ├── splats/                                                                                        # README.md · scene.js · shaders.js · index.js
-    ├── fire/                                                                                          # README.md · simulations.js · shaders.js · index.js
-    ├── water/                                                                                         # README.md · simulation.js · shaders.js · index.js
-    ├── shadows/                                                                                       # README.md · shaders.js · index.js
-    ├── cloth/                                                                                         # README.md · simulation.js · shaders.js · index.js
-    ├── fur/                                                                                           # README.md · groom.js · shaders.js · index.js
-    ├── glass/                                                                                         # README.md · optics.js · shaders.js · index.js
-    ├── clouds/                                                                                        # README.md · atmosphere.js · shaders.js · index.js
-    ├── grass/                                                                                         # README.md · scene.js · shaders.js · index.js
-    ├── pathtracing/                                                                                   # README.md · shaders.js · index.js
-    ├── toon/                                                                                          # README.md · scene.js · shaders.js · index.js
-    ├── aa/                                                                                            # README.md · shaders.js · index.js
-    ├── reflections/                                                                                   # README.md · shaders.js · index.js
-    └── surface/                                                                                       # README.md · mesh.js · shaders.js · index.js
+    ├── splats/                                                                                             # README.md · scene.js · shaders.js · index.js
+    ├── fire/                                                                                               # README.md · simulations.js · shaders.js · index.js
+    ├── water/                                                                                              # README.md · simulation.js · shaders.js · index.js
+    ├── shadows/                                                                                            # README.md · shaders.js · index.js
+    ├── cloth/                                                                                              # README.md · simulation.js · shaders.js · index.js
+    ├── fur/                                                                                                # README.md · groom.js · shaders.js · index.js
+    ├── glass/                                                                                              # README.md · optics.js · shaders.js · index.js
+    ├── clouds/                                                                                             # README.md · atmosphere.js · shaders.js · index.js
+    ├── grass/                                                                                              # README.md · scene.js · shaders.js · index.js
+    ├── pathtracing/                                                                                        # README.md · shaders.js · index.js
+    ├── toon/                                                                                               # README.md · scene.js · shaders.js · index.js
+    ├── aa/                                                                                                 # README.md · shaders.js · index.js
+    ├── reflections/                                                                                        # README.md · shaders.js · index.js
+    ├── surface/                                                                                            # README.md · mesh.js · shaders.js · index.js
+    └── fog/                                                                                                # README.md · shaders.js · index.js
 ```
 
 ## Controls

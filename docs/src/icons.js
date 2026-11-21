@@ -207,6 +207,21 @@ const ICONS = {
     `<rect x="3" y="8" width="4" height="2" fill="#a89882"/>` +
     `<rect x="7" y="8" width="2" height="2" fill="#d9964e"/>` +
     `<rect x="10" y="3" width="1" height="1" fill="#ffcf5c"/>`,
+
+  // Gothic stained-glass rose window beaming golden & cyan volumetric god rays through dark misty air
+  fog:
+    `<rect x="1" y="1" width="10" height="10" fill="#101829"/>` +
+    `<rect x="4" y="1" width="4" height="4" fill="#2a3550"/>` +
+    `<rect x="5" y="2" width="1" height="1" fill="#ff4769"/>` +
+    `<rect x="6" y="2" width="1" height="1" fill="#ffd147"/>` +
+    `<rect x="5" y="3" width="1" height="1" fill="#38d4ff"/>` +
+    `<rect x="6" y="3" width="1" height="1" fill="#32e8a8"/>` +
+    `<rect x="4" y="5" width="3" height="2" fill="#ffd86b"/>` +
+    `<rect x="3" y="7" width="4" height="2" fill="#e6a945"/>` +
+    `<rect x="2" y="9" width="5" height="2" fill="#a67432"/>` +
+    `<rect x="7" y="6" width="2" height="2" fill="#2cb8d6"/>` +
+    `<rect x="8" y="8" width="2" height="3" fill="#1d6e8c"/>` +
+    `<rect x="1" y="9" width="10" height="2" fill="#293b59" fill-opacity="0.45"/>`,
 };
 
 const FALLBACK_ICON =
