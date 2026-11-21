@@ -461,11 +461,12 @@ void main() {
     col = shadeHit(centerHit, rayForUv(baseUv), uTime, useSpecAA);
   }
 
-  // Exact analytical screen-space motion vector (unjittered curUv - prevUv)
+  // Exact analytical screen-space motion vector: centerHit.pos lies on baseUv (NOT vUv!),
+  // so baseUv - projectPrevUv(prevPos) cancels Halton jitter cleanly -> 0.000 px motion when camera is static!
   vec2 prevUv = (centerHit.matId == 0)
-    ? projectPrevUv(uCamPos + rayForUv(vUv) * 100.0)
+    ? projectPrevUv(uCamPos + rayForUv(baseUv) * 100.0)
     : projectPrevUv(centerHit.prevPos);
-  vec2 vel = vUv - prevUv;
+  vec2 vel = baseUv - prevUv;
 
   outColor = vec4(max(col, vec3(0.0)), 1.0);
   outVelocity = vec4(vel, centerHit.t < INF ? centerHit.t : 99.0, centerHit.moving);
