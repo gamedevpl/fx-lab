@@ -1,6 +1,7 @@
 // Bilingual (EN / PL) catalog for all effects and stages in FX Lab.
 
 export const REPO_TREE_BASE = "https://github.com/gamedevpl/fx-lab/tree/main/";
+export const SHORTS_CHANNEL_URL = "https://www.youtube.com/@gamedev_pl/shorts";
 
 export const UI = {
   en: {
@@ -46,11 +47,30 @@ export const UI = {
     tonemappingClickHint: "Click left/right to set Exposure (−3 to +5.5 EV) · Drag to orbit · E for effects",
     pixel3dClickHint: "Click or drag yellow 4× loupe reticle onto windmill blades or roof · Drag elsewhere to orbit · E for effects",
     videoPrefix: "Watch the Short:",
+    videoScheduledPrefix: d => `Short drops ${d}:`,
+    videoScheduledTitle: d => `Scheduled for ${d} at 02:00 CET on YouTube`,
     channelLink: "GamedevPL on YouTube ↗",
+    shortsChannelLink: "GamedevPL Shorts ↗",
     shortLink: "Pixel-Art Splats Short ↗",
     fireShortLink: "Evolution of Fire Short ↗",
     waterShortLink: "Evolution of Water Short ↗",
     shadowsShortLink: "Evolution of Shadows Short ↗",
+    clothShortLink: "Evolution of Cloth Short ↗",
+    furShortLink: "Evolution of Fur Short ↗",
+    glassShortLink: "Evolution of Glass Short ↗",
+    cloudsShortLink: "Evolution of Clouds Short ↗",
+    grassShortLink: "Evolution of Grass Short ↗",
+    pathtracingShortLink: "Path Tracing Short ↗",
+    toonShortLink: "Cel Shading Short ↗",
+    aaShortLink: "Anti-Aliasing Short ↗",
+    reflectionsShortLink: "Evolution of Reflections Short ↗",
+    surfaceShortLink: "3D Surface Detail Short ↗",
+    fogShortLink: "Evolution of Fog Short ↗",
+    giShortLink: "Global Illumination Short ↗",
+    texturesShortLink: "PS1 & N64 Textures Short ↗",
+    portalsShortLink: "Non-Euclidean Portals Short ↗",
+    tonemappingShortLink: "HDR & Tone Mapping Short ↗",
+    pixel3dShortLink: "3D Pixel Art Short ↗",
     noglTitle: "WebGL2 is required",
     noglBody: "Your browser or GPU context does not expose WebGL2, so the shaders cannot run here.",
     stepLabel: (i, n) => `Step ${i + 1} / ${n}`,
@@ -104,11 +124,30 @@ export const UI = {
     tonemappingClickHint: "Kliknij lewo/prawo by ustawić Ekspozycję (−3 do +5,5 EV) · Przeciągnij by obrócić · E katalog",
     pixel3dClickHint: "Kliknij lub przeciągnij żółtą lupę 4× na wiatrak lub krawędź dachu · Reszta obraca kamerę · E katalog",
     videoPrefix: "Zobacz filmik:",
+    videoScheduledPrefix: d => `Premiera Shorta ${d}:`,
+    videoScheduledTitle: d => `Zaplanowany na ${d} o 02:00 CET na YouTube`,
     channelLink: "GamedevPL na YouTube ↗",
+    shortsChannelLink: "GamedevPL Shorts ↗",
     shortLink: "Short o Pixel-Art Splats ↗",
     fireShortLink: "Short o Ewolucji Ognia ↗",
     waterShortLink: "Short o Ewolucji Wody ↗",
     shadowsShortLink: "Short o Ewolucji Cieni ↗",
+    clothShortLink: "Short o Ewolucji Tkanin ↗",
+    furShortLink: "Short o Ewolucji Futra ↗",
+    glassShortLink: "Short o Ewolucji Szkła ↗",
+    cloudsShortLink: "Short o Ewolucji Chmur ↗",
+    grassShortLink: "Short o Ewolucji Trawy ↗",
+    pathtracingShortLink: "Short o Path Tracingu ↗",
+    toonShortLink: "Short o Cel Shadingu ↗",
+    aaShortLink: "Short o Antyaliasingu ↗",
+    reflectionsShortLink: "Short o Ewolucji Odbić ↗",
+    surfaceShortLink: "Short o Detalu Powierzchni ↗",
+    fogShortLink: "Short o Ewolucji Mgły ↗",
+    giShortLink: "Short o Global Illumination ↗",
+    texturesShortLink: "Short o Teksturach PS1 i N64 ↗",
+    portalsShortLink: "Short o Portalach 3D ↗",
+    tonemappingShortLink: "Short o HDR i Tone Mappingu ↗",
+    pixel3dShortLink: "Short o Pixel Arcie 3D ↗",
     noglTitle: "Wymagany jest WebGL2",
     noglBody: "Ta przeglądarka lub karta graficzna nie udostępnia WebGL2, więc shadery nie mogą się uruchomić.",
     stepLabel: (i, n) => `Krok ${i + 1} / ${n}`,
@@ -569,6 +608,7 @@ export const EFFECTS = [
     tags: ["Shadow Map", "PCF / PCSS", "Ray-Traced", "Stained Glass GI"],
     videoUrl: "https://www.youtube.com/shorts/AaOwo3sHVRk",
     videoLabelKey: "shadowsShortLink",
+    videoPublishAt: "2026-11-22T02:00:00+01:00",
     steps: [
       {
         id: "SH1",
@@ -730,8 +770,9 @@ export const EFFECTS = [
     summaryEn: "Nearly forty years of game cloth: 1988 2-frame pixel flip, rigid hinges, sine-wave flags, Verlet springs, bending weave, velvet sheen + translucency, XPBD sphere wrapping, and live aerodynamic tearing.",
     summaryPl: "Prawie 40 lat tkanin w grach: 2-klatkowy pixel flip z 1988, sztywna klapka, sinusoida, sprężyny Verleta, splot lnu, aksamitny sheen + prześwitywanie, XPBD z kolizją kuli i rozrywanie na żywo.",
     tags: ["Verlet / XPBD", "Charlie Sheen", "Aero Wind", "Live Tearing"],
-    videoUrl: "https://www.youtube.com/@gamedev_pl",
-    videoLabelKey: "channelLink",
+    videoUrl: "https://www.youtube.com/shorts/R_xwfoOKS3I",
+    videoLabelKey: "clothShortLink",
+    videoPublishAt: "2026-11-24T02:00:00+01:00",
     steps: [
       {
         id: "C1",
@@ -894,8 +935,9 @@ export const EFFECTS = [
     summaryEn: "Thirty-four years of game fur on a red-fox totem: 1992 flat texture, normal maps, 8-layer & 40-layer Shell Texturing, Kajiya–Kay sheen, Marschner backlit rim, 30,000 geometric clumped strands, and live wind & petting physics.",
     summaryPl: "34 lata futra w grach na lisiej figurce: płaska tekstura z 1992, normal-mapa, warstwowe Shell Texturing (8 i 40 warstw), połysk Kajiya–Kay, aureola Marschnera, 30 000 kosmyków 3D i fizyka wiatru oraz głaskania.",
     tags: ["Shell Texturing", "Kajiya–Kay", "Marschner Rim", "30K 3D Strands"],
-    videoUrl: "https://www.youtube.com/@gamedev_pl",
-    videoLabelKey: "channelLink",
+    videoUrl: "https://www.youtube.com/shorts/PtXzuqlUVnY",
+    videoLabelKey: "furShortLink",
+    videoPublishAt: "2026-11-23T02:00:00+01:00",
     steps: [
       {
         id: "FU1",
@@ -1055,8 +1097,9 @@ export const EFFECTS = [
     summaryEn: "Thirty-one years of game glass & optics: 1995 flat alpha, env-map chrome, Schlick Fresnel, Snell refraction, Beer–Lambert absorption, Cauchy dispersion, real-time GPU photon caustics, and multi-bounce Total Internal Reflection.",
     summaryPl: "31 lat szkła i optyki w grach: płaska alfa z 1995, refleks env-mapy, Fresnel Schlicka, refrakcja Snella, absorpcja Beera–Lamberta, dyspersja Cauchy'ego, fotonowa kaustyka GPU na żywo i wielokrotne wewnętrzne odbicia (TIR).",
     tags: ["Snell / Fresnel", "Beer–Lambert", "Cauchy RGB", "98K Photon Caustics"],
-    videoUrl: "https://www.youtube.com/@gamedev_pl",
-    videoLabelKey: "channelLink",
+    videoUrl: "https://www.youtube.com/shorts/T2alevyW7Bo",
+    videoLabelKey: "glassShortLink",
+    videoPublishAt: "2026-11-25T02:00:00+01:00",
     steps: [
       {
         id: "G1",
@@ -1217,8 +1260,9 @@ export const EFFECTS = [
     summaryEn: "Thirty-four years of game skies & clouds: 1992 pixel sprites, scrolling skybox planes, 3D billboards, Rayleigh & Mie atmosphere, 64³ Perlin–Worley raymarching, Beer–Lambert silver lining, multi-scattering powder, and live crepuscular god-rays.",
     summaryPl: "34 lata nieba i chmur w grach: pikselowe sprite'y z 1992, przewijana płaszczyzna, billboardy 3D, fizyczne niebo Rayleigh + Mie, raymarching 64³ Perlin–Worley, silver lining, multi-scattering powder i promienie słońca (god-rays).",
     tags: ["Rayleigh + Mie", "64³ Perlin–Worley", "Silver Lining", "God-Rays"],
-    videoUrl: "https://www.youtube.com/@gamedev_pl",
-    videoLabelKey: "channelLink",
+    videoUrl: "https://www.youtube.com/shorts/ms-mbMSgG9A",
+    videoLabelKey: "cloudsShortLink",
+    videoPublishAt: "2026-11-26T02:00:00+01:00",
     steps: [
       {
         id: "CL1",
@@ -1379,8 +1423,9 @@ export const EFFECTS = [
     summaryEn: "Thirty-four years of game grass: 1992 pixel tiles, 1996 crossed alpha X-cards, 2001 stacked shell layers, 28,000 GPU-instanced 3D blades, travelling wind waves, backlit SSS, swaying wildflowers, and live spring-damper trampling trails.",
     summaryPl: "34 lata trawy w grach: pikselowa tekstura 1992, skrzyżowane karty X z 1996, 10 warstw shell 2001, 28 000 instancjonowanych źdźbeł 3D, fale wiatru, podświetlone SSS, polne kwiaty i żywe wydeptywanie ścieżek.",
     tags: ["Alpha X-Cards", "28K Instanced", "Backlit SSS", "Live Trails"],
-    videoUrl: "https://www.youtube.com/@gamedev_pl",
-    videoLabelKey: "channelLink",
+    videoUrl: "https://www.youtube.com/shorts/DnuMky0yNu0",
+    videoLabelKey: "grassShortLink",
+    videoPublishAt: "2026-11-27T02:00:00+01:00",
     steps: [
       {
         id: "G1",
@@ -1542,8 +1587,9 @@ export const EFFECTS = [
     summaryEn: "Fifty-one years of light transport in one Cornell Gallery: 1975 Blinn–Phong rasterization, 1980 Whitted ray tracing, 1984 Cook distributed RT, 1986 Kajiya 1 SPP path tracing, multi-SPP accumulation, NEE & MIS, ReSTIR + SVGF denoising, and 2026 real-time browser path tracing.",
     summaryPl: "51 lat transportu światła w jednej sali Cornella: rasteryzacja Blinn–Phong z 1975, Whitted ray tracing z 1980, Cook 1984 (miękkie cienie, DoF, motion blur), path tracing Kajiyi 1 SPP (1986), akumulacja wielu próbek, NEE + MIS, ReSTIR + odszumianie SVGF i path tracing w przeglądarce.",
     tags: ["Whitted & Cook", "Kajiya GI", "NEE + MIS", "ReSTIR + SVGF"],
-    videoUrl: "https://www.youtube.com/@gamedev_pl",
-    videoLabelKey: "channelLink",
+    videoUrl: "https://www.youtube.com/shorts/lKV2oTqJ0RU",
+    videoLabelKey: "pathtracingShortLink",
+    videoPublishAt: "2026-11-28T02:00:00+01:00",
     steps: [
       {
         id: "PT1",
@@ -1706,8 +1752,9 @@ export const EFFECTS = [
     summaryEn: "Thirty years of Non-Photorealistic Rendering on one stylized Ronin-Sentinel: 1996 Decaudin cartoon edges, 1998 Gooch warm-to-cool, 2000 inverted hull cel games, 2002 Wind Waker ramps, 2009 Borderlands Sobel + hatching, 2014 Guilty Gear Xrd edited normals & UV lines, 2018 Spider-Verse halftone & 1s/2s, and 2026 Anisotropic Kuwahara brushstrokes.",
     summaryPl: "30 lat renderingu niefotorealistycznego (NPR) na figurce Ronina-Strażnika: praca Decaudina 1996, model Goocha 1998, era gier cel-shaded 2000 z inverted hull, styl Wind Waker 2002, Sobel i kreskowanie jak w Borderlands 2009, edytowane normalne i linie UV z Guilty Gear Xrd 2014, halftone i animacja na 1/2 ze Spider-Verse 2018 oraz malarski filtr Kuwahary 2026.",
     tags: ["Inverted Hull", "GG Xrd Normals", "Ben-Day Halftone", "Anisotropic Kuwahara"],
-    videoUrl: "https://www.youtube.com/@gamedev_pl",
-    videoLabelKey: "channelLink",
+    videoUrl: "https://www.youtube.com/shorts/jityemaHGLc",
+    videoLabelKey: "toonShortLink",
+    videoPublishAt: "2026-11-29T02:00:00+01:00",
     steps: [
       {
         id: "T1",
@@ -1869,8 +1916,9 @@ export const EFFECTS = [
     summaryEn: "Thirty-six years of anti-aliasing with a live 4× pixel loupe: 1990 Haeberli & Akeley SSAA, 1993 hardware MSAA, 2011 Lottes FXAA, 2012 Jimenez SMAA, 2010–13 Early TAA ghosting, 2014 Karis YCoCg clipping, Toksvig/Kaplanyan Specular AA, and FSR 2 / TSR 50%-axis (25% pixels) temporal upscaling.",
     summaryPl: "36 lat anti-aliasingu z interaktywną lupą 4×: SSAA (Haeberli & Akeley 1990), sprzętowe MSAA (1993), FXAA (Lottes 2011), SMAA (Jimenez 2012), wczesne TAA i ghosting (2010–13), YCoCg clipping (Lottes/Malan/Karis 2014), Specular AA (Toksvig/Kaplanyan) oraz upscaling 50% na oś (25% pikseli, FSR 2 / TSR).",
     tags: ["4× Loupe", "FXAA / SMAA", "TAA YCoCg Clip", "25% px Upscale"],
-    videoUrl: "https://www.youtube.com/@gamedev_pl",
-    videoLabelKey: "channelLink",
+    videoUrl: "https://www.youtube.com/shorts/UizNrqtLYAs",
+    videoLabelKey: "aaShortLink",
+    videoPublishAt: "2026-11-30T02:00:00+01:00",
     steps: [
       {
         id: "AA1",
@@ -2038,8 +2086,9 @@ export const EFFECTS = [
     summaryEn: "Fifty years of reflections on one rain-slicked neon courtyard: 1976 Blinn & Newell equirectangular maps, 1996 planar mirrors, 1999 hardware cubemaps, 2011 Crysis 2 SSR artifacts, 2012 parallax-corrected cubemaps, 2013 Karis Split-Sum IBL, 2018 Battlefield V DXR RT, and UE5 Lumen / Cyberpunk RT Overdrive multi-bounce glossy reflections.",
     summaryPl: "50 lat odbić na jednym mokrym neonowym dziedzińcu: mapy equirectangular (Blinn & Newell 1976), lustra planarne (1996), sprzętowe cubemapy (1999), artefakty SSR (Crysis 2 2011), cubemapy z korekcją paralaksy (2012), Split-Sum IBL (Karis 2013), DXR RT (Battlefield V 2018) oraz wielokrotne odbicia (Lumen / Cyberpunk RT Overdrive).",
     tags: ["Crysis 2 SSR", "Parallax Cube", "DXR RT", "Lumen Multi-Bounce"],
-    videoUrl: "https://www.youtube.com/@gamedev_pl",
-    videoLabelKey: "channelLink",
+    videoUrl: "https://www.youtube.com/shorts/ySQLiscu4U4",
+    videoLabelKey: "reflectionsShortLink",
+    videoPublishAt: "2026-12-01T02:00:00+01:00",
     steps: [
       {
         id: "R1",
@@ -2204,8 +2253,9 @@ export const EFFECTS = [
     summaryEn: "Forty-eight years of turning flat low-poly stone into jagged 3D silhouettes: 1978 Blinn Bump Mapping, 1998 Normal Mapping, 2001 Kaneko Parallax, 2005 Policarpo Relief, 2006 Tatarchuk POM, 2009 DX11 Programmable Tessellation, 2018–20 Turing / DX12 Meshlets, and 2022–26 Virtualized Micropolygons (emulated via dense vertex displacement in WebGL2).",
     summaryPl: "48 lat zamieniania płaskiego walca w prawdziwą 3D kamienną kolumnę: Bump Mapping (Blinn 1978), Normal Mapping (1998), Parallax (Kaneko 2001), Relief (Policarpo 2005), POM z samocieniowaniem (Tatarchuk 2006), programowalna teselacja DX11 (2009), Meshlety (Turing 2018 / DX12 Ultimate 2020) i wirtualne mikropoligony w stylu UE5 Nanite (emulowane gęstym displacementem w WebGL2).",
     tags: ["POM Shadows", "DX11 Tessellation", "Meshlets", "Nanite Style"],
-    videoUrl: "https://www.youtube.com/@gamedev_pl",
-    videoLabelKey: "channelLink",
+    videoUrl: "https://www.youtube.com/shorts/22nWrL2uBKc",
+    videoLabelKey: "surfaceShortLink",
+    videoPublishAt: "2026-12-02T02:00:00+01:00",
     steps: [
       {
         id: "S1",
@@ -2371,8 +2421,9 @@ export const EFFECTS = [
     summaryEn: "Nearly 30 years of fog and volumetric god rays inside one gothic clockwork hall: 1997 Turok / Silent Hill depth fog, 2002 Hoffman & Preetham aerial perspective, 2004 pre-screen-space shadow slices, 2007 Mitchell GPU Gems 3 screen-space rays (fading when you look away), 2009 Tóth & Umenhoffer interleaved 3D raymarching, 2014 Wronski froxel fog, 2015 Hillaire / Frostbite heterogeneous mist & local lights, and 2020–26 Hillaire EGSR multi-scattering with stained-glass sunbeams.",
     summaryPl: "Prawie 30 lat mgły i snopów światła w jednej gotyckiej hali z kołem zębatym: mgła głębi (Turok '97 / Silent Hill '99), Hoffman & Preetham (2002), plastry cieni 3D (2004), Screen-Space God Rays (Mitchell GPU Gems 3, 2007 — wygasają po odwróceniu wzroku!), raymarching 3D z interleaved sampling (Tóth & Umenhoffer 2009), Froxel Fog (Wronski 2014), heterogeniczna mgła i lokalne światła (Hillaire / Frostbite 2015) oraz multi-scattering (Hillaire EGSR 2020) z kolorowym witrażem.",
     tags: ["GPU Gems 3", "Froxel Fog", "Frostbite 2015", "Stained Glass"],
-    videoUrl: "https://www.youtube.com/@gamedev_pl",
-    videoLabelKey: "channelLink",
+    videoUrl: "https://www.youtube.com/shorts/7DkkkWPEO8A",
+    videoLabelKey: "fogShortLink",
+    videoPublishAt: "2026-12-03T02:00:00+01:00",
     steps: [
       {
         id: "F1",
@@ -2534,8 +2585,9 @@ export const EFFECTS = [
     summaryEn: "30 years of indirect light in real-time WebGPU Compute (with automatic WebGL2 fallback): 1996 Quake baked lightmaps (frozen when the lamp moves), 1998–2004 irradiance probes (thin-wall light leaking), 2007 Crysis SSAO (occlusion, not GI), 2009 Ritschel SSDO/SSGI (vanishes when looking away), 2011 Crassin 3D Voxel Cone Tracing, 2019 DDGI Chebyshev probes, 2022 UE5 Lumen-style software SDF GI, and 2023–26 Sannikov Radiance Cascades.",
     summaryPl: "30 lat światła odbitego w WebGPU Compute (z automatycznym fallbackiem WebGL2): lightmapy z Quake'a (1996 — zamrożone po ruchu lampy), sondy irradiance (1998–2004 — przeciek przez cienką ścianę), SSAO (Crysis 2007 — samo zasłanianie, nie GI), SSDO/SSGI (Ritschel 2009 — znika po odwróceniu wzroku), Voxel Cone Tracing 3D (Crassin 2011), DDGI z widocznością Czebyszewa (2019), programowe SDF GI w stylu UE5 Lumen (2022) oraz Radiance Cascades (Sannikov 2023–26).",
     tags: ["WebGPU Compute", "Radiance Cascades", "DDGI", "Voxel Cones"],
-    videoUrl: "https://www.youtube.com/@gamedev_pl",
-    videoLabelKey: "channelLink",
+    videoUrl: "https://www.youtube.com/shorts/JnQ5xxRjIkE",
+    videoLabelKey: "giShortLink",
+    videoPublishAt: "2026-12-04T02:00:00+01:00",
     steps: [
       {
         id: "GI1",
@@ -2702,8 +2754,9 @@ export const EFFECTS = [
     summaryEn: "32 years of real-time texture mapping on one oblique corridor: 1994 PS1 affine warping & GTE vertex snapping, 1996 Quake 16-pixel spans, 1996 3dfx Voodoo bilinear shimmer, 1996 mipmapping & trilinear (Williams '83), 1998 S3TC/DXT1 4×4 blocks, 2001 16× Anisotropic Filtering (GeForce 3 vs angle-dependent Radeon 8500), 2011 RAGE MegaTexture pop-in, and 2020–26 DX12 Sampler Feedback streaming.",
     summaryPl: "32 lata mapowania tekstur na jednym ukośnym korytarzu: 1994 PS1 affine warping i drganie wierzchołków, 1996 Quake (podział co 16 px), 1996 3dfx Voodoo bilinear, 1996 mipmapping i trilinear (Williams '83), 1998 kompresja S3TC/DXT1 4×4, 2001 anizotropowe 16× (GeForce 3 vs kątowy Radeon 8500), 2011 MegaTexture z pop-inem kafelków (RAGE) i 2020–26 DX12 Sampler Feedback.",
     tags: ["PS1 Affine", "16× Anisotropic", "S3TC 4×4", "Sampler Feedback"],
-    videoUrl: "https://www.youtube.com/@gamedev_pl",
-    videoLabelKey: "channelLink",
+    videoUrl: "https://www.youtube.com/shorts/X13_VuMJKmA",
+    videoLabelKey: "texturesShortLink",
+    videoPublishAt: "2026-12-05T02:00:00+01:00",
     steps: [
       {
         id: "TX1",
@@ -2867,8 +2920,9 @@ export const EFFECTS = [
     summaryEn: "30 years of non-Euclidean game geometry live in WebGL2 SDF ray-teleportation: 1994 Marathon overlapping rooms, 1996 Build/Duke3D overlapping sectors & portal mirrors, 2006 Prey fixed 3D portals, 2007 Portal recursive Blue↔Orange infinite corridors, 2013 Antichamber look-away shifting rooms, 2018 CodeParade 2m-outside / 22m-inside tunnel, 2022 Portal with RTX light & shadows through portals, and 2023 Viewfinder photo-to-3D geometry.",
     summaryPl: "30 lat geometrii nieeuklidesowej na żywo w WebGL2: 1994 nakładające się pokoje (Marathon), 1996 sektory i lustra (Build / Duke Nukem 3D), 2006 stałe portale 3D (Prey), 2007 rekurencyjne portale (Portal), 2013 zmieniające się pokoje (Antichamber), 2018 tunel większy w środku (CodeParade), 2022 światło i cienie przez portale (Portal RTX) i 2023 zdjęcie stające się 3D (Viewfinder).",
     tags: ["Recursive Portals", "Bigger Inside", "Portal RTX", "Viewfinder 3D"],
-    videoUrl: "https://www.youtube.com/@gamedev_pl",
-    videoLabelKey: "channelLink",
+    videoUrl: "https://www.youtube.com/shorts/luQ7DI7gWmg",
+    videoLabelKey: "portalsShortLink",
+    videoPublishAt: "2026-12-06T02:00:00+01:00",
     steps: [
       {
         id: "P1",
@@ -3030,8 +3084,9 @@ export const EFFECTS = [
     summaryEn: "22 years of HDR tone mapping in real RGBA16F WebGL2: LDR clamping, Reinhard, Far Cry / HL2 bloom, Uncharted 2, ACES, GT Uchimura, AgX & Khronos PBR Neutral.",
     summaryPl: "22 lata tone mappingu HDR w prawdziwym RGBA16F WebGL2: ucinanie LDR, Reinhard, bloom Far Cry / HL2, Uncharted 2, ACES, GT Uchimura, AgX i Khronos PBR Neutral.",
     tags: ["HDR RGBA16F", "ACES", "AgX", "PBR Neutral"],
-    videoUrl: "https://www.youtube.com/@gamedev_pl",
-    videoLabelKey: "channelLink",
+    videoUrl: "https://www.youtube.com/shorts/O_lfxUgcVkY",
+    videoLabelKey: "tonemappingShortLink",
+    videoPublishAt: "2026-12-07T02:00:00+01:00",
     steps: [
       {
         id: "TM1",
@@ -3196,8 +3251,9 @@ export const EFFECTS = [
     summaryEn: "31 years of turning 3D into crisp pixel art (noting the 1997–2017 gap): Comanche Voxel Space, DKC sprites, Blood voxels, Dead Cells, HD-2D, Obra Dinn 1-bit lock, A Short Hike & t3ssel8r texel-snapping.",
     summaryPl: "31 lat zamieniania 3D w ostry pixel art (z uczciwą przerwą 1997–2017): Voxel Space Comanche, DKC, woksele Blood, Dead Cells, HD-2D, 1-bit Obra Dinn, A Short Hike i texel-snapping t3ssel8r.",
     tags: ["Texel Snap", "Obra Dinn", "HD-2D", "4× Loupe"],
-    videoUrl: "https://www.youtube.com/@gamedev_pl",
-    videoLabelKey: "channelLink",
+    videoUrl: "https://www.youtube.com/shorts/BQ37q7o_rtM",
+    videoLabelKey: "pixel3dShortLink",
+    videoPublishAt: "2026-12-08T02:00:00+01:00",
     steps: [
       {
         id: "PX1",
