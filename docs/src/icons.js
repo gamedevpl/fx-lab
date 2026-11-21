@@ -222,6 +222,25 @@ const ICONS = {
     `<rect x="7" y="6" width="2" height="2" fill="#2cb8d6"/>` +
     `<rect x="8" y="8" width="2" height="3" fill="#1d6e8c"/>` +
     `<rect x="1" y="9" width="10" height="2" fill="#293b59" fill-opacity="0.45"/>`,
+
+  // Cornell-style Global Illumination room: crimson left wall, cyan right wall, glowing warm lamp & colored bounce on white sphere
+  gi:
+    `<rect x="1" y="1" width="10" height="10" fill="#1b2030"/>` +
+    `<rect x="1" y="2" width="2" height="8" fill="#e62b2b"/>` +
+    `<rect x="2" y="3" width="1" height="6" fill="#ff5447"/>` +
+    `<rect x="9" y="2" width="2" height="8" fill="#12b8d9"/>` +
+    `<rect x="9" y="3" width="1" height="6" fill="#4de8ff"/>` +
+    `<rect x="3" y="2" width="6" height="6" fill="#5e5954"/>` +
+    `<rect x="3" y="3" width="2" height="4" fill="#9c4c47"/>` +
+    `<rect x="7" y="3" width="2" height="4" fill="#3a7c8c"/>` +
+    `<rect x="5" y="1" width="2" height="2" fill="#ffd86b"/>` +
+    `<rect x="5" y="2" width="2" height="1" fill="#fff7d6"/>` +
+    `<rect x="4" y="6" width="4" height="3" fill="#e8e1d5"/>` +
+    `<rect x="4" y="6" width="1" height="2" fill="#ff7d70"/>` +
+    `<rect x="7" y="6" width="1" height="2" fill="#63e2f5"/>` +
+    `<rect x="2" y="9" width="8" height="2" fill="#8c8378"/>` +
+    `<rect x="2" y="9" width="3" height="2" fill="#bf4b45"/>` +
+    `<rect x="7" y="9" width="3" height="2" fill="#299bb5"/>`,
 };
 
 const FALLBACK_ICON =

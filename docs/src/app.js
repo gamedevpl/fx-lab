@@ -39,6 +39,7 @@ const LOADERS = {
   reflections: () => import("../effects/reflections/index.js").then(m => m.createReflectionsEffect),
   surface: () => import("../effects/surface/index.js").then(m => m.createSurfaceEffect),
   fog: () => import("../effects/fog/index.js").then(m => m.createFogEffect),
+  gi: () => import("../effects/gi/index.js").then(m => m.createGiEffect),
 };
 const engines = new Map();
 const moduleCache = new Map();
@@ -59,10 +60,10 @@ async function loadEngine(id) {
   if (!engines.has(id)) {
     prefetchEffect(id);
     const factory = await moduleCache.get(id);
-    // Double rAF guarantees the browser paints & composites the pixel loader before synchronous GLSL compile.
+    // Double rAF guarantees the browser paints & composites the pixel loader before synchronous GLSL/WGSL compile.
     await nextFrame();
     await nextFrame();
-    engines.set(id, factory(gl));
+    engines.set(id, await factory(gl, { canvas, params }));
   }
   return engines.get(id);
 }
@@ -443,9 +444,10 @@ function updateCard() {
   const isReflections = currentEffect.id === "reflections";
   const isSurface = currentEffect.id === "surface";
   const isFog = currentEffect.id === "fog";
+  const isGi = currentEffect.id === "gi";
   $("hintLine").textContent = isWaterLive
     ? u.waterClickHint
-    : (isShadows ? u.shadowsClickHint : (isCloth ? u.clothClickHint : (isFurLive ? u.furClickHint : (isGlass ? u.glassClickHint : (isClouds ? u.cloudsClickHint : (isGrass ? u.grassClickHint : (isPathtracing ? u.pathtracingClickHint : (isToon ? u.toonClickHint : (isAa ? u.aaClickHint : (isReflections ? u.reflectionsClickHint : (isSurface ? u.surfaceClickHint : (isFog ? u.fogClickHint : u.dragHint))))))))))));
+    : (isShadows ? u.shadowsClickHint : (isCloth ? u.clothClickHint : (isFurLive ? u.furClickHint : (isGlass ? u.glassClickHint : (isClouds ? u.cloudsClickHint : (isGrass ? u.grassClickHint : (isPathtracing ? u.pathtracingClickHint : (isToon ? u.toonClickHint : (isAa ? u.aaClickHint : (isReflections ? u.reflectionsClickHint : (isSurface ? u.surfaceClickHint : (isFog ? u.fogClickHint : (isGi ? u.giClickHint : u.dragHint)))))))))))));
   const linkLabel = u[currentEffect.videoLabelKey] || u.channelLink;
   const filmLine = $("filmLine");
   filmLine.innerHTML = `<span>${u.videoPrefix} <a href="${currentEffect.videoUrl}" target="_blank" rel="noopener">${linkLabel}</a></span><span>·</span><button type="button" class="film-more" id="moreFxBtn">${u.moreEffects(EFFECTS.length)}</button>`;
@@ -503,7 +505,14 @@ async function selectEffect(effectId, stepIdx = null, splitOpt = null) {
     const eng = await loadEngine(nextFx.id);
     if (seq !== switchSeq) return;
 
+    if (activeEngine && activeEngine !== eng && typeof activeEngine.setVisible === "function") {
+      activeEngine.setVisible(false);
+    }
     activeEngine = eng;
+    if (typeof activeEngine.setVisible === "function") {
+      activeEngine.setVisible(true);
+    }
+    canvas.style.opacity = activeEngine.usesExternalCanvas ? "0" : "";
     resetCamera();
     activeEngine.enterStep(currentStepIdx);
     resizeCanvas(true);
@@ -717,7 +726,8 @@ splitHit.addEventListener("keydown", ev => {
 window.FXLAB = {
   EFFECTS,
   lang: () => lang,
-  current: () => ({ effect: currentEffect, step: currentStep(), stepIdx: currentStepIdx, split: split.enabled }),
+  backend: () => activeEngine?.backend || "webgl2",
+  current: () => ({ effect: currentEffect, step: currentStep(), stepIdx: currentStepIdx, split: split.enabled, backend: activeEngine?.backend || "webgl2" }),
   show(effectId, stepRef, splitOpt = null) {
     const fx = EFFECTS.find(e => e.id === effectId);
     if (!fx) return false;
