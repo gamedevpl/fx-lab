@@ -163,6 +163,20 @@ const ICONS = {
     `<rect x="3" y="8" width="5" height="1" fill="#ff5c6c"/>` +
     `<rect x="9" y="9" width="2" height="2" fill="#ffd147"/>` +
     `<rect x="3" y="10" width="6" height="1" fill="#2d63bd"/>`,
+
+  // 4x AA magnifier: jagged stair-stepped pixels on left vs smooth anti-aliased ramp on right inside amber frame
+  aa:
+    `<rect x="1" y="1" width="10" height="10" fill="#f2b84b"/>` +
+    `<rect x="2" y="2" width="8" height="8" fill="#182238"/>` +
+    `<rect x="2" y="7" width="2" height="3" fill="#e8eef7"/>` +
+    `<rect x="4" y="5" width="2" height="5" fill="#e8eef7"/>` +
+    `<rect x="6" y="4" width="1" height="6" fill="#e8eef7"/>` +
+    `<rect x="7" y="3" width="1" height="7" fill="#e8eef7"/>` +
+    `<rect x="8" y="2" width="2" height="8" fill="#e8eef7"/>` +
+    `<rect x="6" y="3" width="1" height="1" fill="#70b8ff"/>` +
+    `<rect x="7" y="2" width="1" height="1" fill="#46e8c8"/>` +
+    `<rect x="5" y="4" width="1" height="1" fill="#4f6d9e"/>` +
+    `<rect x="5" y="2" width="1" height="8" fill="#ff5c77"/>`,
 };
 
 const FALLBACK_ICON =

@@ -35,6 +35,7 @@ const LOADERS = {
   grass: () => import("../effects/grass/index.js").then(m => m.createGrassEffect),
   pathtracing: () => import("../effects/pathtracing/index.js").then(m => m.createPathtracingEffect),
   toon: () => import("../effects/toon/index.js").then(m => m.createToonEffect),
+  aa: () => import("../effects/aa/index.js").then(m => m.createAaEffect),
 };
 const engines = new Map();
 const moduleCache = new Map();
@@ -435,9 +436,10 @@ function updateCard() {
   const isGrass = currentEffect.id === "grass" && st.stage >= 4;
   const isPathtracing = currentEffect.id === "pathtracing" && st.stage >= 6;
   const isToon = currentEffect.id === "toon";
+  const isAa = currentEffect.id === "aa";
   $("hintLine").textContent = isWaterLive
     ? u.waterClickHint
-    : (isShadows ? u.shadowsClickHint : (isCloth ? u.clothClickHint : (isFurLive ? u.furClickHint : (isGlass ? u.glassClickHint : (isClouds ? u.cloudsClickHint : (isGrass ? u.grassClickHint : (isPathtracing ? u.pathtracingClickHint : (isToon ? u.toonClickHint : u.dragHint))))))));
+    : (isShadows ? u.shadowsClickHint : (isCloth ? u.clothClickHint : (isFurLive ? u.furClickHint : (isGlass ? u.glassClickHint : (isClouds ? u.cloudsClickHint : (isGrass ? u.grassClickHint : (isPathtracing ? u.pathtracingClickHint : (isToon ? u.toonClickHint : (isAa ? u.aaClickHint : u.dragHint)))))))));
   const linkLabel = u[currentEffect.videoLabelKey] || u.channelLink;
   const filmLine = $("filmLine");
   filmLine.innerHTML = `<span>${u.videoPrefix} <a href="${currentEffect.videoUrl}" target="_blank" rel="noopener">${linkLabel}</a></span><span>·</span><button type="button" class="film-more" id="moreFxBtn">${u.moreEffects(EFFECTS.length)}</button>`;

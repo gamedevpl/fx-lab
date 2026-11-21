@@ -17,6 +17,7 @@ Interactive WebGL2 sandbox for real-time graphics effects from [gamedev.pl](http
 9. **[Evolution of Grass & Foliage](https://gamedevpl.github.io/fx-lab/grass/)** (8 eras, 1992–2026 · [source & notes](./docs/effects/grass/README.md)) — 1992 flat pixel tile, 1996 crossed alpha-cutout X-cards (with wireframe toggle), 2001 10-layer stacked shell grass, 28,000 GPU-instanced 3D curved blades, multi-octave travelling wind waves & root AO, backlit golden subsurface scattering, 650 swaying 3D wildflowers with drifting cloud shadows & sunlit pollen, and a live 128×128 spring-damper trampling trail field parted by a rolling carved orb and mouse clicks.
 10. **[Evolution of Path Tracing](https://gamedevpl.github.io/fx-lab/pathtracing/)** (8 eras, 1975–2026 · [source & notes](./docs/effects/pathtracing/README.md)) — 1975 Blinn–Phong local rasterization, 1980 Whitted ray tracing (hard shadows, chrome mirror & Snell crystal glass), 1984 Cook distributed ray tracing (soft area shadows, glossy gold, thin-lens DoF & swinging pendulum motion blur), 1986 Kajiya 1 SPP unbiased Monte Carlo path tracing, multi-SPP progressive temporal accumulation, importance sampling + NEE + Veach MIS, ReSTIR multi-light RIS + 4-pass edge-stopping À-Trous SVGF denoising, and 2026 interactive real-time browser path tracing.
 11. **[Evolution of Toon & NPR Shading](https://gamedevpl.github.io/fx-lab/toon/)** (8 eras, 1996–2026 · [source & notes](./docs/effects/toon/README.md)) — 1996 Decaudin cartoon rendering (2-tone cel + Z/normal discontinuity ink), 1998 Gooch warm-to-cool technical illustration, 2000 cel-shaded games with authentic back-face Inverted Hull geometry, 2002 *Wind Waker*-style saturated cel ramps, 2009 *Borderlands*-style Sobel ink & comic cross-hatching, 2014 *Guilty Gear Xrd* artist-edited normals, ILM masks, UV inner lines & stepped anime timing, 2018 *Spider-Verse*-style Ben-Day halftone, shadow hatching, CMYK offset & mixed 1s/2s animation, and 2026 real-time 8-sector Anisotropic Kuwahara painterly oil brushstrokes driven by a GPU Structure Tensor.
+12. **[Evolution of Anti-Aliasing & Temporal Upscaling](https://gamedevpl.github.io/fx-lab/aa/)** (8 eras, 1990–2026 · [source & notes](./docs/effects/aa/README.md)) — 1990 Haeberli & Akeley 4×4 SSAA, 1993 hardware 4× MSAA (smooth geometry edges with remaining specular aliasing), 2011 Timothy Lottes FXAA, 2012 Jorge Jimenez SMAA (sharp textures while subpixel wires still break up), 2010–2013 Early TAA (*Halo: Reach* / *Crysis 2* / *UE4*) showing motion ghosting, 2014 Motion Vectors + Catmull-Rom + YCoCg AABB clipping (Lottes 2011 / Malan 2012 / Karis SIGGRAPH 2014), Toksvig/Kaplanyan Specular AA, and FSR 2 / TSR-style 50%-axis (25% pixels) Halton(2,3) temporal upscaling with a clickable 4× pixel magnifier loupe.
 
 ## Project structure
 
@@ -24,21 +25,22 @@ Each effect lives in its own self-contained folder under `docs/effects/<id>/` wi
 
 ```text
 docs/
-├── index.html                                                                # Root entry (loads default effect)
-├── splats/ fire/ water/ shadows/ cloth/ fur/ glass/ clouds/ grass/ pathtracing/ toon/ # Clean per-effect routes with dedicated Open Graph cards
-├── src/                                                                      # Shared app shell, catalog metadata, WebGL2 helpers
+├── index.html                                                                   # Root entry (loads default effect)
+├── splats/ fire/ water/ shadows/ cloth/ fur/ glass/ clouds/ grass/ pathtracing/ toon/ aa/ # Clean per-effect routes with dedicated Open Graph cards
+├── src/                                                                         # Shared app shell, catalog metadata, WebGL2 helpers
 └── effects/
-    ├── splats/                                                               # README.md · scene.js · shaders.js · index.js
-    ├── fire/                                                                 # README.md · simulations.js · shaders.js · index.js
-    ├── water/                                                                # README.md · simulation.js · shaders.js · index.js
-    ├── shadows/                                                              # README.md · shaders.js · index.js
-    ├── cloth/                                                                # README.md · simulation.js · shaders.js · index.js
-    ├── fur/                                                                  # README.md · groom.js · shaders.js · index.js
-    ├── glass/                                                                # README.md · optics.js · shaders.js · index.js
-    ├── clouds/                                                               # README.md · atmosphere.js · shaders.js · index.js
-    ├── grass/                                                                # README.md · scene.js · shaders.js · index.js
-    ├── pathtracing/                                                          # README.md · shaders.js · index.js
-    └── toon/                                                                 # README.md · scene.js · shaders.js · index.js
+    ├── splats/                                                                  # README.md · scene.js · shaders.js · index.js
+    ├── fire/                                                                    # README.md · simulations.js · shaders.js · index.js
+    ├── water/                                                                   # README.md · simulation.js · shaders.js · index.js
+    ├── shadows/                                                                 # README.md · shaders.js · index.js
+    ├── cloth/                                                                   # README.md · simulation.js · shaders.js · index.js
+    ├── fur/                                                                     # README.md · groom.js · shaders.js · index.js
+    ├── glass/                                                                   # README.md · optics.js · shaders.js · index.js
+    ├── clouds/                                                                  # README.md · atmosphere.js · shaders.js · index.js
+    ├── grass/                                                                   # README.md · scene.js · shaders.js · index.js
+    ├── pathtracing/                                                             # README.md · shaders.js · index.js
+    ├── toon/                                                                    # README.md · scene.js · shaders.js · index.js
+    └── aa/                                                                      # README.md · shaders.js · index.js
 ```
 
 ## Controls
