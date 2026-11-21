@@ -268,6 +268,35 @@ const ICONS = {
     `<rect x="9" y="2" width="1" height="2" fill="#ffd28a"/>` +
     `<rect x="5" y="5" width="2" height="2" fill="#e6ecf5"/>` +
     `<rect x="5" y="6" width="2" height="1" fill="#ff5488"/>`,
+
+  // HDR Tone Mapping: glowing RGB/CMY neon pillars + smooth amber S-curve across dark studio
+  tonemapping:
+    `<rect x="1" y="1" width="10" height="10" fill="#101422"/>` +
+    `<rect x="2" y="3" width="1" height="6" fill="#ff3344"/>` +
+    `<rect x="2" y="2" width="1" height="2" fill="#fff0e0"/>` +
+    `<rect x="4" y="3" width="1" height="6" fill="#2ee85c"/>` +
+    `<rect x="6" y="3" width="1" height="6" fill="#1ea8ff"/>` +
+    `<rect x="6" y="2" width="1" height="2" fill="#e6f7ff"/>` +
+    `<rect x="8" y="3" width="1" height="6" fill="#ff38c7"/>` +
+    `<rect x="10" y="2" width="1" height="7" fill="#ffb830"/>` +
+    `<rect x="1" y="9" width="3" height="1" fill="#ffd166"/>` +
+    `<rect x="4" y="7" width="2" height="2" fill="#ffd166"/>` +
+    `<rect x="6" y="5" width="2" height="2" fill="#ffd166"/>` +
+    `<rect x="8" y="3" width="3" height="1" fill="#ffd166"/>`,
+
+  // 3D Pixel Art: tiny red-roofed windmill island on turquoise water with crisp 1px dark outline
+  pixel3d:
+    `<rect x="1" y="1" width="10" height="7" fill="#5cb8f5"/>` +
+    `<rect x="1" y="8" width="10" height="3" fill="#188eb5"/>` +
+    `<rect x="2" y="7" width="8" height="2" fill="#3bb54a"/>` +
+    `<rect x="3" y="8" width="6" height="1" fill="#8c7a62"/>` +
+    `<rect x="4" y="5" width="4" height="3" fill="#efe2c4"/>` +
+    `<rect x="3" y="4" width="6" height="1" fill="#d9382e"/>` +
+    `<rect x="4" y="3" width="4" height="1" fill="#d9382e"/>` +
+    `<rect x="5" y="2" width="2" height="1" fill="#f05a4f"/>` +
+    `<rect x="6" y="5" width="1" height="1" fill="#ffd447"/>` +
+    `<rect x="2" y="4" width="1" height="3" fill="#1d6e3a"/>` +
+    `<rect x="9" y="5" width="1" height="2" fill="#1d6e3a"/>`,
 };
 
 const FALLBACK_ICON =

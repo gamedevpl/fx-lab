@@ -42,6 +42,8 @@ const LOADERS = {
   gi: () => import("../effects/gi/index.js").then(m => m.createGiEffect),
   textures: () => import("../effects/textures/index.js").then(m => m.createTexturesEffect),
   portals: () => import("../effects/portals/index.js").then(m => m.createPortalsEffect),
+  tonemapping: () => import("../effects/tonemapping/index.js").then(m => m.createTonemappingEffect),
+  pixel3d: () => import("../effects/pixel3d/index.js").then(m => m.createPixel3dEffect),
 };
 const engines = new Map();
 const moduleCache = new Map();
@@ -449,9 +451,11 @@ function updateCard() {
   const isGi = currentEffect.id === "gi";
   const isTextures = currentEffect.id === "textures";
   const isPortals = currentEffect.id === "portals";
+  const isTonemapping = currentEffect.id === "tonemapping";
+  const isPixel3d = currentEffect.id === "pixel3d";
   $("hintLine").textContent = isWaterLive
     ? u.waterClickHint
-    : (isShadows ? u.shadowsClickHint : (isCloth ? u.clothClickHint : (isFurLive ? u.furClickHint : (isGlass ? u.glassClickHint : (isClouds ? u.cloudsClickHint : (isGrass ? u.grassClickHint : (isPathtracing ? u.pathtracingClickHint : (isToon ? u.toonClickHint : (isAa ? u.aaClickHint : (isReflections ? u.reflectionsClickHint : (isSurface ? u.surfaceClickHint : (isFog ? u.fogClickHint : (isGi ? u.giClickHint : (isTextures ? u.texturesClickHint : (isPortals ? u.portalsClickHint : u.dragHint)))))))))))))));
+    : (isShadows ? u.shadowsClickHint : (isCloth ? u.clothClickHint : (isFurLive ? u.furClickHint : (isGlass ? u.glassClickHint : (isClouds ? u.cloudsClickHint : (isGrass ? u.grassClickHint : (isPathtracing ? u.pathtracingClickHint : (isToon ? u.toonClickHint : (isAa ? u.aaClickHint : (isReflections ? u.reflectionsClickHint : (isSurface ? u.surfaceClickHint : (isFog ? u.fogClickHint : (isGi ? u.giClickHint : (isTextures ? u.texturesClickHint : (isPortals ? u.portalsClickHint : (isTonemapping ? u.tonemappingClickHint : (isPixel3d ? u.pixel3dClickHint : u.dragHint)))))))))))))))));
   const linkLabel = u[currentEffect.videoLabelKey] || u.channelLink;
   const filmLine = $("filmLine");
   filmLine.innerHTML = `<span>${u.videoPrefix} <a href="${currentEffect.videoUrl}" target="_blank" rel="noopener">${linkLabel}</a></span><span>·</span><button type="button" class="film-more" id="moreFxBtn">${u.moreEffects(EFFECTS.length)}</button>`;
