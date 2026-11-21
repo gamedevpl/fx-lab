@@ -1,7 +1,6 @@
 // Bilingual (EN / PL) catalog for all effects and stages in FX Lab.
 
 export const REPO_TREE_BASE = "https://github.com/gamedevpl/fx-lab/tree/main/";
-export const SHORTS_CHANNEL_URL = "https://www.youtube.com/@gamedev_pl/shorts";
 
 export const UI = {
   en: {
@@ -47,10 +46,7 @@ export const UI = {
     tonemappingClickHint: "Click left/right to set Exposure (−3 to +5.5 EV) · Drag to orbit · E for effects",
     pixel3dClickHint: "Click or drag yellow 4× loupe reticle onto windmill blades or roof · Drag elsewhere to orbit · E for effects",
     videoPrefix: "Watch the Short:",
-    videoScheduledPrefix: d => `Short drops ${d}:`,
-    videoScheduledTitle: d => `Scheduled for ${d} at 02:00 CET on YouTube`,
     channelLink: "GamedevPL on YouTube ↗",
-    shortsChannelLink: "GamedevPL Shorts ↗",
     shortLink: "Pixel-Art Splats Short ↗",
     fireShortLink: "Evolution of Fire Short ↗",
     waterShortLink: "Evolution of Water Short ↗",
@@ -124,10 +120,7 @@ export const UI = {
     tonemappingClickHint: "Kliknij lewo/prawo by ustawić Ekspozycję (−3 do +5,5 EV) · Przeciągnij by obrócić · E katalog",
     pixel3dClickHint: "Kliknij lub przeciągnij żółtą lupę 4× na wiatrak lub krawędź dachu · Reszta obraca kamerę · E katalog",
     videoPrefix: "Zobacz filmik:",
-    videoScheduledPrefix: d => `Premiera Shorta ${d}:`,
-    videoScheduledTitle: d => `Zaplanowany na ${d} o 02:00 CET na YouTube`,
     channelLink: "GamedevPL na YouTube ↗",
-    shortsChannelLink: "GamedevPL Shorts ↗",
     shortLink: "Short o Pixel-Art Splats ↗",
     fireShortLink: "Short o Ewolucji Ognia ↗",
     waterShortLink: "Short o Ewolucji Wody ↗",
@@ -608,7 +601,6 @@ export const EFFECTS = [
     tags: ["Shadow Map", "PCF / PCSS", "Ray-Traced", "Stained Glass GI"],
     videoUrl: "https://www.youtube.com/shorts/AaOwo3sHVRk",
     videoLabelKey: "shadowsShortLink",
-    videoPublishAt: "2026-11-22T02:00:00+01:00",
     steps: [
       {
         id: "SH1",
@@ -772,7 +764,6 @@ export const EFFECTS = [
     tags: ["Verlet / XPBD", "Charlie Sheen", "Aero Wind", "Live Tearing"],
     videoUrl: "https://www.youtube.com/shorts/R_xwfoOKS3I",
     videoLabelKey: "clothShortLink",
-    videoPublishAt: "2026-11-24T02:00:00+01:00",
     steps: [
       {
         id: "C1",
@@ -937,7 +928,6 @@ export const EFFECTS = [
     tags: ["Shell Texturing", "Kajiya–Kay", "Marschner Rim", "30K 3D Strands"],
     videoUrl: "https://www.youtube.com/shorts/PtXzuqlUVnY",
     videoLabelKey: "furShortLink",
-    videoPublishAt: "2026-11-23T02:00:00+01:00",
     steps: [
       {
         id: "FU1",
@@ -1099,7 +1089,6 @@ export const EFFECTS = [
     tags: ["Snell / Fresnel", "Beer–Lambert", "Cauchy RGB", "98K Photon Caustics"],
     videoUrl: "https://www.youtube.com/shorts/T2alevyW7Bo",
     videoLabelKey: "glassShortLink",
-    videoPublishAt: "2026-11-25T02:00:00+01:00",
     steps: [
       {
         id: "G1",
@@ -1262,7 +1251,6 @@ export const EFFECTS = [
     tags: ["Rayleigh + Mie", "64³ Perlin–Worley", "Silver Lining", "God-Rays"],
     videoUrl: "https://www.youtube.com/shorts/ms-mbMSgG9A",
     videoLabelKey: "cloudsShortLink",
-    videoPublishAt: "2026-11-26T02:00:00+01:00",
     steps: [
       {
         id: "CL1",
@@ -1425,7 +1413,6 @@ export const EFFECTS = [
     tags: ["Alpha X-Cards", "28K Instanced", "Backlit SSS", "Live Trails"],
     videoUrl: "https://www.youtube.com/shorts/DnuMky0yNu0",
     videoLabelKey: "grassShortLink",
-    videoPublishAt: "2026-11-27T02:00:00+01:00",
     steps: [
       {
         id: "G1",
@@ -1589,7 +1576,6 @@ export const EFFECTS = [
     tags: ["Whitted & Cook", "Kajiya GI", "NEE + MIS", "ReSTIR + SVGF"],
     videoUrl: "https://www.youtube.com/shorts/lKV2oTqJ0RU",
     videoLabelKey: "pathtracingShortLink",
-    videoPublishAt: "2026-11-28T02:00:00+01:00",
     steps: [
       {
         id: "PT1",
@@ -1754,7 +1740,6 @@ export const EFFECTS = [
     tags: ["Inverted Hull", "GG Xrd Normals", "Ben-Day Halftone", "Anisotropic Kuwahara"],
     videoUrl: "https://www.youtube.com/shorts/jityemaHGLc",
     videoLabelKey: "toonShortLink",
-    videoPublishAt: "2026-11-29T02:00:00+01:00",
     steps: [
       {
         id: "T1",
@@ -1918,7 +1903,6 @@ export const EFFECTS = [
     tags: ["4× Loupe", "FXAA / SMAA", "TAA YCoCg Clip", "25% px Upscale"],
     videoUrl: "https://www.youtube.com/shorts/UizNrqtLYAs",
     videoLabelKey: "aaShortLink",
-    videoPublishAt: "2026-11-30T02:00:00+01:00",
     steps: [
       {
         id: "AA1",
@@ -2088,7 +2072,6 @@ export const EFFECTS = [
     tags: ["Crysis 2 SSR", "Parallax Cube", "DXR RT", "Lumen Multi-Bounce"],
     videoUrl: "https://www.youtube.com/shorts/ySQLiscu4U4",
     videoLabelKey: "reflectionsShortLink",
-    videoPublishAt: "2026-12-01T02:00:00+01:00",
     steps: [
       {
         id: "R1",
@@ -2255,7 +2238,6 @@ export const EFFECTS = [
     tags: ["POM Shadows", "DX11 Tessellation", "Meshlets", "Nanite Style"],
     videoUrl: "https://www.youtube.com/shorts/22nWrL2uBKc",
     videoLabelKey: "surfaceShortLink",
-    videoPublishAt: "2026-12-02T02:00:00+01:00",
     steps: [
       {
         id: "S1",
@@ -2423,7 +2405,6 @@ export const EFFECTS = [
     tags: ["GPU Gems 3", "Froxel Fog", "Frostbite 2015", "Stained Glass"],
     videoUrl: "https://www.youtube.com/shorts/7DkkkWPEO8A",
     videoLabelKey: "fogShortLink",
-    videoPublishAt: "2026-12-03T02:00:00+01:00",
     steps: [
       {
         id: "F1",
@@ -2587,7 +2568,6 @@ export const EFFECTS = [
     tags: ["WebGPU Compute", "Radiance Cascades", "DDGI", "Voxel Cones"],
     videoUrl: "https://www.youtube.com/shorts/JnQ5xxRjIkE",
     videoLabelKey: "giShortLink",
-    videoPublishAt: "2026-12-04T02:00:00+01:00",
     steps: [
       {
         id: "GI1",
@@ -2756,7 +2736,6 @@ export const EFFECTS = [
     tags: ["PS1 Affine", "16× Anisotropic", "S3TC 4×4", "Sampler Feedback"],
     videoUrl: "https://www.youtube.com/shorts/X13_VuMJKmA",
     videoLabelKey: "texturesShortLink",
-    videoPublishAt: "2026-12-05T02:00:00+01:00",
     steps: [
       {
         id: "TX1",
@@ -2922,7 +2901,6 @@ export const EFFECTS = [
     tags: ["Recursive Portals", "Bigger Inside", "Portal RTX", "Viewfinder 3D"],
     videoUrl: "https://www.youtube.com/shorts/luQ7DI7gWmg",
     videoLabelKey: "portalsShortLink",
-    videoPublishAt: "2026-12-06T02:00:00+01:00",
     steps: [
       {
         id: "P1",
@@ -3086,7 +3064,6 @@ export const EFFECTS = [
     tags: ["HDR RGBA16F", "ACES", "AgX", "PBR Neutral"],
     videoUrl: "https://www.youtube.com/shorts/O_lfxUgcVkY",
     videoLabelKey: "tonemappingShortLink",
-    videoPublishAt: "2026-12-07T02:00:00+01:00",
     steps: [
       {
         id: "TM1",
@@ -3253,7 +3230,6 @@ export const EFFECTS = [
     tags: ["Texel Snap", "Obra Dinn", "HD-2D", "4× Loupe"],
     videoUrl: "https://www.youtube.com/shorts/BQ37q7o_rtM",
     videoLabelKey: "pixel3dShortLink",
-    videoPublishAt: "2026-12-08T02:00:00+01:00",
     steps: [
       {
         id: "PX1",

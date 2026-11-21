@@ -1,7 +1,7 @@
 // FX Lab controller: lazy-loaded WebGL2 effects, scalable catalog overlay, orbit/zoom camera,
 // draggable split-screen divider, URL deep-linking, and window.FXLAB API.
 
-import { EFFECTS, UI, REPO_TREE_BASE, SHORTS_CHANNEL_URL, getEffect } from "./catalog.js";
+import { EFFECTS, UI, REPO_TREE_BASE, getEffect } from "./catalog.js";
 import { clamp } from "./gl-utils.js";
 import { getEffectIconSvg } from "./icons.js";
 
@@ -456,21 +456,9 @@ function updateCard() {
   $("hintLine").textContent = isWaterLive
     ? u.waterClickHint
     : (isShadows ? u.shadowsClickHint : (isCloth ? u.clothClickHint : (isFurLive ? u.furClickHint : (isGlass ? u.glassClickHint : (isClouds ? u.cloudsClickHint : (isGrass ? u.grassClickHint : (isPathtracing ? u.pathtracingClickHint : (isToon ? u.toonClickHint : (isAa ? u.aaClickHint : (isReflections ? u.reflectionsClickHint : (isSurface ? u.surfaceClickHint : (isFog ? u.fogClickHint : (isGi ? u.giClickHint : (isTextures ? u.texturesClickHint : (isPortals ? u.portalsClickHint : (isTonemapping ? u.tonemappingClickHint : (isPixel3d ? u.pixel3dClickHint : u.dragHint)))))))))))))))));
+  const linkLabel = u[currentEffect.videoLabelKey] || u.channelLink;
   const filmLine = $("filmLine");
-  const pubTs = currentEffect.videoPublishAt ? Date.parse(currentEffect.videoPublishAt) : 0;
-  const showAllShorts = params.get("shorts") === "all";
-  if (pubTs && !showAllShorts && Date.now() < pubTs) {
-    const [, mm, dd] = currentEffect.videoPublishAt.match(/^\d{4}-(\d{2})-(\d{2})/) || [];
-    const enMonths = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-    const dateStr = lang === "pl"
-      ? `${parseInt(dd, 10)}.${mm}`
-      : `${enMonths[parseInt(mm, 10) - 1]} ${parseInt(dd, 10)}`;
-    const schedTitle = u.videoScheduledTitle ? u.videoScheduledTitle(dateStr) : "";
-    filmLine.innerHTML = `<span>${u.videoScheduledPrefix(dateStr)} <a href="${SHORTS_CHANNEL_URL}" target="_blank" rel="noopener" title="${schedTitle}">${u.shortsChannelLink}</a></span><span>·</span><button type="button" class="film-more" id="moreFxBtn">${u.moreEffects(EFFECTS.length)}</button>`;
-  } else {
-    const linkLabel = u[currentEffect.videoLabelKey] || u.channelLink;
-    filmLine.innerHTML = `<span>${u.videoPrefix} <a href="${currentEffect.videoUrl}" target="_blank" rel="noopener">${linkLabel}</a></span><span>·</span><button type="button" class="film-more" id="moreFxBtn">${u.moreEffects(EFFECTS.length)}</button>`;
-  }
+  filmLine.innerHTML = `<span>${u.videoPrefix} <a href="${currentEffect.videoUrl}" target="_blank" rel="noopener">${linkLabel}</a></span><span>·</span><button type="button" class="film-more" id="moreFxBtn">${u.moreEffects(EFFECTS.length)}</button>`;
   $("moreFxBtn")?.addEventListener("click", () => setCatalogOpen(true));
 
   updateSplitOverlay();
