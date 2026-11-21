@@ -32,17 +32,8 @@ const HALTON_16 = Array.from({ length: 16 }, (_, k) => [
   halton(k + 1, 3) - 0.5,
 ]);
 
-// Curated default 4x Loupe inspection targets per step (user can click anywhere to move it!)
-const STEP_LOUPE_TARGETS = [
-  [0.50, 0.72], // 0: Diagonal roof eave + thin wires (stair-stepping vs 4x4 SSAA!)
-  [0.34, 0.44], // 1: Fluted dark-chrome sphere specular aliasing (MSAA!)
-  [0.36, 0.65], // 2: Fine vertical stripes on resolution sign (exposes FXAA texture blur!)
-  [0.54, 0.62], // 3: Thin diagonal & horizontal wires (SMAA sharpens edges, wires still break!)
-  [0.48, 0.50], // 4: Moving crimson pendulum sweeping past wires (exposes Early TAA ghosting!)
-  [0.48, 0.50], // 5: Moving crimson pendulum with Motion Vectors + YCoCg Clipping!
-  [0.34, 0.44], // 6: Fluted dark-chrome sphere specular micro-highlights (Toksvig/Kaplanyan Specular AA!)
-  [0.44, 0.62], // 7: Thin wires + stripe sign reconstructed from 50%-axis (25% pixels) buffer!
-];
+// Default 4x Loupe inspection target (stays pinned across technique switches; user can click or drag it anywhere!)
+const DEFAULT_LOUPE_TARGET = [0.44, 0.62];
 
 export function createAaEffect(gl) {
   const fmt = hdrFormat(gl);
@@ -144,8 +135,9 @@ export function createAaEffect(gl) {
 
   // Interactive controls
   let loupeOn = true;
-  let loupeCustom = false;
-  let loupeTarget = [...STEP_LOUPE_TARGETS[7]];
+  let loupeTarget = [...DEFAULT_LOUPE_TARGET];
+  let draggingLoupe = false;
+  let loupeDragOff = [0, 0];
   let freezeMotion = false;
   let specAaOn = true;
   let showRawHalf = false;
@@ -153,6 +145,7 @@ export function createAaEffect(gl) {
   return {
     id: "aa",
     maxPixels: 560000,
+    disableDblClickReset: true,
     defaultCamera: {
       yaw: 0.04,
       pitch: 0.08,
@@ -166,9 +159,7 @@ export function createAaEffect(gl) {
       autoOrbitSpeed: 0.0,
     },
     enterStep(stepIdx) {
-      if (!loupeCustom && STEP_LOUPE_TARGETS[stepIdx]) {
-        loupeTarget = [...STEP_LOUPE_TARGETS[stepIdx]];
-      }
+      // Keep loupeTarget pinned right where the user is inspecting across all 8 techniques!
       if (stepIdx !== 4) freezeMotion = false;
       if (stepIdx !== 6) specAaOn = true;
       if (stepIdx !== 7) showRawHalf = false;
@@ -176,8 +167,8 @@ export function createAaEffect(gl) {
     },
     onReset() {
       loupeOn = true;
-      loupeCustom = false;
-      loupeTarget = [...STEP_LOUPE_TARGETS[7]];
+      loupeTarget = [...DEFAULT_LOUPE_TARGET];
+      draggingLoupe = false;
       freezeMotion = false;
       specAaOn = true;
       showRawHalf = false;
@@ -197,12 +188,36 @@ export function createAaEffect(gl) {
       if (actionId === "rawInput") return showRawHalf;
       return false;
     },
+    onPointerDown(ndcX, ndcY, w, h) {
+      if (!loupeOn) return false;
+      const u = ndcX * 0.5 + 0.5;
+      const v = ndcY * 0.5 + 0.5;
+      const aspect = w / Math.max(1, h);
+      const tHalfY = 0.165 * 0.25;
+      const tHalfX = (0.165 / Math.max(0.5, aspect)) * 0.25;
+      const hitX = Math.max(tHalfX * 1.6, 0.036);
+      const hitY = Math.max(tHalfY * 1.6, 0.048);
+      if (Math.abs(u - loupeTarget[0]) <= hitX && Math.abs(v - loupeTarget[1]) <= hitY) {
+        draggingLoupe = true;
+        loupeDragOff = [u - loupeTarget[0], v - loupeTarget[1]];
+        return true;
+      }
+      return false;
+    },
+    onPointerMove(ndcX, ndcY) {
+      if (!draggingLoupe) return;
+      const u = clamp(ndcX * 0.5 + 0.5 - loupeDragOff[0], 0.06, 0.94);
+      const v = clamp(ndcY * 0.5 + 0.5 - loupeDragOff[1], 0.08, 0.92);
+      loupeTarget = [u, v];
+    },
+    onPointerUp() {
+      draggingLoupe = false;
+    },
     onCanvasClick(ndcX, ndcY) {
       // Click anywhere on the scene to inspect that exact pixel cluster at 4x magnification!
       const u = clamp(ndcX * 0.5 + 0.5, 0.06, 0.94);
       const v = clamp(ndcY * 0.5 + 0.5, 0.08, 0.92);
       loupeTarget = [u, v];
-      loupeCustom = true;
       loupeOn = true;
     },
     getTechBadge(stepIdx) {

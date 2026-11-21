@@ -584,12 +584,21 @@ window.addEventListener("keydown", ev => {
   }
 });
 
-// Pointer drag camera orbit + wheel zoom + double-click reset + pool click ripple
+// Pointer drag camera orbit + wheel zoom + double-click reset + effect drag/click
 let draggingCam = false;
+let draggingEffect = false;
 let dragMoved = 0;
 let lastX = 0, lastY = 0;
 const pointers = new Map();
 let pinchDist0 = 0, pinchCamDist0 = 0;
+
+function pointerToNdc(ev) {
+  const rect = canvas.getBoundingClientRect();
+  return [
+    ((ev.clientX - rect.left) / Math.max(1, rect.width)) * 2.0 - 1.0,
+    1.0 - ((ev.clientY - rect.top) / Math.max(1, rect.height)) * 2.0,
+  ];
+}
 
 canvas.addEventListener("pointerdown", ev => {
   if (!cam) return;
@@ -597,12 +606,23 @@ canvas.addEventListener("pointerdown", ev => {
   canvas.setPointerCapture(ev.pointerId);
   pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
   if (pointers.size === 1) {
+    const [ndcX, ndcY] = pointerToNdc(ev);
+    if (activeEngine && typeof activeEngine.onPointerDown === "function"
+        && activeEngine.onPointerDown(ndcX, ndcY, renderW, renderH, currentStep(), cam)) {
+      draggingEffect = true;
+      draggingCam = false;
+      canvas.classList.add("dragging");
+      return;
+    }
+    draggingEffect = false;
     draggingCam = true;
     dragMoved = 0;
     lastX = ev.clientX;
     lastY = ev.clientY;
     canvas.classList.add("dragging");
   } else if (pointers.size === 2) {
+    if (draggingEffect && activeEngine && typeof activeEngine.onPointerUp === "function") activeEngine.onPointerUp();
+    draggingEffect = false;
     draggingCam = false;
     const pts = [...pointers.values()];
     pinchDist0 = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
@@ -620,6 +640,13 @@ canvas.addEventListener("pointermove", ev => {
     userInteracted = true;
     return;
   }
+  if (draggingEffect) {
+    const [ndcX, ndcY] = pointerToNdc(ev);
+    if (activeEngine && typeof activeEngine.onPointerMove === "function") {
+      activeEngine.onPointerMove(ndcX, ndcY, renderW, renderH, currentStep(), cam);
+    }
+    return;
+  }
   if (!draggingCam) return;
   const dx = ev.clientX - lastX, dy = ev.clientY - lastY;
   lastX = ev.clientX; lastY = ev.clientY;
@@ -631,21 +658,27 @@ canvas.addEventListener("pointermove", ev => {
 
 function endCanvasPointer(ev) {
   const wasClick = draggingCam && dragMoved < 7;
+  const wasEffect = draggingEffect;
   pointers.delete(ev.pointerId);
   if (pointers.size === 0) {
     draggingCam = false;
+    draggingEffect = false;
     canvas.classList.remove("dragging");
   }
+  if (wasEffect && activeEngine && typeof activeEngine.onPointerUp === "function") {
+    activeEngine.onPointerUp();
+    return;
+  }
   if (wasClick && activeEngine && typeof activeEngine.onCanvasClick === "function") {
-    const rect = canvas.getBoundingClientRect();
-    const ndcX = ((ev.clientX - rect.left) / rect.width) * 2.0 - 1.0;
-    const ndcY = 1.0 - ((ev.clientY - rect.top) / rect.height) * 2.0;
+    const [ndcX, ndcY] = pointerToNdc(ev);
     activeEngine.onCanvasClick(ndcX, ndcY, renderW, renderH, currentStep(), cam);
   }
 }
 canvas.addEventListener("pointerup", endCanvasPointer);
 canvas.addEventListener("pointercancel", endCanvasPointer);
-canvas.addEventListener("dblclick", resetCamera);
+canvas.addEventListener("dblclick", () => {
+  if (!activeEngine?.disableDblClickReset) resetCamera();
+});
 
 canvas.addEventListener("wheel", ev => {
   if (!cam) return;
