@@ -1,4 +1,4 @@
-// Evolution of Texture Mapping (1994-2026) — Interactive WebGL2 Corridor Lab:
+// Evolution of Texture Mapping (1994-2026) — Interactive WebGL2 Corridor Lab with Draggable 4x Loupe:
 //   0: 1994 PS1 Affine Warping + GTE Vertex Snapping (exact noperspective via vAffUv/vClipW)
 //   1: 1996 Quake 16-Pixel Span Perspective (Michael Abrash)
 //   2: 1996 3dfx Voodoo Bilinear Filtering (blurry up close, wild horizon Moire shimmer)
@@ -8,10 +8,10 @@
 //   6: 2011 MegaTexture / Virtual Texturing (id Tech 5 / RAGE — unique murals + live Snap Turn tile pop-in!)
 //   7: 2020-26 Sampler Feedback Streaming (DX12 Ultimate, emulated — proactive tile residency + Feedback Map!)
 
-import { clamp, makeLookAt, makePerspective, linkProgram } from "../../src/gl-utils.js";
+import { clamp, makeLookAt, makePerspective, FULL_VS, linkPrograms, makeTex2D } from "../../src/gl-utils.js";
 import { buildCorridorGeometry } from "./mesh.js";
 import { createTextureAtlases } from "./atlas.js";
-import { CORRIDOR_VS, CORRIDOR_FS } from "./shaders.js";
+import { CORRIDOR_VS, CORRIDOR_FS, LOUPE_FS } from "./shaders.js";
 
 function mulMat4(a, b) {
   const out = new Float32Array(16);
@@ -28,19 +28,22 @@ function mulMat4(a, b) {
 }
 
 export function createTexturesEffect(gl) {
-  const prog = linkProgram(gl, CORRIDOR_VS, CORRIDOR_FS);
-  const uLoc = names => Object.fromEntries(names.map(n => [n, gl.getUniformLocation(prog, n)]));
-  const u = uLoc([
+  const [prog, progLoupe] = linkPrograms(gl, [
+    [CORRIDOR_VS, CORRIDOR_FS],
+    [FULL_VS, LOUPE_FS],
+  ]);
+  const uLoc = (p, names) => Object.fromEntries(names.map(n => [n, gl.getUniformLocation(p, n)]));
+  const u = uLoc(prog, [
     "uViewProj", "uVertexSnap", "uSnapSplitX",
     "uTexFloor", "uTexWall", "uTexCrate", "uPageTable",
     "uCamPos", "uRes", "uTime", "uSplitX",
     "uStageLeft", "uStageRight", "uDebugOn", "uBilinearLeft",
   ]);
+  const uL = uLoc(progLoupe, ["uSrc", "uRes", "uLoupeTarget", "uLoupeOn", "uSplitX"]);
 
   const geom = buildCorridorGeometry();
   const vao = gl.createVertexArray();
   gl.bindVertexArray(vao);
-
   function bindAttr(loc, data, size) {
     const buf = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, buf);
@@ -52,63 +55,76 @@ export function createTexturesEffect(gl) {
   bindAttr(1, geom.normals, 3);
   bindAttr(2, geom.uvs, 2);
   bindAttr(3, geom.mats, 1);
-
   const ibo = gl.createBuffer();
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
   gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, geom.indices, gl.STATIC_DRAW);
   gl.bindVertexArray(null);
 
+  const vaoEmpty = gl.createVertexArray();
   const atlases = createTextureAtlases(gl);
 
-  // Live 64x64 Virtual Page Table (R = residentMip [0..7] -> 0..255, G = samplerFeedbackTouched [0..255])
+  // Offscreen FBO (color + depth renderbuffer) feeding Pass 2 (4x Pixel Magnifier Loupe!)
+  let bufW = 0, bufH = 0;
+  let texScene = null, rbDepth = null, fboScene = null;
+  function allocTargets(w, h) {
+    if (w === bufW && h === bufH) return;
+    if (texScene) gl.deleteTexture(texScene);
+    if (rbDepth) gl.deleteRenderbuffer(rbDepth);
+    if (fboScene) gl.deleteFramebuffer(fboScene);
+    bufW = w; bufH = h;
+    texScene = makeTex2D(gl, w, h, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, gl.NEAREST);
+    rbDepth = gl.createRenderbuffer();
+    gl.bindRenderbuffer(gl.RENDERBUFFER, rbDepth);
+    gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT24, w, h);
+    fboScene = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fboScene);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texScene, 0);
+    gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, rbDepth);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  }
+
   const pageMips = new Float32Array(64 * 64);
   const pageBytes = new Uint8Array(64 * 64 * 4);
   pageMips.fill(0.0);
 
   let simTime = 0;
-  let ps1Jitter = true;       // Stage 0: PS1 GTE vertex snapping toggle
-  let showMips = false;       // Stage 3: color-coded mip level bands
-  let showBlocks = false;     // Stage 4: S3TC 4x4 block wireframe
-  let radeon8500 = false;     // Stage 5: Radeon 8500 angle-dependent AF optimization!
-  let feedbackMap = false;    // Stage 7: Sampler Feedback active tile heatmap
-  let snapTurnTimer = 0.0;    // Stage 6: triggers rapid camera whip + MegaTexture pop-in!
-  let customPitchBias = 0.0;  // Clicking floor tilts viewing angle shallower/steeper!
+  let ps1Jitter = true;
+  let showMips = false;
+  let showBlocks = false;
+  let radeon8500 = false;
+  let feedbackMap = false;
+  let snapTurnTimer = 0.0;
   let prevCamYaw = 0.0;
+
+  // Draggable 4x Loupe reticle (default aims right onto the grazing horizon floor seam!)
+  let loupeTarget = [0.50, 0.34];
+  let draggingLoupe = false;
 
   function evictPagesForPopIn() {
     for (let i = 0; i < 64 * 64; i++) {
-      // Deterministic pseudo-random coarse mip eviction (mip 4..6) so tiles stream back in staggered chunks!
       const h = Math.sin(i * 12.9898 + simTime * 7.1) * 43758.5453;
       pageMips[i] = 4.2 + (h - Math.floor(h)) * 2.4;
     }
   }
 
   function updatePageTable(dt, camYaw, isMegaStage) {
-    // Detect rapid manual camera rotation -> evict newly visible pages on MegaTexture stage!
     const yawDelta = Math.abs(camYaw - prevCamYaw);
     prevCamYaw = camYaw;
     if (isMegaStage && yawDelta > 0.14) {
       for (let i = 0; i < 64 * 64; i++) {
-        if ((i * 7 + Math.floor(simTime * 30)) % 3 === 0) {
-          pageMips[i] = Math.max(pageMips[i], 4.8);
-        }
+        if ((i * 7 + Math.floor(simTime * 30)) % 3 === 0) pageMips[i] = Math.max(pageMips[i], 4.8);
       }
     }
-
-    // Stream evicted virtual pages back to crisp mip 0 in staggered tile batches (authentic RAGE pop-in!)
     for (let y = 0; y < 64; y++) {
       for (let x = 0; x < 64; x++) {
         const i = y * 64 + x;
         if (pageMips[i] > 0.0) {
           const tileJitter = 0.55 + 0.9 * (((x * 37 + y * 17) & 15) / 15);
-          // Slight discrete step drop so pages visibly pop from mip 6 -> 4 -> 2 -> 0!
           pageMips[i] = Math.max(0.0, pageMips[i] - dt * 3.8 * tileJitter);
         }
         const quantMip = pageMips[i] > 0.2 ? Math.ceil(pageMips[i]) : 0;
         pageBytes[i * 4 + 0] = Math.min(255, Math.round((quantMip / 7.0) * 255));
-        // Feedback touched mask: tiles inside central view frustum band
-        const inFrustum = (y >= 2 && y <= 54 && Math.abs(x - 32) <= 26) ? 255 : 40;
-        pageBytes[i * 4 + 1] = inFrustum;
+        pageBytes[i * 4 + 1] = (y >= 2 && y <= 54 && Math.abs(x - 32) <= 26) ? 255 : 40;
         pageBytes[i * 4 + 2] = 0;
         pageBytes[i * 4 + 3] = 255;
       }
@@ -119,12 +135,13 @@ export function createTexturesEffect(gl) {
 
   return {
     id: "textures",
+    disableDblClickReset: true,
     maxPixels: 920000,
     defaultCamera: {
       yaw: 0.0,
-      pitch: 0.13,
+      pitch: 0.04,
       dist: 4.1,
-      lookY: 1.12,
+      lookY: 0.78,
       fovDeg: 58,
       minDist: 1.8,
       maxDist: 6.0,
@@ -138,10 +155,19 @@ export function createTexturesEffect(gl) {
       if (stepIdx !== 4) showBlocks = false;
       if (stepIdx !== 5) radeon8500 = false;
       if (stepIdx !== 7) feedbackMap = false;
-      if (stepIdx === 6) {
-        // Trigger an immediate crisp tile pop-in showcase when entering 2011 RAGE MegaTexture!
-        evictPagesForPopIn();
-      }
+      if (stepIdx === 6) evictPagesForPopIn();
+      // Auto-aim 4x loupe reticle at the most dramatic visual artifact for each era (user can still drag anywhere!)
+      const sweetSpots = [
+        [0.50, 0.34], // 0: PS1 affine seam on floor stripe
+        [0.50, 0.34], // 1: Quake 16-px spans
+        [0.50, 0.45], // 2: Bilinear horizon Moire shimmer
+        [0.50, 0.45], // 3: Mipmap/Trilinear grazing horizon blur
+        [0.50, 0.35], // 4: S3TC 4x4 block quantization
+        [0.50, 0.46], // 5: Trilinear mush vs 16x AF horizon razor sharpness!
+        [0.55, 0.48], // 6: MegaTexture pop-in tiles
+        [0.50, 0.45], // 7: Sampler Feedback streaming
+      ];
+      if (sweetSpots[stepIdx]) loupeTarget = [...sweetSpots[stepIdx]];
     },
 
     onReset() {
@@ -151,7 +177,7 @@ export function createTexturesEffect(gl) {
       radeon8500 = false;
       feedbackMap = false;
       snapTurnTimer = 0.0;
-      customPitchBias = 0.0;
+      loupeTarget = [0.50, 0.34];
       pageMips.fill(0.0);
     },
 
@@ -160,10 +186,8 @@ export function createTexturesEffect(gl) {
       else if (actionId === "showMips") showMips = !showMips;
       else if (actionId === "showBlocks") showBlocks = !showBlocks;
       else if (actionId === "radeon8500") radeon8500 = !radeon8500;
-      else if (actionId === "snapTurn") {
-        snapTurnTimer = 1.65;
-        evictPagesForPopIn();
-      } else if (actionId === "feedbackMap") feedbackMap = !feedbackMap;
+      else if (actionId === "snapTurn") { snapTurnTimer = 1.65; evictPagesForPopIn(); }
+      else if (actionId === "feedbackMap") feedbackMap = !feedbackMap;
     },
 
     isActionActive(actionId) {
@@ -175,9 +199,22 @@ export function createTexturesEffect(gl) {
       return false;
     },
 
-    onCanvasClick(_ndcX, ndcY) {
-      // Click higher/lower in corridor to tilt viewing grazing angle (shallower angle exaggerates AF & PS1 warp!)
-      customPitchBias = clamp(ndcY * 0.22, -0.16, 0.24);
+    onPointerDown(ndcX, ndcY) {
+      const uvX = ndcX * 0.5 + 0.5;
+      const uvY = ndcY * 0.5 + 0.5;
+      if (Math.hypot(uvX - loupeTarget[0], uvY - loupeTarget[1]) < 0.075) {
+        draggingLoupe = true;
+        return true;
+      }
+      return false;
+    },
+    onPointerMove(ndcX, ndcY) {
+      if (!draggingLoupe) return;
+      loupeTarget = [clamp(ndcX * 0.5 + 0.5, 0.06, 0.94), clamp(ndcY * 0.5 + 0.5, 0.08, 0.92)];
+    },
+    onPointerUp() { draggingLoupe = false; },
+    onCanvasClick(ndcX, ndcY) {
+      loupeTarget = [clamp(ndcX * 0.5 + 0.5, 0.06, 0.94), clamp(ndcY * 0.5 + 0.5, 0.08, 0.92)];
     },
 
     getTechBadge(stepIdx) {
@@ -193,36 +230,34 @@ export function createTexturesEffect(gl) {
       ][stepIdx] || "WEBGL2";
     },
 
-    resize() {},
+    resize(w, h) { allocTargets(w, h); },
 
     update(dt, paused, step) {
       if (!paused) {
         simTime += dt;
-        if (snapTurnTimer > 0.0) {
-          snapTurnTimer = Math.max(0.0, snapTurnTimer - dt);
-        }
+        if (snapTurnTimer > 0.0) snapTurnTimer = Math.max(0.0, snapTurnTimer - dt);
       }
-      const isMega = step && step.stage === 6;
-      updatePageTable(paused ? 0 : dt, simTime, isMega);
+      updatePageTable(paused ? 0 : dt, simTime, step && step.stage === 6);
     },
 
     render(w, h, step, split, cam) {
+      allocTargets(w, h);
       const aspect = w / Math.max(1, h);
-      // Gentle forward/sidewalk glide in corridor so PS1 warping, Bilinear shimmer, and Radeon 8500 angle-dep AF pop alive!
       const glideZ = Math.sin(simTime * 0.55) * 1.15;
-      const swayX = Math.sin(simTime * 0.42) * 0.48;
+      const swayX = Math.sin(simTime * 0.42) * 0.44;
       const snapWhip = snapTurnTimer > 0.0 ? Math.sin((snapTurnTimer / 1.65) * Math.PI) * 0.62 : 0.0;
 
-      const yaw = cam.yaw + snapWhip + (radeon8500 ? Math.sin(simTime * 0.85) * 0.42 : 0.0);
-      const pitch = clamp(cam.pitch + customPitchBias, -0.10, 0.58);
+      const yaw = cam.yaw + snapWhip + (radeon8500 ? Math.sin(simTime * 0.85) * 0.44 : 0.0);
+      const pitch = clamp(cam.pitch, -0.10, 0.58);
+      // Lower grazing floor angle -> dramatically magnifies Trilinear blur vs 16x AF & PS1 affine warp!
       const eye = [
-        swayX + Math.sin(yaw) * 1.35,
-        clamp(1.18 + pitch * 2.2, 0.55, 2.85),
+        swayX + Math.sin(yaw) * 1.25,
+        clamp(0.76 + pitch * 2.1, 0.40, 2.55),
         cam.dist + glideZ,
       ];
       const look = [
         Math.sin(yaw) * -10.5,
-        clamp(1.05 - pitch * 1.4, 0.25, 2.4),
+        clamp(0.74 - pitch * 1.3, 0.20, 2.2),
         eye[2] - Math.cos(yaw) * 12.0,
       ];
 
@@ -241,7 +276,8 @@ export function createTexturesEffect(gl) {
       else if (step.stage === 5) debugOn = radeon8500;
       else if (step.stage === 7) debugOn = feedbackMap;
 
-      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      // Pass 1: Render 3D corridor into offscreen FBO
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fboScene);
       gl.viewport(0, 0, w, h);
       gl.enable(gl.DEPTH_TEST);
       gl.depthFunc(gl.LEQUAL);
@@ -251,7 +287,6 @@ export function createTexturesEffect(gl) {
 
       gl.useProgram(prog);
       gl.bindVertexArray(vao);
-
       gl.uniformMatrix4fv(u.uViewProj, false, vp);
       gl.uniform1f(u.uVertexSnap, hasPs1 && ps1Jitter ? 1.0 : 0.0);
       gl.uniform1f(u.uSnapSplitX, snapSplit);
@@ -268,10 +303,21 @@ export function createTexturesEffect(gl) {
       gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, atlases.texWall); gl.uniform1i(u.uTexWall, 1);
       gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, atlases.texCrate); gl.uniform1i(u.uTexCrate, 2);
       gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, atlases.texPageTable); gl.uniform1i(u.uPageTable, 3);
-
       gl.drawElements(gl.TRIANGLES, geom.indexCount, gl.UNSIGNED_SHORT, 0);
-      gl.bindVertexArray(null);
+
+      // Pass 2: Fullscreen + draggable 4x Pixel Magnifier Loupe
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, w, h);
       gl.disable(gl.DEPTH_TEST);
+      gl.useProgram(progLoupe);
+      gl.bindVertexArray(vaoEmpty);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, texScene); gl.uniform1i(uL.uSrc, 0);
+      gl.uniform2f(uL.uRes, w, h);
+      gl.uniform2fv(uL.uLoupeTarget, loupeTarget);
+      gl.uniform1f(uL.uLoupeOn, 1.0);
+      gl.uniform1f(uL.uSplitX, split.enabled ? split.pos : -1.0);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      gl.bindVertexArray(null);
     },
   };
 }

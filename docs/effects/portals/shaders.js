@@ -1,12 +1,12 @@
-// Evolution of Portals & Impossible Spaces (1994-2023) — Interactive WebGL2 SDF Ray-Teleportation Engine.
-//   0: 1994 Marathon Overlapping Spaces (two rooms occupy the exact same 3D coordinates behind a divider!)
+// Evolution of Portals & Impossible Spaces (1994-2023) — Interactive WebGL2 FPP Non-Euclidean Engine.
+//   0: 1994 Marathon Overlapping Spaces (two rooms occupy the exact same 3D coordinates)
 //   1: 1996 Build / Duke Nukem 3D Overlapping Sectors & Portal Mirror (plus Descent '95; Sector Glitch toggle!)
-//   2: 2006 Prey Fixed 3D Portals (plus Narbacular Drop '05; tilted alien-tech portal + flying energy orbs!)
-//   3: 2007 Portal Recursive Portals (Blue <-> Orange 8-bounce curved infinite corridor; Depth 1 vs 8; click to shift!)
-//   4: 2013 Antichamber Non-Euclidean Shifting Rooms (room transforms behind your back when looking away!)
-//   5: 2018 CodeParade Bigger-on-the-Inside Tunnel (tiny 1.8m exterior pavilion holds a 22m infinity hall!)
-//   6: 2022 Portal with RTX (moody glossy chamber — blazing golden light beam, crisp shadows & reflections THROUGH portals!)
-//   7: 2023 Viewfinder Photo-to-3D Reality (2D Polaroid stamps real 3D sunlit Mediterranean archway & sky into concrete room!)
+//   2: 2006 Prey Fixed 3D Portals (plus Narbacular Drop '05; tilted 38-deg alien gateway)
+//   3: 2007 Portal Recursive Blue <-> Orange Loop (10x recursion + live FPP Fly-Through!)
+//   4: 2013 Antichamber 5-Room 360-deg Riemann-Sheet Paradox (4 right-angle turns != back to start!)
+//   5: 2018 CodeParade Bigger-on-the-Inside Pavilion (1.4m exterior kiosk -> 24m vaulted hall, bidirectional FPP fly-through!)
+//   6: 2022 Portal with RTX (golden sunbeam, sharp shadows & glossy floor reflections straight through infinite portals!)
+//   7: 2023 Viewfinder Photo-to-3D Reality (stamp 2D Polaroid into dead-end wall & walk FPP onto the real 3D bridge!)
 
 export const PORTALS_FS = /* glsl */`#version 300 es
 precision highp float;
@@ -20,11 +20,13 @@ uniform vec2 uRes;
 uniform float uSplitX;
 uniform int uStageLeft, uStageRight;
 uniform float uDebugOn;     // Per-stage action toggle
-uniform vec2 uOrangeOff;    // Interactive clickable portal offset [x, y] on Stages 3 & 6
-uniform float uShiftState;  // Antichamber room variant (0 or 1)
-uniform float uPhotoStamp;  // Viewfinder photo-stamp blend (0=floating 2D Polaroid, 1=real 3D world!)
+uniform vec2 uOrangeOff;    // Interactive clickable portal offset [x, y]
+uniform float uShiftState;  // Continuous unwrapped orbit angle (radians) for Antichamber 5-room 360-deg Riemann sheet!
+uniform float uPhotoStamp;  // Viewfinder photo-stamp blend (0=floating 2D Polaroid, 1=stamped into real 3D!)
+uniform float uInHall;      // CodeParade explicit interior flag (1.0 when FPP camera is inside the 24m hall!)
 
 const float PI = 3.14159265359;
+const float TAU = 6.28318530718;
 
 float sdBox(vec3 p, vec3 b) {
   vec3 q = abs(p) - b;
@@ -87,9 +89,7 @@ vec2 mapMarathonRoom(vec3 p, int sector) {
 
 vec3 shadeMarathon(vec3 ro, vec3 rd, bool isDuke, bool glitchOn) {
   int sector = ro.x > 0.0 ? 1 : 0;
-  float t = 0.05;
-  int hitSector = sector;
-  vec2 hit = vec2(-1.0);
+  float t = 0.05; int hitSector = sector; vec2 hit = vec2(-1.0);
   bool crossedMirror = false;
 
   for (int i = 0; i < 84; i++) {
@@ -105,20 +105,13 @@ vec3 shadeMarathon(vec3 ro, vec3 rd, bool isDuke, bool glitchOn) {
     vec2 h = mapMarathonRoom(p, sector);
     if (h.x < 0.003) {
       if (isDuke && !crossedMirror && p.z < -3.35 && p.x > 0.65 && p.x < 2.85 && p.y > 0.45 && p.y < 2.85) {
-        crossedMirror = true;
-        ro = p + vec3(0.0, 0.0, 0.03);
-        rd.z = -rd.z;
-        t = 0.04;
-        continue;
+        crossedMirror = true; ro = p + vec3(0.0, 0.0, 0.03); rd.z = -rd.z; t = 0.04; continue;
       }
-      hit = vec2(t, h.y);
-      hitSector = sector;
-      break;
+      hit = vec2(t, h.y); hitSector = sector; break;
     }
     t += max(h.x * 0.88, 0.004);
     if (t > 24.0) break;
   }
-
   if (hit.x < 0.0) return vec3(0.05, 0.06, 0.10);
   vec3 p = ro + rd * hit.x;
   vec2 e = vec2(0.003, 0.0);
@@ -127,33 +120,22 @@ vec3 shadeMarathon(vec3 ro, vec3 rd, bool isDuke, bool glitchOn) {
     mapMarathonRoom(p + e.yxy, hitSector).x - mapMarathonRoom(p - e.yxy, hitSector).x,
     mapMarathonRoom(p + e.yyx, hitSector).x - mapMarathonRoom(p - e.yyx, hitSector).x
   ));
-
   int m = int(floor(hit.y + 0.5));
   vec3 alb = hitSector == 0 ? vec3(0.68, 0.48, 0.28) : vec3(0.16, 0.36, 0.62);
   if (m == 0) {
     float chk = mod(floor(p.x * 1.4) + floor(p.z * 1.4), 2.0);
-    alb = hitSector == 0
-      ? mix(vec3(0.18, 0.28, 0.22), vec3(0.68, 0.58, 0.42), chk)
-      : mix(vec3(0.12, 0.18, 0.34), vec3(0.52, 0.68, 0.86), chk);
-  } else if (m == 1) {
-    alb = hitSector == 0 ? vec3(0.24, 0.20, 0.18) : vec3(0.14, 0.18, 0.28);
-  } else if (m == 3) {
-    float band = smoothstep(0.06, 0.02, abs(fract(p.y * 0.85) - 0.5));
-    alb = mix(vec3(0.32, 0.34, 0.40), vec3(0.92, 0.70, 0.26), band);
-  } else if (m == 5) {
-    return vec3(1.9, 0.85, 0.18) * (0.7 + 0.3 * max(dot(n, normalize(vec3(0.3, 0.8, 0.5))), 0.0));
-  } else if (m == 7) {
-    return vec3(0.18, 1.35, 1.85) * (0.65 + 0.35 * max(dot(n, normalize(vec3(-0.3, 0.8, 0.5))), 0.0));
-  } else if (m == 4 || m == 6) {
-    alb = hitSector == 0 ? vec3(0.82, 0.32, 0.18) : vec3(0.86, 0.22, 0.36);
-  }
+    alb = hitSector == 0 ? mix(vec3(0.18, 0.28, 0.22), vec3(0.68, 0.58, 0.42), chk)
+                         : mix(vec3(0.12, 0.18, 0.34), vec3(0.52, 0.68, 0.86), chk);
+  } else if (m == 1) alb = hitSector == 0 ? vec3(0.24, 0.20, 0.18) : vec3(0.14, 0.18, 0.28);
+  else if (m == 3) alb = mix(vec3(0.32, 0.34, 0.40), vec3(0.92, 0.70, 0.26), smoothstep(0.06, 0.02, abs(fract(p.y * 0.85) - 0.5)));
+  else if (m == 5) return vec3(1.9, 0.85, 0.18) * (0.7 + 0.3 * max(dot(n, normalize(vec3(0.3, 0.8, 0.5))), 0.0));
+  else if (m == 7) return vec3(0.18, 1.35, 1.85) * (0.65 + 0.35 * max(dot(n, normalize(vec3(-0.3, 0.8, 0.5))), 0.0));
+  else if (m == 4 || m == 6) alb = hitSector == 0 ? vec3(0.82, 0.32, 0.18) : vec3(0.86, 0.22, 0.36);
 
   vec3 lPos = hitSector == 0 ? vec3(-1.4, 2.9, 0.5) : vec3(1.4, 2.9, 0.5);
-  vec3 ld = normalize(lPos - p);
-  float dist = length(lPos - p);
+  vec3 ld = normalize(lPos - p); float dist = length(lPos - p);
   float diff = max(dot(n, ld), 0.0) * (9.5 / (1.8 + dist * dist * 0.48));
   vec3 col = alb * (0.22 + diff * (hitSector == 0 ? vec3(1.0, 0.86, 0.62) : vec3(0.72, 0.90, 1.0)));
-
   if (crossedMirror) col = mix(col, vec3(0.45, 0.78, 0.96), 0.18);
   if (isDuke && !crossedMirror && p.z < -3.35 && p.x > 0.55 && p.x < 2.95 && p.y > 0.35 && p.y < 2.95) {
     if (p.x < 0.68 || p.x > 2.82 || p.y < 0.48 || p.y > 2.82) col = vec3(0.88, 0.66, 0.28);
@@ -163,55 +145,49 @@ vec3 shadeMarathon(vec3 ro, vec3 rd, bool isDuke, bool glitchOn) {
 }
 
 // ============================================================================
-// STAGE 2 (2006 Prey), STAGE 3 (2007 Portal Recursive 8x), STAGE 6 (2022 Portal with RTX)
-// Opposing Blue Portal (Back Wall z=-2.65) <-> Orange Portal (Front Wall z=+2.65) + moody Aperture industrial lab!
-// Looking straight toward the Back Wall shows ALL 8 RECURSIONS of glowing Blue & Orange portals + Companion Cubes curving into infinity!!
+// STAGE 2 (2006 Prey), STAGE 3 (2007 Portal Fly-Through 10x), STAGE 6 (2022 Portal with RTX)
+// Alternating Electric Blue & Fiery Orange portals on opposite walls + seamless FPP Fly-Through!
 // ============================================================================
 float mapApertureObstacles(vec3 p, bool rtxMode) {
-  // Companion cube & pedestal placed slightly right-of-center so you see BOTH the hero cube AND the giant infinite portal tunnel!
-  float d = sdBox(p - vec3(0.95, 0.14, -0.55), vec3(0.50, 0.14, 0.50));
-  vec3 cp = p - vec3(0.95, 0.64, -0.55);
+  float d = sdBox(p - vec3(1.12, 0.14, -0.35), vec3(0.46, 0.14, 0.46));
+  vec3 cp = p - vec3(1.12, 0.60, -0.35);
   cp.xz = rot2(0.45 + sin(uTime * 0.5) * 0.14) * cp.xz;
-  d = min(d, sdRoundBox(cp, vec3(0.36), 0.045));
+  d = min(d, sdRoundBox(cp, vec3(0.34), 0.045));
   if (rtxMode) {
-    // Sleek dark test cylinder sitting right in the path of the golden RTX portal sunbeam -> casts crisp ray-traced shadow!
-    d = min(d, sdCylinder(p - vec3(-0.35, 0.68, -0.45), 0.16, 0.68));
+    d = min(d, sdCylinder(p - vec3(-1.05, 0.68, -0.35), 0.17, 0.68));
   }
   return d;
 }
 
 vec2 mapApertureChamber(vec3 p, bool rtxMode) {
-  // Chamber: x in [-2.65, 2.65], y in [0.0, 3.45], z in [-2.65, 2.65]
   float d = p.y; float mat = 0.0;
   float dCeil = 3.45 - p.y; if (dCeil < d) { d = dCeil; mat = 1.0; }
-  float dBack = p.z + 2.65; if (dBack < d) { d = dBack; mat = 3.0; } // Blue Portal Wall!
-  float dFront = 2.65 - p.z; if (dFront < d) { d = dFront; mat = 4.0; } // Orange Portal Wall!
+  float dBack = p.z + 2.65; if (dBack < d) { d = dBack; mat = 3.0; } // Blue Portal Wall
+  float dFront = 2.65 - p.z; if (dFront < d) { d = dFront; mat = 4.0; } // Orange Portal Wall
   float dL = p.x + 2.65; if (dL < d) { d = dL; mat = 2.0; }
   float dR = 2.65 - p.x; if (dR < d) { d = dR; mat = 2.0; }
 
-  // Industrial dark steel side wall ribs (give unmistakable depth cues inside every single recursive bounce!)
   float ribZ = abs(fract((p.z + 2.65) / 1.75) - 0.5) * 1.75;
-  float dRibL = sdBox(vec3(p.x + 2.58, p.y - 1.72, ribZ), vec3(0.10, 1.72, 0.09));
-  float dRibR = sdBox(vec3(p.x - 2.58, p.y - 1.72, ribZ), vec3(0.10, 1.72, 0.09));
-  float dRib = min(dRibL, dRibR);
+  float dRib = min(
+    sdBox(vec3(p.x + 2.58, p.y - 1.72, ribZ), vec3(0.10, 1.72, 0.09)),
+    sdBox(vec3(p.x - 2.58, p.y - 1.72, ribZ), vec3(0.10, 1.72, 0.09)));
   if (dRib < d) { d = dRib; mat = 5.0; }
 
-  // Companion cube on pedestal
-  float dPed = sdBox(p - vec3(0.95, 0.14, -0.55), vec3(0.50, 0.14, 0.50));
+  float dPed = sdBox(p - vec3(1.12, 0.14, -0.35), vec3(0.46, 0.14, 0.46));
   if (dPed < d) { d = dPed; mat = 5.0; }
-  vec3 cp = p - vec3(0.95, 0.64, -0.55);
+  vec3 cp = p - vec3(1.12, 0.60, -0.35);
   cp.xz = rot2(0.45 + sin(uTime * 0.5) * 0.14) * cp.xz;
-  float dCube = sdRoundBox(cp, vec3(0.36), 0.045);
+  float dCube = sdRoundBox(cp, vec3(0.34), 0.045);
   if (dCube < d) { d = dCube; mat = 6.0; }
 
-  // Glowing cyan energy orb flying straight through the Z portal loop (enters Blue at z=-2.65, exits Orange at z=+2.65!)
-  float orbPhase = fract(uTime * 0.28);
+  // Glowing energy orb zipping through the portal loop cleanly to the side of the camera path!
+  float orbPhase = fract(uTime * 0.35);
   float orbZ = mix(2.35, -2.35, orbPhase);
-  float dOrb = length(p - vec3(-0.22 + sin(orbPhase * PI) * 0.12, 1.72, orbZ)) - 0.15;
+  float dOrb = length(p - vec3(0.58 + sin(orbPhase * TAU) * 0.10, 1.72, orbZ)) - 0.11;
   if (dOrb < d) { d = dOrb; mat = 7.0; }
 
   if (rtxMode) {
-    float dP2 = sdCylinder(p - vec3(-0.35, 0.68, -0.45), 0.16, 0.68);
+    float dP2 = sdCylinder(p - vec3(-1.05, 0.68, -0.35), 0.17, 0.68);
     if (dP2 < d) { d = dP2; mat = 8.0; }
   }
   return vec2(d, mat);
@@ -241,67 +217,51 @@ float softShadowAperture(vec3 ro, vec3 rd, float tMax, float k, bool rtxMode) {
   return clamp(res, 0.0, 1.0);
 }
 
-float portalOvalDist(vec2 xy, vec2 cen, vec2 rad) {
-  return length((xy - cen) / rad);
-}
+float portalOvalDist(vec2 xy, vec2 cen, vec2 rad) { return length((xy - cen) / rad); }
 
 vec3 shadeApertureSurface(vec3 p, vec3 n, float matId, bool rtxMode, vec2 blueCen, vec2 orangeCen, vec2 pRad) {
   int m = int(floor(matId + 0.5));
   vec3 alb = vec3(0.42, 0.46, 0.54);
   if (m == 0) {
-    // Moody Aperture dark slate/concrete test floor (makes RTX portal light beam & reflections POP!)
     float g = max(smoothstep(0.46, 0.495, abs(fract(p.x * 0.95) - 0.5)), smoothstep(0.46, 0.495, abs(fract(p.z * 0.95) - 0.5)));
-    alb = mix(rtxMode ? vec3(0.18, 0.21, 0.27) : vec3(0.28, 0.32, 0.39), vec3(0.10, 0.12, 0.17), g * 0.65);
-  } else if (m == 1) {
-    alb = vec3(0.24, 0.27, 0.34);
-  } else if (m == 2 || m == 3 || m == 4) {
+    alb = mix(rtxMode ? vec3(0.11, 0.14, 0.20) : vec3(0.18, 0.22, 0.29), vec3(0.06, 0.08, 0.12), g * 0.72);
+  } else if (m == 1) alb = vec3(0.14, 0.17, 0.24);
+  else if (m == 2 || m == 3 || m == 4) {
     vec2 uv = (m == 2) ? p.zy : p.xy;
     float g = max(smoothstep(0.47, 0.495, abs(fract(uv.x * 0.85) - 0.5)), smoothstep(0.47, 0.495, abs(fract(uv.y * 0.85) - 0.5)));
-    // Classic Aperture two-tone chamber: dark industrial lower dado + clean architectural gray-white upper panels!
-    vec3 panel = p.y < 1.05 ? vec3(0.18, 0.21, 0.28) : (rtxMode ? vec3(0.38, 0.41, 0.48) : vec3(0.56, 0.60, 0.66));
-    alb = mix(panel, vec3(0.11, 0.14, 0.19), g * 0.65);
-  } else if (m == 5) {
-    alb = vec3(0.14, 0.17, 0.23);
-  } else if (m == 6) {
-    float stripe = smoothstep(0.12, 0.08, abs(p.y - 0.64));
-    alb = mix(vec3(0.56, 0.60, 0.66), vec3(0.98, 0.30, 0.55), stripe);
-  } else if (m == 7) {
-    return vec3(0.35, 1.55, 2.35);
-  } else if (m == 8) {
-    alb = vec3(0.28, 0.34, 0.44);
-  }
+    vec3 panel = p.y < 1.05 ? vec3(0.11, 0.14, 0.20) : (rtxMode ? vec3(0.24, 0.28, 0.36) : vec3(0.38, 0.43, 0.50));
+    alb = mix(panel, vec3(0.07, 0.09, 0.14), g * 0.72);
+  } else if (m == 5) alb = vec3(0.10, 0.12, 0.18);
+  else if (m == 6) alb = mix(vec3(0.46, 0.50, 0.56), vec3(0.96, 0.24, 0.50), smoothstep(0.12, 0.08, abs(p.y - 0.60)));
+  else if (m == 7) return vec3(0.25, 1.35, 2.15);
+  else if (m == 8) alb = vec3(0.24, 0.30, 0.40);
 
-  // Overhead chamber key light (dimmer in Portal RTX so the golden portal light beam dominates!)
   vec3 lPos = vec3(0.3, 3.15, 0.2);
   vec3 toL = lPos - p; float dL = length(toL); vec3 ld = toL / max(dL, 1e-4);
   float sh = softShadowAperture(p + n * 0.03, ld, dL - 0.1, 7.0, rtxMode);
-  vec3 light = vec3(0.12, 0.15, 0.21) * (0.55 + 0.45 * n.y);
-  light += vec3(0.95, 0.94, 0.92) * (max(dot(n, ld), 0.0) * sh * (rtxMode ? 2.4 : 5.4) / (1.5 + dL * dL * 0.36));
+  vec3 light = (rtxMode ? vec3(0.05, 0.07, 0.12) : vec3(0.11, 0.14, 0.20)) * (0.55 + 0.45 * n.y);
+  light += vec3(0.95, 0.94, 0.92) * (max(dot(n, ld), 0.0) * sh * (rtxMode ? 1.1 : 4.2) / (1.5 + dL * dL * 0.36));
 
-  // Vivid Electric Blue portal glow from Back Wall (z = -2.62) & Fiery Orange portal glow from Front Wall (z = +2.62)!
   vec3 blueP = vec3(blueCen.x, blueCen.y, -2.58);
   vec3 toB = blueP - p; float dB = length(toB);
-  light += vec3(0.06, 0.62, 1.45) * (max(dot(n, toB / max(dB, 1e-4)), 0.0) * 0.78 + 0.22) * (3.6 / (0.85 + dB * dB * 0.52));
+  light += vec3(0.06, 0.66, 1.55) * (max(dot(n, toB / max(dB, 1e-4)), 0.0) * 0.78 + 0.22) * ((rtxMode ? 4.4 : 3.8) / (0.85 + dB * dB * 0.50));
 
   vec3 orgP = vec3(orangeCen.x, orangeCen.y, 2.58);
   vec3 toO = orgP - p; float dO = length(toO);
-  light += vec3(1.55, 0.46, 0.05) * (max(dot(n, toO / max(dO, 1e-4)), 0.0) * 0.78 + 0.22) * (3.4 / (0.85 + dO * dO * 0.52));
+  light += vec3(1.65, 0.48, 0.05) * (max(dot(n, toO / max(dO, 1e-4)), 0.0) * 0.78 + 0.22) * ((rtxMode ? 4.2 : 3.6) / (0.85 + dO * dO * 0.50));
 
-  // ON STAGE 6 (2022 Portal with RTX): A blazing golden sun spotlight inside the Orange chamber shoots a REAL ray-traced
-  // beam & crisp shadows of the cylinder & companion cube STRAIGHT THROUGH the Blue Portal across the dark reflective floor!
+  // STAGE 6 (Portal RTX): Golden sunbeam + razor shadows pouring STRAIGHT OUT of the Blue Portal!
   if (rtxMode) {
-    vec3 virtualSun = vec3(blueCen.x - 0.35, blueCen.y + 0.65, -5.8);
-    vec3 toV = virtualSun - p;
-    float dV = length(toV);
-    vec3 vd = toV / max(dV, 1e-4);
+    vec3 virtualSun = vec3(blueCen.x - 0.48, blueCen.y + 0.52, -5.6);
+    vec3 toV = virtualSun - p; float dV = length(toV); vec3 vd = toV / max(dV, 1e-4);
     if (vd.z < -0.05 && p.z > -2.62) {
       float tBlue = (-2.64 - p.z) / vd.z;
       vec3 hitB = p + vd * tBlue;
       float oval = portalOvalDist(hitB.xy, blueCen, pRad * 0.96);
       if (oval < 1.0) {
-        float beamEdge = smoothstep(1.0, 0.80, oval);
-        float pSh = softShadowAperture(p + n * 0.03, vd, tBlue - 0.05, 11.0, true);
-        light += vec3(2.2, 1.28, 0.42) * (max(dot(n, vd), 0.0) * pSh * beamEdge * 6.5 / (1.0 + dV * dV * 0.08));
+        float beamEdge = smoothstep(1.0, 0.78, oval);
+        float pSh = softShadowAperture(p + n * 0.03, vd, tBlue - 0.05, 12.0, true);
+        light += vec3(3.15, 1.72, 0.46) * (max(dot(n, vd), 0.0) * pSh * beamEdge * 9.5 / (1.0 + dV * dV * 0.07));
       }
     }
   }
@@ -309,26 +269,21 @@ vec3 shadeApertureSurface(vec3 p, vec3 n, float matId, bool rtxMode, vec2 blueCe
 }
 
 vec3 shadePortalsAperture(vec3 ro, vec3 rd, int mode, bool actionOn) {
-  // mode 0 = Prey (2006 tilted alien portal), mode 1 = Portal (2007 recursive 8x vs 1x), mode 2 = Portal RTX (2022)
   bool rtxMode = (mode == 2);
-  int maxDepth = (mode == 0) ? 2 : (mode == 1 ? (actionOn ? 1 : 8) : 7);
-  vec2 blueCen = vec2(-0.18, 1.48);
+  int maxDepth = (mode == 0) ? 2 : (mode == 1 ? (actionOn ? 1 : 10) : 8);
+  vec2 blueCen = vec2(-0.08, 1.50);
   vec2 orangeCen = (mode == 0)
-    ? vec2(-0.18, 1.48)
-    : vec2(clamp(-0.18 + uOrangeOff.x, -1.25, 0.95), clamp(1.48 + uOrangeOff.y, 1.15, 2.05));
-  vec2 pRad = (mode == 0) ? vec2(0.86, 1.15) : vec2(0.92, 1.22);
+    ? vec2(-0.08, 1.50)
+    : vec2(clamp(-0.08 + uOrangeOff.x, -1.15, 0.95), clamp(1.50 + uOrangeOff.y, 1.15, 2.05));
+  vec2 pRad = (mode == 0) ? vec2(0.90, 1.18) : vec2(0.98, 1.26);
 
-  vec3 curRo = ro;
-  vec3 curRd = rd;
-  vec3 tint = vec3(1.0);
+  vec3 curRo = ro; vec3 curRd = rd; vec3 tint = vec3(1.0);
   vec3 outCol = vec3(0.04, 0.06, 0.10);
 
-  for (int bounce = 0; bounce < 9; bounce++) {
-    float t = 0.04;
-    vec2 hit = vec2(-1.0);
-    for (int i = 0; i < 74; i++) {
-      vec3 p = curRo + curRd * t;
-      vec2 h = mapApertureChamber(p, rtxMode);
+  for (int bounce = 0; bounce < 11; bounce++) {
+    float t = 0.03; vec2 hit = vec2(-1.0);
+    for (int i = 0; i < 72; i++) {
+      vec2 h = mapApertureChamber(curRo + curRd * t, rtxMode);
       if (h.x < 0.0025) { hit = vec2(t, h.y); break; }
       t += max(h.x * 0.9, 0.003);
       if (t > 16.0) break;
@@ -338,44 +293,40 @@ vec3 shadePortalsAperture(vec3 ro, vec3 rd, int mode, bool actionOn) {
     vec3 p = curRo + curRd * hit.x;
     int m = int(floor(hit.y + 0.5));
 
-    // Check Blue Portal on Back Wall (m == 3, z ~ -2.65) or Orange Portal on Front Wall (m == 4, z ~ +2.65)
     if (m == 3 || m == 4) {
       bool isBlue = (m == 3);
       vec2 cen = isBlue ? blueCen : orangeCen;
       float oval = portalOvalDist(p.xy, cen, pRad);
 
-      // Blazing high-contrast glowing portal ring!
-      if (oval >= 0.92 && oval <= 1.15) {
-        float core = smoothstep(1.15, 1.01, oval) * smoothstep(0.90, 0.98, oval);
+      if (oval >= 0.91 && oval <= 1.15) {
+        float core = smoothstep(1.15, 1.01, oval) * smoothstep(0.89, 0.98, oval);
+        // Alternate Electric Blue & Fiery Orange rim hue on alternating recursive hops so BOTH iconic colors pop down the tunnel!
+        bool showOrangeRim = (!isBlue) || ((bounce & 1) == 1 && mode != 0);
         vec3 rimCol = (mode == 0)
-          ? vec3(0.20, 1.45, 0.92) // Prey bio-emerald portal
-          : (isBlue ? vec3(0.08, 0.85, 2.25) : vec3(2.35, 0.62, 0.06));
-        outCol = rimCol * (0.95 + core * 1.45) * tint;
+          ? vec3(0.16, 1.38, 0.88)
+          : (showOrangeRim ? vec3(2.25, 0.34, 0.02) : vec3(0.04, 0.72, 2.35));
+        outCol = rimCol * (0.88 + core * 1.15) * tint;
         break;
       }
 
-      if (oval < 0.92) {
+      if (oval < 0.91) {
         if (bounce >= maxDepth) {
-          vec3 cap = isBlue ? vec3(0.04, 0.24, 0.52) : vec3(0.55, 0.18, 0.03);
-          outCol = cap * tint;
+          outCol = ((bounce & 1) == 1 ? vec3(0.55, 0.18, 0.03) : vec3(0.04, 0.24, 0.55)) * tint;
           break;
         }
         vec2 local = p.xy - cen;
         if (mode == 0) {
-          // 2006 Prey: dramatic 38-degree tilted non-axis-aligned alien corridor!
           vec2 rl = rot2(0.66) * local;
           curRo = vec3(orangeCen.x + rl.x, orangeCen.y + rl.y, isBlue ? 2.58 : -2.58);
           vec2 rdxy = rot2(0.66) * curRd.xy;
           curRd = normalize(vec3(rdxy.x, rdxy.y, curRd.z));
         } else {
-          // 2007 Portal / 2022 Portal RTX: teleport Back (-2.65) -> Front (+2.58) with subtle 6-deg curve -> ICONIC INFINITE HALL!
           vec2 dstCen = isBlue ? orangeCen : blueCen;
-          // Show orange rim reflection on alternating hops by slightly rotating XZ!
           curRo = vec3(dstCen.x + local.x, dstCen.y + local.y, isBlue ? 2.58 : -2.58);
-          vec2 xz = rot2(isBlue ? 0.085 : -0.085) * curRd.xz;
+          vec2 xz = rot2(isBlue ? 0.065 : -0.065) * curRd.xz;
           curRd = normalize(vec3(xz.x, curRd.y, xz.y));
         }
-        tint *= (mode == 2 ? vec3(0.97, 0.96, 0.96) : vec3(0.93, 0.95, 0.97));
+        tint *= (mode == 2 ? vec3(0.97, 0.96, 0.96) : vec3(0.94, 0.95, 0.97));
         continue;
       }
     }
@@ -383,16 +334,13 @@ vec3 shadePortalsAperture(vec3 ro, vec3 rd, int mode, bool actionOn) {
     vec3 n = normalAperture(p, rtxMode);
     vec3 col = shadeApertureSurface(p, n, hit.y, rtxMode, blueCen, orangeCen, pRad);
 
-    // Subtle volumetric sunbeam haze pouring out of the Blue Portal in 2022 Portal with RTX!
     if (rtxMode && bounce == 0) {
       float beamT = clamp(hit.x, 0.0, 5.2);
       vec3 midP = curRo + curRd * (beamT * 0.55);
       float bDist = portalOvalDist(midP.xy, blueCen + vec2(0.15, -0.25), pRad * 1.15);
-      float shaft = smoothstep(1.15, 0.1, bDist) * smoothstep(2.6, -2.5, midP.z) * 0.14;
-      col += vec3(1.25, 0.78, 0.30) * shaft;
+      col += vec3(1.30, 0.78, 0.28) * (smoothstep(1.15, 0.1, bDist) * smoothstep(2.6, -2.5, midP.z) * 0.16);
     }
 
-    // Glossy mirror floor reflections on 2022 Portal with RTX (reflects glowing Blue portal + golden RTX light!)
     if (rtxMode && m == 0 && bounce == 0) {
       vec3 reflRd = reflect(curRd, n);
       vec3 reflRo = p + n * 0.03;
@@ -409,12 +357,12 @@ vec3 shadePortalsAperture(vec3 ro, vec3 rd, int mode, bool actionOn) {
         vec3 rCol = vec3(0.0);
         if (rm == 3 && portalOvalDist(rp.xy, blueCen, pRad) < 1.14) {
           float ov = portalOvalDist(rp.xy, blueCen, pRad);
-          rCol = ov > 0.90 ? vec3(0.14, 1.05, 2.35) : vec3(0.45, 0.56, 0.72);
+          rCol = ov > 0.89 ? vec3(0.14, 1.05, 2.35) : vec3(0.48, 0.58, 0.76);
         } else {
           vec3 rn = normalAperture(rp, true);
           rCol = shadeApertureSurface(rp, rn, rh.y, true, blueCen, orangeCen, pRad);
         }
-        float fres = 0.12 + 0.42 * pow(1.0 - max(dot(n, -curRd), 0.0), 3.2);
+        float fres = 0.14 + 0.44 * pow(1.0 - max(dot(n, -curRd), 0.0), 3.0);
         col = mix(col, rCol, fres);
       }
     }
@@ -426,165 +374,160 @@ vec3 shadePortalsAperture(vec3 ro, vec3 rd, int mode, bool actionOn) {
 }
 
 // ============================================================================
-// STAGE 4 (2013 Antichamber)
+// STAGE 4 (2013 Antichamber): TRUE 5-ROOM 360-DEG RIEMANN-SHEET PARADOX!!
+// Orbit 360 deg around the central monolith -> 4 corners = 4 distinct rooms -> 360 deg lands in a 5th impossible room!
+// The branch cut ALWAYS stays hidden behind the opaque central monolith -> ZERO visual seam!
 // ============================================================================
-vec2 mapAntichamber(vec3 p, int variant) {
-  float d = p.y; float mat = 0.0;
-  float dCeil = 3.8 - p.y; if (dCeil < d) { d = dCeil; mat = 1.0; }
-  float dL = p.x + 3.2; if (dL < d) { d = dL; mat = 2.0; }
-  float dR = 3.2 - p.x; if (dR < d) { d = dR; mat = 2.0; }
-  float dBack = p.z + 4.4; if (dBack < d) { d = dBack; mat = 2.0; }
+int riemannRoomAt(vec3 p) {
+  float a = atan(p.x, p.z);
+  float delta = mod(a - uShiftState + PI, TAU) - PI;
+  float unwrapped = uShiftState + delta;
+  // 5 distinct rooms mapped across 90-degree quadrants! (4 turns = 360 deg -> room 4 != room 0!)
+  float quad = floor((unwrapped + PI * 0.25) / (PI * 0.5));
+  return int(mod(mod(quad, 5.0) + 5.0, 5.0));
+}
 
-  float dMono = sdBox(p - vec3(0.0, 1.9, -0.35), vec3(0.46, 1.9, 0.46));
+vec2 mapAntichamber5(vec3 p) {
+  // Spacious square looping gallery around central monolith: outer walls at +-3.75, central pillar +-0.95!
+  float d = p.y; float mat = 0.0;
+  float dCeil = 3.75 - p.y; if (dCeil < d) { d = dCeil; mat = 1.0; }
+  float dOut = 3.75 - max(abs(p.x), abs(p.z));
+  if (dOut < d) { d = dOut; mat = 2.0; }
+  float dMono = sdBox(p - vec3(0.0, 1.88, 0.0), vec3(0.95, 1.88, 0.95));
   if (dMono < d) { d = dMono; mat = 3.0; }
 
-  if (variant == 0) {
-    for (int s = 0; s < 5; s++) {
+  // Place one unmistakable iconic sculpture in each 90-deg hallway quadrant at outer radius ~2.88m (zero camera clipping at r=1.85!)
+  int rId = riemannRoomAt(p);
+  float a = atan(p.x, p.z);
+  float delta = mod(a - uShiftState + PI, TAU) - PI;
+  float qIdx = floor((uShiftState + delta + PI * 0.25) / (PI * 0.5));
+  float qCenter = qIdx * (PI * 0.5);
+  vec2 lp2 = rot2(-qCenter) * p.xz;
+  vec3 lp = vec3(lp2.x, p.y, lp2.y - 2.88);
+
+  if (rId == 0) {
+    // Room 0: Golden Escher ascending steps!
+    for (int s = 0; s < 4; s++) {
       float fs = float(s);
-      float ds = sdBox(p - vec3(-1.7, 0.25 + fs * 0.44, -1.2 - fs * 0.55), vec3(0.72, 0.18, 0.32));
+      float ds = sdBox(lp - vec3(-0.72 + fs * 0.48, 0.28 + fs * 0.40, 0.0), vec3(0.26, 0.16, 0.42));
       if (ds < d) { d = ds; mat = 4.0; }
     }
-    float dArch = sdBox(p - vec3(1.75, 1.5, -2.2), vec3(0.55, 1.5, 0.32));
-    if (dArch < d) { d = dArch; mat = 5.0; }
+  } else if (rId == 1) {
+    // Room 1: Floating Crimson Twin Cubes!
+    vec3 cp = lp - vec3(0.0, 1.50 + sin(uTime * 1.8) * 0.16, 0.0);
+    cp.xy = rot2(uTime * 0.7) * cp.xy;
+    float dc = min(sdBox(cp, vec3(0.42)), sdBox(lp - vec3(0.0, 0.34, 0.0), vec3(0.46, 0.34, 0.46)));
+    if (dc < d) { d = dc; mat = 5.0; }
+  } else if (rId == 2) {
+    // Room 2: Twin Cobalt & Amber Archway!
+    float dA = min(min(
+      sdCylinder(lp - vec3(-0.75, 1.55, 0.0), 0.24, 1.55),
+      sdCylinder(lp - vec3( 0.75, 1.55, 0.0), 0.24, 1.55)),
+      sdBox(lp - vec3(0.0, 3.05, 0.0), vec3(1.05, 0.22, 0.30)));
+    if (dA < d) { d = dA; mat = 6.0; }
+  } else if (rId == 3) {
+    // Room 3: Emerald Floating Sphere on Plinth!
+    float dS = min(sdBox(lp - vec3(0.0, 0.42, 0.0), vec3(0.44, 0.42, 0.44)), length(lp - vec3(0.0, 1.55 + sin(uTime * 1.6) * 0.12, 0.0)) - 0.46);
+    if (dS < d) { d = dS; mat = 7.0; }
   } else {
-    for (int k = 0; k < 3; k++) {
-      float fk = float(k);
-      vec3 cp = p - vec3(-1.65 + sin(uTime + fk) * 0.15, 0.9 + fk * 0.85, -2.0 - fk * 0.45);
-      cp.xy = rot2(uTime * 0.5 + fk) * cp.xy;
-      float dc = sdBox(cp, vec3(0.36));
-      if (dc < d) { d = dc; mat = 6.0; }
-    }
-    float dWin = sdCylinder(p - vec3(1.75, 1.65, -2.1), 0.65, 1.65);
-    if (dWin < d) { d = dWin; mat = 7.0; }
+    // Room 4 (THE 5TH IMPOSSIBLE ROOM AT 360 DEG!): Neon Magenta Spinning Obelisk + Ring!
+    vec3 sp = lp - vec3(0.0, 1.55, 0.0);
+    sp.xz = rot2(uTime * 0.95) * sp.xz;
+    float dSp = min(sdBox(sp, vec3(0.26, 1.25, 0.26)), sdBox(lp - vec3(0.0, 0.26, 0.0), vec3(0.55, 0.26, 0.55)));
+    if (dSp < d) { d = dSp; mat = 8.0; }
   }
   return vec2(d, mat);
 }
 
 vec3 shadeAntichamber(vec3 ro, vec3 rd) {
-  int variant = int(mod(floor(uShiftState + 0.5), 2.0));
   float t = 0.04; vec2 hit = vec2(-1.0);
-  for (int i = 0; i < 74; i++) {
-    vec2 h = mapAntichamber(ro + rd * t, variant);
+  for (int i = 0; i < 76; i++) {
+    vec2 h = mapAntichamber5(ro + rd * t);
     if (h.x < 0.0025) { hit = vec2(t, h.y); break; }
-    t += max(h.x * 0.9, 0.004);
-    if (t > 18.0) break;
+    t += max(h.x * 0.85, 0.004);
+    if (t > 14.0) break;
   }
-  if (hit.x < 0.0) return vec3(0.95);
+  if (hit.x < 0.0) return vec3(0.92);
   vec3 p = ro + rd * hit.x;
   vec2 e = vec2(0.003, 0.0);
   vec3 n = normalize(vec3(
-    mapAntichamber(p + e.xyy, variant).x - mapAntichamber(p - e.xyy, variant).x,
-    mapAntichamber(p + e.yxy, variant).x - mapAntichamber(p - e.yxy, variant).x,
-    mapAntichamber(p + e.yyx, variant).x - mapAntichamber(p - e.yyx, variant).x
+    mapAntichamber5(p + e.xyy).x - mapAntichamber5(p - e.xyy).x,
+    mapAntichamber5(p + e.yxy).x - mapAntichamber5(p - e.yxy).x,
+    mapAntichamber5(p + e.yyx).x - mapAntichamber5(p - e.yyx).x
   ));
+  int rId = riemannRoomAt(p);
   int m = int(floor(hit.y + 0.5));
-  vec3 col = variant == 0 ? vec3(0.92, 0.93, 0.96) : vec3(0.09, 0.11, 0.16);
-  if (m == 3) col = variant == 0 ? vec3(0.10, 0.11, 0.15) : vec3(0.94, 0.95, 0.97);
-  else if (m == 4) col = vec3(0.98, 0.72, 0.14);
-  else if (m == 5) col = vec3(0.08, 0.74, 0.96);
-  else if (m == 6) col = vec3(0.98, 0.22, 0.34);
-  else if (m == 7) col = vec3(0.12, 0.88, 0.54);
 
-  float shade = 0.72 + 0.28 * max(dot(n, normalize(vec3(0.35, 0.85, 0.45))), 0.0);
-  float edge = gridLine(abs(n.y) > 0.5 ? p.xz : (abs(n.x) > 0.5 ? p.zy : p.xy), 0.75, 1.3);
-  vec3 lineCol = variant == 0 ? vec3(0.12, 0.14, 0.18) : vec3(0.28, 0.92, 0.78);
-  return mix(col * shade, lineCol, edge * 0.45);
+  // Each of the 5 rooms has its own unmistakable bold Antichamber wall & ink theme!
+  vec3 wallCol = vec3(0.93, 0.94, 0.96);
+  vec3 lineCol = vec3(0.10, 0.12, 0.16);
+  if (rId == 1) { wallCol = vec3(0.11, 0.12, 0.17); lineCol = vec3(0.96, 0.26, 0.38); }
+  else if (rId == 2) { wallCol = vec3(0.10, 0.24, 0.44); lineCol = vec3(0.98, 0.78, 0.24); }
+  else if (rId == 3) { wallCol = vec3(0.90, 0.94, 0.88); lineCol = vec3(0.08, 0.68, 0.44); }
+  else if (rId == 4) { wallCol = vec3(0.16, 0.10, 0.24); lineCol = vec3(0.98, 0.30, 0.88); }
+
+  vec3 col = wallCol;
+  if (m == 3) col = (rId == 0 || rId == 3) ? vec3(0.12, 0.14, 0.19) : vec3(0.92, 0.94, 0.96);
+  else if (m == 4) col = vec3(0.98, 0.72, 0.12); // Gold stairs
+  else if (m == 5) col = vec3(0.98, 0.20, 0.34); // Crimson cubes
+  else if (m == 6) col = vec3(0.98, 0.68, 0.16); // Amber arch pillars
+  else if (m == 7) col = vec3(0.10, 0.86, 0.54); // Emerald sphere
+  else if (m == 8) col = vec3(1.05, 0.28, 0.92); // Neon magenta spire (5th room!)
+
+  float shade = 0.70 + 0.30 * max(dot(n, normalize(vec3(0.35, 0.85, 0.45))), 0.0);
+  float edge = gridLine(abs(n.y) > 0.5 ? p.xz : (abs(n.x) > 0.5 ? p.zy : p.xy), 0.80, 1.35);
+  return mix(col * shade, lineCol, edge * 0.48);
 }
 
 // ============================================================================
-// STAGE 5 (2018 CodeParade): "Bigger on the Inside" 1.8m Stone Pavilion -> 22m Vaulted Hall!
+// STAGE 5 (2018 CodeParade): BIDIRECTIONAL "1.4m Outside / 24m Inside" FPP PAVILION!!
+// Works seamlessly outside, orbiting 360 deg around the back, flying 14m deep INSIDE, and looking back out!
 // ============================================================================
 vec2 mapInsideHall(vec3 p) {
   float d = p.y; float mat = 0.0;
   float dCeil = 2.62 - p.y; if (dCeil < d) { d = dCeil; mat = 1.0; }
-  float dL = p.x + 1.15; if (dL < d) { d = dL; mat = 2.0; }
-  float dR = 1.15 - p.x; if (dR < d) { d = dR; mat = 2.0; }
-  float dEnd = p.z + 21.0; if (dEnd < d) { d = dEnd; mat = 3.0; }
+  float dL = p.x + 1.18; if (dL < d) { d = dL; mat = 2.0; }
+  float dR = 1.18 - p.x; if (dR < d) { d = dR; mat = 2.0; }
+  float dEnd = p.z + 23.5; if (dEnd < d) { d = dEnd; mat = 3.0; }
 
   vec3 rp = p;
   rp.z = mod(p.z + 1.2, 2.4) - 1.2;
   float dRib = min(min(
-    sdBox(rp - vec3(-1.05, 1.31, 0.0), vec3(0.12, 1.31, 0.14)),
-    sdBox(rp - vec3( 1.05, 1.31, 0.0), vec3(0.12, 1.31, 0.14))),
-    sdBox(rp - vec3( 0.0, 2.50, 0.0), vec3(1.15, 0.14, 0.14)));
+    sdBox(rp - vec3(-1.08, 1.31, 0.0), vec3(0.12, 1.31, 0.14)),
+    sdBox(rp - vec3( 1.08, 1.31, 0.0), vec3(0.12, 1.31, 0.14))),
+    sdBox(rp - vec3( 0.0, 2.50, 0.0), vec3(1.18, 0.14, 0.14)));
   if (dRib < d) { d = dRib; mat = 4.0; }
 
-  float dGem = length(p - vec3(0.0, 1.35 + sin(uTime * 2.0) * 0.16, -15.5)) - 0.55;
+  float dGem = length(p - vec3(0.0, 1.35 + sin(uTime * 2.0) * 0.16, -18.5)) - 0.62;
   if (dGem < d) { d = dGem; mat = 5.0; }
   return vec2(d, mat);
 }
 
 vec2 mapExteriorCourtyard(vec3 p) {
   float d = p.y; float mat = 0.0;
-  float boxOuter = sdBox(p - vec3(0.0, 1.45, 0.0), vec3(1.35, 1.45, 0.90));
-  float doorCut = sdBox(p - vec3(0.0, 1.27, 0.72), vec3(1.05, 1.28, 0.45));
+  // TINY 1.4m-deep crimson terracotta stone kiosk! (z in [-0.70, +0.70])
+  float boxOuter = sdBox(p - vec3(0.0, 1.45, 0.0), vec3(1.36, 1.45, 0.70));
+  float doorCut = sdBox(p - vec3(0.0, 1.27, 0.56), vec3(1.06, 1.28, 0.35));
   float kiosk = max(boxOuter, -doorCut);
   if (kiosk < d) { d = kiosk; mat = 1.0; }
 
-  float dPostL = sdCylinder(p - vec3(-3.2, 1.6, -2.6), 0.28, 1.6);
-  float dPostR = sdCylinder(p - vec3( 3.2, 1.6, -2.6), 0.28, 1.6);
-  float dBackWall = sdBox(p - vec3(0.0, 0.55, -3.4), vec3(3.6, 0.55, 0.32));
+  // Courtyard colonnade pillars & low wall well behind the tiny 1.4m kiosk (proving zero depth behind it, zero camera occlusion!)
+  float dPostL = sdCylinder(p - vec3(-4.6, 1.65, -4.4), 0.28, 1.65);
+  float dPostR = sdCylinder(p - vec3( 4.6, 1.65, -4.4), 0.28, 1.65);
+  float dBackWall = sdBox(p - vec3(0.0, 0.52, -5.4), vec3(5.0, 0.52, 0.30));
   float dEnv = min(min(dPostL, dPostR), dBackWall);
   if (dEnv < d) { d = dEnv; mat = 2.0; }
   return vec2(d, mat);
 }
 
-vec3 shadeCodeParade(vec3 ro, vec3 rd) {
-  bool enterInterior = false;
-  float tDoor = 1e9;
-  if (ro.z > 0.86 && rd.z < -0.01) {
-    float td = (0.86 - ro.z) / rd.z;
-    if (td > 0.01) {
-      vec3 dp = ro + rd * td;
-      if (abs(dp.x) < 1.05 && dp.y > 0.0 && dp.y < 2.55) tDoor = td;
-    }
-  } else if (ro.z <= 0.86 && abs(ro.x) < 1.15 && ro.y < 2.62) {
-    enterInterior = true; tDoor = 0.0;
+vec3 shadeExteriorColor(vec3 ro, vec3 rd, float tStart) {
+  float tExt = tStart; vec2 hitExt = vec2(-1.0);
+  for (int i = 0; i < 68; i++) {
+    vec2 h = mapExteriorCourtyard(ro + rd * tExt);
+    if (h.x < 0.0025) { hitExt = vec2(tExt, h.y); break; }
+    tExt += max(h.x * 0.9, 0.004);
+    if (tExt > 30.0) break;
   }
-
-  float tExt = 0.04; vec2 hitExt = vec2(-1.0);
-  if (!enterInterior) {
-    for (int i = 0; i < 68; i++) {
-      vec2 h = mapExteriorCourtyard(ro + rd * tExt);
-      if (h.x < 0.0025) { hitExt = vec2(tExt, h.y); break; }
-      tExt += max(h.x * 0.9, 0.004);
-      if (tExt > min(tDoor, 28.0)) break;
-    }
-  }
-
-  if (enterInterior || (tDoor < 1e8 && (hitExt.x < 0.0 || tDoor < hitExt.x))) {
-    float tIn = max(tDoor + 0.02, 0.02); vec2 hitIn = vec2(-1.0);
-    for (int i = 0; i < 80; i++) {
-      vec2 h = mapInsideHall(ro + rd * tIn);
-      if (h.x < 0.003) { hitIn = vec2(tIn, h.y); break; }
-      tIn += max(h.x * 0.9, 0.005);
-      if (tIn > 28.0) break;
-    }
-    if (hitIn.x > 0.0) {
-      vec3 p = ro + rd * hitIn.x;
-      vec2 e = vec2(0.003, 0.0);
-      vec3 n = normalize(vec3(
-        mapInsideHall(p + e.xyy).x - mapInsideHall(p - e.xyy).x,
-        mapInsideHall(p + e.yxy).x - mapInsideHall(p - e.yxy).x,
-        mapInsideHall(p + e.yyx).x - mapInsideHall(p - e.yyx).x
-      ));
-      int m = int(floor(hitIn.y + 0.5));
-      if (m == 5) return vec3(0.24, 1.55, 2.05);
-      if (m == 3) return vec3(1.55, 1.15, 0.65);
-      vec3 alb = vec3(0.20, 0.25, 0.36);
-      if (m == 0) {
-        float chk = mod(floor(p.x * 2.0) + floor(p.z * 0.9), 2.0);
-        alb = mix(vec3(0.14, 0.18, 0.28), vec3(0.76, 0.72, 0.66), chk);
-      } else if (m == 4) alb = vec3(0.94, 0.70, 0.28);
-      else if (m == 2) alb = vec3(0.22, 0.34, 0.52);
-      float ribLight = 0.55 + 0.45 * cos(p.z * 2.618);
-      float depthGlow = exp(-max(0.0, p.z + 15.5) * 0.18) * 1.1;
-      vec3 col = alb * (0.32 + 0.78 * ribLight * (0.6 + 0.4 * max(n.y, 0.0)));
-      col += vec3(0.18, 0.82, 1.0) * depthGlow * 0.45;
-      return mix(col, vec3(0.10, 0.20, 0.34), (1.0 - exp(-max(0.0, -p.z) * 0.055)) * 0.65);
-    }
-  }
-
   if (hitExt.x < 0.0) {
     float sky = clamp(rd.y * 0.5 + 0.5, 0.0, 1.0);
     return mix(vec3(0.68, 0.82, 0.96), vec3(0.18, 0.44, 0.80), pow(sky, 0.7));
@@ -602,16 +545,13 @@ vec3 shadeCodeParade(vec3 ro, vec3 rd) {
     float chk = mod(floor(p.x * 0.9) + floor(p.z * 0.9), 2.0);
     alb = mix(vec3(0.74, 0.70, 0.62), vec3(0.58, 0.54, 0.48), chk);
   } else if (m == 1) {
-    bool isTrim = p.z > 0.82 && abs(p.x) < 1.20 && p.y < 2.70;
-    alb = isTrim ? vec3(0.94, 0.72, 0.24) : vec3(0.78, 0.28, 0.20);
+    bool isTrim = p.z > 0.62 && abs(p.x) < 1.22 && p.y < 2.70;
+    alb = isTrim ? vec3(0.96, 0.72, 0.22) : vec3(0.80, 0.26, 0.20);
   }
   vec3 sun = normalize(vec3(0.58, 0.78, 0.42));
-  // Crisp courtyard shadow cast by the tiny 1.8m pavilion onto the plaza!
-  float sh = 1.0;
-  float st = 0.08;
+  float sh = 1.0, st = 0.08;
   for (int i = 0; i < 24; i++) {
-    vec3 sp = p + n * 0.04 + sun * st;
-    float h = sdBox(sp - vec3(0.0, 1.45, 0.0), vec3(1.35, 1.45, 0.90));
+    float h = sdBox(p + n * 0.04 + sun * st - vec3(0.0, 1.45, 0.0), vec3(1.36, 1.45, 0.70));
     if (h < 0.005) { sh = 0.0; break; }
     sh = min(sh, 7.0 * h / st);
     st += clamp(h, 0.05, 0.35);
@@ -620,30 +560,128 @@ vec3 shadeCodeParade(vec3 ro, vec3 rd) {
   return alb * (vec3(0.24, 0.30, 0.42) + vec3(1.18, 1.04, 0.84) * (max(dot(n, sun), 0.0) * sh));
 }
 
+vec3 shadeCodeParade(vec3 ro, vec3 rd) {
+  bool startInside = uInHall > 0.5 || (ro.z < 0.66 && abs(ro.x) < 1.15 && ro.y < 2.60);
+
+  // Case 1: Camera is INSIDE the 24m hall! (Can also look BACK out the doorway at z = +0.68 into the sunny plaza!)
+  if (startInside) {
+    float tExit = 1e9;
+    if (rd.z > 0.01) {
+      float te = (0.68 - ro.z) / rd.z;
+      if (te > 0.01) {
+        vec3 ep = ro + rd * te;
+        if (abs(ep.x) < 1.06 && ep.y > 0.0 && ep.y < 2.55) tExit = te;
+      }
+    }
+    float tIn = 0.03; vec2 hitIn = vec2(-1.0);
+    for (int i = 0; i < 82; i++) {
+      vec3 p = ro + rd * tIn;
+      if (p.z > 0.68) break;
+      vec2 h = mapInsideHall(p);
+      if (h.x < 0.003) { hitIn = vec2(tIn, h.y); break; }
+      tIn += max(h.x * 0.9, 0.005);
+      if (tIn > min(tExit, 28.0)) break;
+    }
+    if (tExit < 1e8 && (hitIn.x < 0.0 || tExit < hitIn.x)) {
+      return shadeExteriorColor(ro, rd, tExit + 0.04);
+    }
+    if (hitIn.x > 0.0) {
+      vec3 p = ro + rd * hitIn.x;
+      vec2 e = vec2(0.003, 0.0);
+      vec3 n = normalize(vec3(
+        mapInsideHall(p + e.xyy).x - mapInsideHall(p - e.xyy).x,
+        mapInsideHall(p + e.yxy).x - mapInsideHall(p - e.yxy).x,
+        mapInsideHall(p + e.yyx).x - mapInsideHall(p - e.yyx).x
+      ));
+      int m = int(floor(hitIn.y + 0.5));
+      if (m == 5) return vec3(0.24, 1.60, 2.15);
+      if (m == 3) return vec3(1.55, 1.15, 0.65);
+      vec3 alb = vec3(0.20, 0.25, 0.36);
+      if (m == 0) alb = mix(vec3(0.14, 0.18, 0.28), vec3(0.76, 0.72, 0.66), mod(floor(p.x * 2.0) + floor(p.z * 0.9), 2.0));
+      else if (m == 4) alb = vec3(0.95, 0.70, 0.26);
+      else if (m == 2) alb = vec3(0.22, 0.35, 0.54);
+      float ribLight = 0.55 + 0.45 * cos(p.z * 2.618);
+      float depthGlow = exp(-max(0.0, p.z + 18.5) * 0.16) * 1.1;
+      vec3 col = alb * (0.32 + 0.78 * ribLight * (0.6 + 0.4 * max(n.y, 0.0))) + vec3(0.18, 0.82, 1.0) * depthGlow * 0.45;
+      return mix(col, vec3(0.10, 0.20, 0.34), (1.0 - exp(-max(0.0, -p.z - 2.0) * 0.045)) * 0.60);
+    }
+    return vec3(0.12, 0.18, 0.28);
+  }
+
+  // Case 2: Camera is OUTSIDE -> check if ray crosses front doorway portal (z = +0.66) before hitting exterior stone!
+  float tDoor = 1e9;
+  if (ro.z > 0.66 && rd.z < -0.01) {
+    float td = (0.66 - ro.z) / rd.z;
+    if (td > 0.01) {
+      vec3 dp = ro + rd * td;
+      if (abs(dp.x) < 1.06 && dp.y > 0.0 && dp.y < 2.55) tDoor = td;
+    }
+  }
+  float tExt = 0.04; vec2 hitExt = vec2(-1.0);
+  for (int i = 0; i < 68; i++) {
+    vec2 h = mapExteriorCourtyard(ro + rd * tExt);
+    if (h.x < 0.0025) { hitExt = vec2(tExt, h.y); break; }
+    tExt += max(h.x * 0.9, 0.004);
+    if (tExt > min(tDoor, 28.0)) break;
+  }
+  if (tDoor < 1e8 && (hitExt.x < 0.0 || tDoor < hitExt.x)) {
+    float tIn = tDoor + 0.02; vec2 hitIn = vec2(-1.0);
+    for (int i = 0; i < 82; i++) {
+      vec2 h = mapInsideHall(ro + rd * tIn);
+      if (h.x < 0.003) { hitIn = vec2(tIn, h.y); break; }
+      tIn += max(h.x * 0.9, 0.005);
+      if (tIn > 30.0) break;
+    }
+    if (hitIn.x > 0.0) {
+      vec3 p = ro + rd * hitIn.x;
+      vec2 e = vec2(0.003, 0.0);
+      vec3 n = normalize(vec3(
+        mapInsideHall(p + e.xyy).x - mapInsideHall(p - e.xyy).x,
+        mapInsideHall(p + e.yxy).x - mapInsideHall(p - e.yxy).x,
+        mapInsideHall(p + e.yyx).x - mapInsideHall(p - e.yyx).x
+      ));
+      int m = int(floor(hitIn.y + 0.5));
+      if (m == 5) return vec3(0.24, 1.60, 2.15);
+      if (m == 3) return vec3(1.55, 1.15, 0.65);
+      vec3 alb = vec3(0.20, 0.25, 0.36);
+      if (m == 0) alb = mix(vec3(0.14, 0.18, 0.28), vec3(0.76, 0.72, 0.66), mod(floor(p.x * 2.0) + floor(p.z * 0.9), 2.0));
+      else if (m == 4) alb = vec3(0.95, 0.70, 0.26);
+      else if (m == 2) alb = vec3(0.22, 0.35, 0.54);
+      float ribLight = 0.55 + 0.45 * cos(p.z * 2.618);
+      float depthGlow = exp(-max(0.0, p.z + 18.5) * 0.16) * 1.1;
+      vec3 col = alb * (0.32 + 0.78 * ribLight * (0.6 + 0.4 * max(n.y, 0.0))) + vec3(0.18, 0.82, 1.0) * depthGlow * 0.45;
+      return mix(col, vec3(0.10, 0.20, 0.34), (1.0 - exp(-max(0.0, -p.z) * 0.045)) * 0.60);
+    }
+  }
+  return shadeExteriorColor(ro, rd, 0.04);
+}
+
 // ============================================================================
-// STAGE 7 (2023 Viewfinder): 2D Photo Becomes Real 3D Architecture!
+// STAGE 7 (2023 Viewfinder): Stamp 2D Polaroid & WALK FPP ONTO THE 3D BRIDGE!
 // ============================================================================
 vec2 mapDarkRoom(vec3 p) {
   float d = p.y; float mat = 0.0;
   float dCeil = 3.6 - p.y; if (dCeil < d) { d = dCeil; mat = 1.0; }
-  float dBack = p.z + 3.2; if (dBack < d) { d = dBack; mat = 2.0; }
+  float dBack = p.z + 2.4; if (dBack < d) { d = dBack; mat = 2.0; }
   float dL = p.x + 3.2; if (dL < d) { d = dL; mat = 2.0; }
   float dR = 3.2 - p.x; if (dR < d) { d = dR; mat = 2.0; }
-  float dCrate = sdBox(p - vec3(-1.8, 0.48, -1.6), vec3(0.48));
+  float dCrate = sdBox(p - vec3(-1.95, 0.48, -1.2), vec3(0.46));
   if (dCrate < d) { d = dCrate; mat = 3.0; }
   return vec2(d, mat);
 }
 
 vec2 mapPhotoWorld(vec3 p) {
   float d = p.y; float mat = 0.0;
-  float dPilL = sdCylinder(p - vec3(-0.92, 1.45, -2.05), 0.22, 1.45);
-  float dPilR = sdCylinder(p - vec3( 0.92, 1.45, -2.05), 0.22, 1.45);
-  float dLint = sdBox(p - vec3(0.0, 2.95, -2.05), vec3(1.35, 0.22, 0.28));
-  float dArchBack = sdCylinder(p - vec3(-1.35, 1.5, -5.2), 0.24, 1.5);
-  float dArchBack2 = sdCylinder(p - vec3( 1.35, 1.5, -5.2), 0.24, 1.5);
-  float dBridge = sdBox(p - vec3(0.0, 0.16, -3.8), vec3(1.15, 0.16, 2.4));
-  float dSunOrb = length(p - vec3(0.0, 1.85 + sin(uTime * 1.4) * 0.14, -4.4)) - 0.44;
-  float dArch = min(min(min(dPilL, dPilR), dLint), min(dArchBack, dArchBack2));
+  // Walkable turquoise-inlaid sandstone bridge stretching straight out through the stamped wall!
+  float dBridge = sdBox(p - vec3(0.0, 0.14, -4.2), vec3(1.10, 0.14, 3.6));
+  float dPilL = sdCylinder(p - vec3(-1.05, 1.48, -2.8), 0.22, 1.48);
+  float dPilR = sdCylinder(p - vec3( 1.05, 1.48, -2.8), 0.22, 1.48);
+  float dLint = sdBox(p - vec3(0.0, 3.02, -2.8), vec3(1.42, 0.22, 0.28));
+  float dPilL2 = sdCylinder(p - vec3(-1.15, 1.48, -6.2), 0.24, 1.48);
+  float dPilR2 = sdCylinder(p - vec3( 1.15, 1.48, -6.2), 0.24, 1.48);
+  float dLint2 = sdBox(p - vec3(0.0, 3.02, -6.2), vec3(1.52, 0.22, 0.28));
+  float dSunOrb = length(p - vec3(0.0, 1.92 + sin(uTime * 1.4) * 0.14, -5.8)) - 0.48;
+  float dArch = min(min(min(dPilL, dPilR), dLint), min(min(dPilL2, dPilR2), dLint2));
   if (dArch < d) { d = dArch; mat = 1.0; }
   if (dBridge < d) { d = dBridge; mat = 2.0; }
   if (dSunOrb < d) { d = dSunOrb; mat = 3.0; }
@@ -651,60 +689,67 @@ vec2 mapPhotoWorld(vec3 p) {
 }
 
 bool insidePhotoFrustum(vec3 p) {
-  float depth = 2.9 - p.z;
-  if (depth < 1.35 || depth > 14.0) return false;
-  return abs(p.x) < depth * 0.38 && abs(p.y - 1.55) < depth * 0.30;
+  float depth = 2.6 - p.z;
+  if (depth < 1.35 || depth > 18.0) return false;
+  return abs(p.x) < depth * 0.42 && abs(p.y - 1.55) < depth * 0.34;
 }
 
-vec3 shadePhotoWorldColor(vec3 ro, vec3 rd) {
-  float t = 0.04; vec2 hit = vec2(-1.0);
-  for (int i = 0; i < 64; i++) {
-    vec2 h = mapPhotoWorld(ro + rd * t);
-    if (h.x < 0.003) { hit = vec2(t, h.y); break; }
-    t += max(h.x * 0.9, 0.005);
-    if (t > 18.0) break;
-  }
-  if (hit.x < 0.0) {
-    float s = clamp(rd.y * 0.7 + 0.4, 0.0, 1.0);
-    return mix(vec3(1.0, 0.84, 0.56), vec3(0.16, 0.56, 0.96), pow(s, 0.75));
-  }
-  vec3 p = ro + rd * hit.x;
+vec3 shadePhotoWorldAt(vec3 p, float matId) {
   vec2 e = vec2(0.003, 0.0);
   vec3 n = normalize(vec3(
     mapPhotoWorld(p + e.xyy).x - mapPhotoWorld(p - e.xyy).x,
     mapPhotoWorld(p + e.yxy).x - mapPhotoWorld(p - e.yxy).x,
     mapPhotoWorld(p + e.yyx).x - mapPhotoWorld(p - e.yyx).x
   ));
-  int m = int(floor(hit.y + 0.5));
+  int m = int(floor(matId + 0.5));
   if (m == 3) return vec3(1.75, 1.18, 0.36);
-  vec3 alb = m == 0 ? vec3(0.88, 0.74, 0.56) : (m == 1 ? vec3(0.95, 0.86, 0.70) : vec3(0.18, 0.68, 0.80));
+  vec3 alb = m == 0 ? vec3(0.88, 0.74, 0.56) : (m == 1 ? vec3(0.95, 0.86, 0.70) : vec3(0.18, 0.72, 0.84));
+  if (m == 2) {
+    float strip = smoothstep(0.18, 0.14, abs(p.x)) + smoothstep(0.08, 0.04, abs(abs(p.x) - 0.96));
+    alb = mix(vec3(0.90, 0.80, 0.64), vec3(0.12, 0.78, 0.88), clamp(strip, 0.0, 1.0));
+  }
   float ndl = max(dot(n, normalize(vec3(0.45, 0.85, 0.35))), 0.0);
   return alb * (vec3(0.32, 0.38, 0.52) + vec3(1.22, 0.98, 0.70) * ndl);
 }
 
+vec3 shadePhotoWorldColor(vec3 ro, vec3 rd) {
+  float t = 0.04; vec2 hit = vec2(-1.0);
+  for (int i = 0; i < 66; i++) {
+    vec2 h = mapPhotoWorld(ro + rd * t);
+    if (h.x < 0.003) { hit = vec2(t, h.y); break; }
+    t += max(h.x * 0.9, 0.005);
+    if (t > 20.0) break;
+  }
+  if (hit.x < 0.0) {
+    float s = clamp(rd.y * 0.7 + 0.4, 0.0, 1.0);
+    return mix(vec3(1.0, 0.84, 0.56), vec3(0.16, 0.56, 0.96), pow(s, 0.75));
+  }
+  return shadePhotoWorldAt(ro + rd * hit.x, hit.y);
+}
+
 vec3 shadeViewfinder(vec3 ro, vec3 rd) {
   if (uPhotoStamp < 0.5) {
-    if (rd.z < -0.02 && ro.z > 0.65) {
-      float tp = (0.65 - ro.z) / rd.z;
+    if (rd.z < -0.02 && ro.z > 0.75) {
+      float tp = (0.75 - ro.z) / rd.z;
       vec3 pp = ro + rd * tp;
       vec2 card = pp.xy - vec2(0.0, 1.52);
-      if (abs(card.x) < 0.96 && abs(card.y) < 0.78) {
-        if (abs(card.x) > 0.86 || card.y > 0.68 || card.y < -0.56) return vec3(0.94, 0.91, 0.85);
-        vec2 photoUv = (card - vec2(0.0, 0.06)) / vec2(0.86, 0.62);
+      if (abs(card.x) < 0.94 && abs(card.y) < 0.78) {
+        if (abs(card.x) > 0.84 || card.y > 0.68 || card.y < -0.56) return vec3(0.95, 0.92, 0.86);
+        vec2 photoUv = (card - vec2(0.0, 0.06)) / vec2(0.84, 0.62);
         vec3 photoRd = normalize(vec3(photoUv.x * 0.58, photoUv.y * 0.44, -1.0));
-        return shadePhotoWorldColor(vec3(0.0, 1.55, 2.4), photoRd);
+        return shadePhotoWorldColor(vec3(0.0, 1.55, 2.2), photoRd);
       }
     }
   }
 
   float t = 0.04; bool hitIsPhoto = false; vec2 hit = vec2(-1.0);
-  for (int i = 0; i < 84; i++) {
+  for (int i = 0; i < 86; i++) {
     vec3 p = ro + rd * t;
     bool inP = uPhotoStamp >= 0.5 && insidePhotoFrustum(p);
     vec2 h = inP ? mapPhotoWorld(p) : mapDarkRoom(p);
     if (h.x < 0.003) { hit = vec2(t, h.y); hitIsPhoto = inP; break; }
     t += max(min(h.x * 0.88, 0.25), 0.005);
-    if (t > 16.0) break;
+    if (t > 18.0) break;
   }
 
   if (hit.x < 0.0) {
@@ -714,17 +759,17 @@ vec3 shadeViewfinder(vec3 ro, vec3 rd) {
 
   vec3 p = ro + rd * hit.x;
   if (uPhotoStamp >= 0.5 && !hitIsPhoto) {
-    float depth = 2.9 - p.z;
-    if (depth > 1.32 && depth < 14.0) {
-      float dx = abs(abs(p.x) - depth * 0.38);
-      float dy = abs(abs(p.y - 1.55) - depth * 0.30);
-      if ((dx < 0.045 && abs(p.y - 1.55) <= depth * 0.30 + 0.045) ||
-          (dy < 0.045 && abs(p.x) <= depth * 0.38 + 0.045)) {
+    float depth = 2.6 - p.z;
+    if (depth > 1.32 && depth < 18.0) {
+      float dx = abs(abs(p.x) - depth * 0.42);
+      float dy = abs(abs(p.y - 1.55) - depth * 0.34);
+      if ((dx < 0.045 && abs(p.y - 1.55) <= depth * 0.34 + 0.045) ||
+          (dy < 0.045 && abs(p.x) <= depth * 0.42 + 0.045)) {
         return vec3(1.0, 0.96, 0.88) * 1.15;
       }
     }
   }
-  if (hitIsPhoto) return shadePhotoWorldColor(ro, rd);
+  if (hitIsPhoto) return shadePhotoWorldAt(p, hit.y);
 
   vec2 e = vec2(0.003, 0.0);
   vec3 n = normalize(vec3(

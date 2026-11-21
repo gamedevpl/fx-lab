@@ -31,8 +31,8 @@ out float vMat;
 void main() {
   vec4 clip = uViewProj * vec4(aPos, 1.0);
   if (uVertexSnap > 0.5 && clip.w > 0.05) {
-    // Authentic PS1 320x240 integer GTE vertex snapping (slightly milder in split so seam stays crisp)
-    vec2 grid = vec2(150.0, 112.0);
+    // Authentic punchy PS1 integer GTE vertex snapping (visible immediately on walls & floor!)
+    vec2 grid = vec2(96.0, 72.0);
     vec2 ndc = clip.xy / clip.w;
     if (uSnapSplitX < 0.0 || ndc.x * 0.5 + 0.5 < uSnapSplitX) {
       ndc = floor(ndc * grid + 0.5) / grid;
@@ -122,8 +122,8 @@ vec3 quantRGB565(vec3 c) {
 }
 
 vec3 sampleS3TC(int m, vec2 uv, float lod, out float blockEdge) {
-  // Use coarse virtual texture resolution (192x192 effective -> crisp unmistakable 4x4 S3TC macroblocks!)
-  float effRes = 192.0 / exp2(floor(clamp(lod, 0.0, 4.0)));
+  // Effective 128x128 texel base so 4x4 S3TC/DXT1 macroblocks & RGB565 banding are unmistakable inside the 4x loupe!
+  float effRes = 128.0 / exp2(floor(clamp(lod, 0.0, 4.0)));
   vec2 tc = uv * effRes;
   vec2 blk = floor(tc * 0.25) * 4.0;
   vec2 inBlk = fract(tc * 0.25);
@@ -351,5 +351,76 @@ void main() {
     outCol = vec3(0.93, 0.65, 0.37);
   }
   oCol = vec4(outCol, 1.0);
+}
+`;
+
+// Pass 2: Interactive 4x Pixel Magnifier Loupe (nearest-neighbor zoomed view of horizon, PS1 edges, or S3TC 4x4 blocks!)
+export const LOUPE_FS = /* glsl */`#version 300 es
+precision highp float;
+
+in vec2 vUv;
+out vec4 oCol;
+
+uniform sampler2D uSrc;
+uniform vec2 uRes;
+uniform vec2 uLoupeTarget; // normalized [0..1] reticle center
+uniform float uLoupeOn;
+uniform float uSplitX;
+
+void main() {
+  vec2 uv = vUv;
+  vec3 col = texture(uSrc, uv).rgb;
+  if (uLoupeOn < 0.5) { oCol = vec4(col, 1.0); return; }
+
+  float aspect = uRes.x / max(1.0, uRes.y);
+  vec2 px = uv * uRes;
+  vec2 tgtPx = uLoupeTarget * uRes;
+
+  // 4x Zoom Box anchored cleanly in upper-right safe area (desktop 16:9) or right-mid (9:16)
+  float boxSizePx = min(uRes.x, uRes.y) * 0.32;
+  vec2 boxCen = aspect > 1.0
+    ? vec2(uRes.x - boxSizePx * 0.62 - 26.0, uRes.y - boxSizePx * 0.62 - 76.0)
+    : vec2(uRes.x - boxSizePx * 0.58 - 22.0, uRes.y * 0.62);
+  vec2 boxHalf = vec2(boxSizePx * 0.5);
+
+  // Target reticle square (exact 1/4 region sampled by the loupe!)
+  vec2 retHalf = boxHalf * 0.25;
+  vec2 dRet = abs(px - tgtPx) - retHalf;
+  float retEdge = max(dRet.x, dRet.y);
+  if (abs(retEdge) < 2.2 && dRet.x < 3.0 && dRet.y < 3.0) {
+    col = vec3(1.0, 0.84, 0.24);
+  }
+
+  // Thin crisp yellow connector line from reticle center toward loupe box
+  vec2 seg = boxCen - tgtPx;
+  float segLen = length(seg);
+  if (segLen > 1.0) {
+    vec2 dir = seg / segLen;
+    float proj = clamp(dot(px - tgtPx, dir), length(retHalf) * 0.9, segLen - boxSizePx * 0.55);
+    float distLine = length((px - tgtPx) - dir * proj);
+    if (distLine < 1.35) {
+      col = mix(col, vec3(1.0, 0.84, 0.24), 0.72);
+    }
+  }
+
+  // Inside 4x Magnifier Loupe window!
+  vec2 dBox = abs(px - boxCen) - boxHalf;
+  float boxEdge = max(dBox.x, dBox.y);
+  if (boxEdge < 0.0) {
+    vec2 local = (px - boxCen) / boxHalf; // [-1, 1]
+    vec2 samplePx = tgtPx + local * retHalf;
+    vec2 sampleUv = clamp((floor(samplePx) + 0.5) / uRes, vec2(0.001), vec2(0.999));
+    col = texture(uSrc, sampleUv).rgb;
+    // Crisp subtle crosshair center tick
+    if (min(abs(px.x - boxCen.x), abs(px.y - boxCen.y)) < 0.9 && length(px - boxCen) < 12.0) {
+      col = mix(col, vec3(1.0, 0.86, 0.30), 0.65);
+    }
+  } else if (boxEdge < 3.5) {
+    col = vec3(1.0, 0.84, 0.24);
+  } else if (boxEdge < 5.5) {
+    col = vec3(0.08, 0.09, 0.14);
+  }
+
+  oCol = vec4(col, 1.0);
 }
 `;
