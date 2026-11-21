@@ -145,6 +145,24 @@ const ICONS = {
     `<rect x="5" y="5" width="2" height="2" fill="#fff3c4"/>` +
     `<rect x="7" y="4" width="1" height="1" fill="#ffe066"/>` +
     `<rect x="8" y="3" width="1" height="1" fill="#7ef2e2"/>`,
+
+  // Cel-shaded sentinel helmet with black ink outline, golden V-crest horns, cyan eyes & crimson scarf
+  toon:
+    `<rect x="1" y="1" width="2" height="2" fill="#ffd147"/>` +
+    `<rect x="9" y="1" width="2" height="2" fill="#ffd147"/>` +
+    `<rect x="2" y="2" width="2" height="2" fill="#f5a623"/>` +
+    `<rect x="8" y="2" width="2" height="2" fill="#f5a623"/>` +
+    `<rect x="3" y="2" width="6" height="7" fill="#151423"/>` +
+    `<rect x="4" y="3" width="4" height="2" fill="#f5f3ef"/>` +
+    `<rect x="5" y="2" width="2" height="2" fill="#e83f55"/>` +
+    `<rect x="3" y="5" width="6" height="2" fill="#1b2238"/>` +
+    `<rect x="4" y="5" width="1" height="1" fill="#47f2ff"/>` +
+    `<rect x="7" y="5" width="1" height="1" fill="#47f2ff"/>` +
+    `<rect x="4" y="7" width="4" height="1" fill="#c7d0e6"/>` +
+    `<rect x="2" y="8" width="8" height="2" fill="#d92b3a"/>` +
+    `<rect x="3" y="8" width="5" height="1" fill="#ff5c6c"/>` +
+    `<rect x="9" y="9" width="2" height="2" fill="#ffd147"/>` +
+    `<rect x="3" y="10" width="6" height="1" fill="#2d63bd"/>`,
 };
 
 const FALLBACK_ICON =
