@@ -40,6 +40,8 @@ const LOADERS = {
   surface: () => import("../effects/surface/index.js").then(m => m.createSurfaceEffect),
   fog: () => import("../effects/fog/index.js").then(m => m.createFogEffect),
   gi: () => import("../effects/gi/index.js").then(m => m.createGiEffect),
+  textures: () => import("../effects/textures/index.js").then(m => m.createTexturesEffect),
+  portals: () => import("../effects/portals/index.js").then(m => m.createPortalsEffect),
 };
 const engines = new Map();
 const moduleCache = new Map();
@@ -445,9 +447,11 @@ function updateCard() {
   const isSurface = currentEffect.id === "surface";
   const isFog = currentEffect.id === "fog";
   const isGi = currentEffect.id === "gi";
+  const isTextures = currentEffect.id === "textures";
+  const isPortals = currentEffect.id === "portals";
   $("hintLine").textContent = isWaterLive
     ? u.waterClickHint
-    : (isShadows ? u.shadowsClickHint : (isCloth ? u.clothClickHint : (isFurLive ? u.furClickHint : (isGlass ? u.glassClickHint : (isClouds ? u.cloudsClickHint : (isGrass ? u.grassClickHint : (isPathtracing ? u.pathtracingClickHint : (isToon ? u.toonClickHint : (isAa ? u.aaClickHint : (isReflections ? u.reflectionsClickHint : (isSurface ? u.surfaceClickHint : (isFog ? u.fogClickHint : (isGi ? u.giClickHint : u.dragHint)))))))))))));
+    : (isShadows ? u.shadowsClickHint : (isCloth ? u.clothClickHint : (isFurLive ? u.furClickHint : (isGlass ? u.glassClickHint : (isClouds ? u.cloudsClickHint : (isGrass ? u.grassClickHint : (isPathtracing ? u.pathtracingClickHint : (isToon ? u.toonClickHint : (isAa ? u.aaClickHint : (isReflections ? u.reflectionsClickHint : (isSurface ? u.surfaceClickHint : (isFog ? u.fogClickHint : (isGi ? u.giClickHint : (isTextures ? u.texturesClickHint : (isPortals ? u.portalsClickHint : u.dragHint)))))))))))))));
   const linkLabel = u[currentEffect.videoLabelKey] || u.channelLink;
   const filmLine = $("filmLine");
   filmLine.innerHTML = `<span>${u.videoPrefix} <a href="${currentEffect.videoUrl}" target="_blank" rel="noopener">${linkLabel}</a></span><span>·</span><button type="button" class="film-more" id="moreFxBtn">${u.moreEffects(EFFECTS.length)}</button>`;

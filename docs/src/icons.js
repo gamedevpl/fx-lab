@@ -241,6 +241,33 @@ const ICONS = {
     `<rect x="2" y="9" width="8" height="2" fill="#8c8378"/>` +
     `<rect x="2" y="9" width="3" height="2" fill="#bf4b45"/>` +
     `<rect x="7" y="9" width="3" height="2" fill="#299bb5"/>`,
+
+  // Oblique checkerboard mosaic receding to horizon with amber split between warped PS1 & crisp 16x AF
+  textures:
+    `<rect x="1" y="1" width="10" height="4" fill="#182238"/>` +
+    `<rect x="4" y="2" width="4" height="3" fill="#eea75e"/>` +
+    `<rect x="5" y="3" width="2" height="2" fill="#fff2cc"/>` +
+    `<rect x="1" y="5" width="10" height="6" fill="#232c42"/>` +
+    `<rect x="2" y="5" width="2" height="2" fill="#ece2ce"/>` +
+    `<rect x="6" y="5" width="2" height="2" fill="#ece2ce"/>` +
+    `<rect x="1" y="7" width="3" height="2" fill="#d94534"/>` +
+    `<rect x="4" y="7" width="2" height="2" fill="#ece2ce"/>` +
+    `<rect x="8" y="7" width="3" height="2" fill="#18a8c7"/>` +
+    `<rect x="1" y="9" width="2" height="2" fill="#ece2ce"/>` +
+    `<rect x="5" y="9" width="3" height="2" fill="#ece2ce"/>` +
+    `<rect x="9" y="9" width="2" height="2" fill="#ece2ce"/>`,
+
+  // Opposing electric-blue & blazing-orange oval portals with recursive depth rings
+  portals:
+    `<rect x="1" y="1" width="10" height="10" fill="#131a2b"/>` +
+    `<rect x="2" y="2" width="3" height="8" fill="#18a8ff"/>` +
+    `<rect x="3" y="3" width="1" height="6" fill="#09213d"/>` +
+    `<rect x="7" y="2" width="3" height="8" fill="#ff781f"/>` +
+    `<rect x="8" y="3" width="1" height="6" fill="#3d1c09"/>` +
+    `<rect x="2" y="2" width="1" height="2" fill="#99e6ff"/>` +
+    `<rect x="9" y="2" width="1" height="2" fill="#ffd28a"/>` +
+    `<rect x="5" y="5" width="2" height="2" fill="#e6ecf5"/>` +
+    `<rect x="5" y="6" width="2" height="1" fill="#ff5488"/>`,
 };
 
 const FALLBACK_ICON =

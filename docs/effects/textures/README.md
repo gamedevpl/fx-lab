@@ -1,0 +1,14 @@
+# Evolution of Texture Mapping (1994–2026)
+
+Interactive WebGL2 corridor sandbox demonstrating 32 years of real-time texture mapping—from 1994 PlayStation affine texture swimming and integer vertex jitter to 2020+ DirectX 12 Sampler Feedback virtual streaming.
+
+## 8 Eras & Verified Sources
+
+1. **1994 — PS1 Affine Warping & GTE Vertex Snapping (*PlayStation*, 1994):** The original PS1 GTE lacked hardware perspective division during rasterization (Copetti, *PlayStation Architecture*), interpolating UVs linearly in screen space (`vAffUv / vClipW` emulates desktop GLSL's `noperspective` exactly in WebGL2) while snapping vertices to an integer screen grid. Toggle **PS1 Vertex Snap**.
+2. **1996 — Quake 16-Pixel Span Perspective (Michael Abrash, *Quake*, 1996):** Software span rasterization performed true `1/z` perspective division every 16 pixels and linearly interpolated across each span (*Graphics Programming Black Book*, Ch. 70)—eliminating PS1's giant triangle seam while leaving subtle 16-pixel wobble on steep diagonals.
+3. **1996 — Bilinear Filtering (*3dfx Voodoo* / *N64*, 1996):** Hardware 2×2 bilinear filtering eliminated close-up texel blocks (3dfx *Voodoo Graphics* spec), yet left nearby surfaces soft and distant grazing floors wildly shimmering with Moiré aliasing when un-mipmapped.
+4. **1996 — Mipmapping & Trilinear Filtering (*Voodoo* / *N64*, 1996):** Building on Lance Williams' 1983 *Pyramidal Parametrics* paper, hardware mip pyramids silenced distant floor shimmer, and trilinear filtering erased the sharp horizontal band seam between bilinear mip levels. Toggle **Show Mip Levels**.
+5. **1998 — S3TC / DXT1 4×4 Block Compression (Microsoft / S3, 1998):** Compressed RGB textures 6:1 via 4×4 blocks with two RGB565 endpoints and 2-bit palette indices (mobile GPUs later adopted ETC2 / ASTC). Evaluated live per 4×4 block in GLSL—toggle **Show 4×4 Blocks**.
+6. **2001 — 16× Anisotropic Filtering (*GeForce 3* vs *Radeon 8500*, 2001):** Sampling along the elongated screen-space Jacobian major axis restores razor-sharp horizon detail where isotropic mipmaps blur to gray. Toggle **Radeon 8500 Mode** to reproduce ATI's famous angle-dependent optimization (sharp on cardinal 0°/90° axes, blurry at 45°).
+7. **2011 — Virtual Texturing / MegaTexture (J.M.P. van Waveren, *id Tech 5 / RAGE*, 2011):** Replaces tiling with unique non-repeating world art streamed via a live `64×64` virtual page table. Press **Snap Turn (Pop-in!)** to watch evicted coarse mip tiles visibly stream back into sharp focus.
+8. **2020–2026 — Sampler Feedback Streaming (DirectX 12 Ultimate, 2020):** Tracks exact per-region min-mip residency requested by shaders so VRAM holds only touched tiles with proactive zero-pop-in streaming (distinct from UE5 Nanite, which streams geometry rather than textures; emulated in WebGL2 via our live virtual page table). Toggle **Feedback Map**.
