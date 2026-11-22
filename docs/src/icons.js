@@ -336,6 +336,32 @@ const ICONS = {
     `<rect x="4" y="8" width="4" height="1" fill="#38e89e"/>` +
     `<rect x="6" y="4" width="1" height="5" fill="#4cd8ff"/>` +
     `<rect x="1" y="10" width="10" height="1" fill="#38e89e"/>`,
+
+  // Motion Blur: speeding crimson-white racing capsule leaving stepped cyan-gold motion streaks across dark studio
+  motionblur:
+    `<rect x="1" y="1" width="10" height="10" fill="#121829"/>` +
+    `<rect x="1" y="5" width="3" height="1" fill="#2c6f9c"/>` +
+    `<rect x="2" y="6" width="3" height="1" fill="#38c8ff"/>` +
+    `<rect x="3" y="4" width="3" height="1" fill="#5ee7ff"/>` +
+    `<rect x="5" y="4" width="5" height="3" fill="#f2f4fa"/>` +
+    `<rect x="6" y="5" width="4" height="1" fill="#ff3347"/>` +
+    `<rect x="9" y="4" width="1" height="1" fill="#38f5ff"/>` +
+    `<rect x="2" y="8" width="8" height="1" fill="#293652"/>` +
+    `<rect x="4" y="9" width="6" height="1" fill="#ff9e2c"/>`,
+
+  // Depth of Field & Bokeh: crisp center camera lens flanked by glowing hexagonal gold, cyan & magenta HDR bokeh orbs
+  dof:
+    `<rect x="1" y="1" width="10" height="10" fill="#0d1324"/>` +
+    `<rect x="1" y="2" width="3" height="3" fill="#ffb838"/>` +
+    `<rect x="2" y="3" width="1" height="1" fill="#fff0b8"/>` +
+    `<rect x="8" y="1" width="3" height="3" fill="#22e8ff"/>` +
+    `<rect x="9" y="2" width="1" height="1" fill="#c7fbff"/>` +
+    `<rect x="8" y="7" width="3" height="3" fill="#ff3b7f"/>` +
+    `<rect x="9" y="8" width="1" height="1" fill="#ffb3cc"/>` +
+    `<rect x="4" y="4" width="4" height="4" fill="#2b3347"/>` +
+    `<rect x="5" y="5" width="2" height="2" fill="#38c8ff"/>` +
+    `<rect x="4" y="3" width="4" height="1" fill="#f5b83d"/>` +
+    `<rect x="4" y="8" width="4" height="1" fill="#f5b83d"/>`,
 };
 
 const FALLBACK_ICON =

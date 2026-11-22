@@ -47,6 +47,8 @@ const LOADERS = {
   animation: () => import("../effects/animation/index.js").then(m => m.createAnimationEffect),
   skin: () => import("../effects/skin/index.js").then(m => m.createSkinEffect),
   terrain: () => import("../effects/terrain/index.js").then(m => m.createTerrainEffect),
+  motionblur: () => import("../effects/motionblur/index.js").then(m => m.createMotionblurEffect),
+  dof: () => import("../effects/dof/index.js").then(m => m.createDofEffect),
 };
 const engines = new Map();
 const moduleCache = new Map();
