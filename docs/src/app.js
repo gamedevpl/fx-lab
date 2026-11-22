@@ -4,6 +4,7 @@
 import { EFFECTS, UI, REPO_TREE_BASE, getEffect } from "./catalog.js";
 import { clamp } from "./gl-utils.js";
 import { getEffectIconSvg } from "./icons.js";
+import { createAudioEngine } from "./audio.js";
 
 const canvas = document.getElementById("c");
 const gl = canvas.getContext("webgl2", {
@@ -82,6 +83,8 @@ async function loadEngine(id) {
 const basePath = new URL("../", import.meta.url).pathname;
 const params = new URLSearchParams(location.search);
 if (params.get("hud") === "0") document.body.classList.add("no-hud");
+const audio = createAudioEngine({ mutedByUrl: params.get("mute") === "1" || params.get("hud") === "0" });
+let hasBooted = false;
 let lang = params.get("lang") === "pl" ? "pl" : "en";
 let currentEffect = getEffect(params.get("fx") || document.documentElement.dataset.fx);
 let currentStepIdx = (() => {
@@ -109,6 +112,70 @@ let switchSeq = 0;
 let catalogOpen = false;
 let filterCat = "all";
 let filterQuery = "";
+
+function ensureAudioControls() {
+  let grp = $("fxAudioGrp");
+  if (!grp) {
+    const nav = document.querySelector("header nav");
+    const langBtn = $("lang");
+    if (!nav) return null;
+    grp = document.createElement("div");
+    grp.id = "fxAudioGrp";
+    grp.className = "fx-audio-grp";
+
+    const sBtn = document.createElement("button");
+    sBtn.id = "audioBtn";
+    sBtn.type = "button";
+    sBtn.className = "fx-audio-btn";
+    sBtn.addEventListener("click", () => {
+      const st = audio.getState();
+      if (st.soundEnabled && !st.unlocked) {
+        audio.unlock();
+        audio.playUi("click");
+      } else {
+        audio.toggleSound();
+      }
+    });
+
+    const mBtn = document.createElement("button");
+    mBtn.id = "musicBtn";
+    mBtn.type = "button";
+    mBtn.className = "fx-audio-btn";
+    mBtn.addEventListener("click", () => audio.toggleMusic());
+
+    grp.append(sBtn, mBtn);
+    if (langBtn && langBtn.parentNode === nav) nav.insertBefore(grp, langBtn);
+    else nav.appendChild(grp);
+    audio.subscribe(updateAudioControls);
+  }
+  return grp;
+}
+
+const SVG_SPEAKER_ON = `<svg viewBox="0 0 12 12" shape-rendering="crispEdges" aria-hidden="true"><rect x="1" y="4" width="2" height="4" fill="currentColor"/><rect x="3" y="3" width="2" height="6" fill="currentColor"/><rect x="5" y="2" width="1" height="8" fill="currentColor"/><rect x="8" y="4" width="1" height="4" fill="currentColor"/><rect x="10" y="3" width="1" height="6" fill="currentColor"/></svg>`;
+const SVG_SPEAKER_OFF = `<svg viewBox="0 0 12 12" shape-rendering="crispEdges" aria-hidden="true"><rect x="1" y="4" width="2" height="4" fill="currentColor"/><rect x="3" y="3" width="2" height="6" fill="currentColor"/><rect x="5" y="2" width="1" height="8" fill="currentColor"/><rect x="8" y="4" width="1" height="1" fill="#ff6b6b"/><rect x="10" y="4" width="1" height="1" fill="#ff6b6b"/><rect x="9" y="5" width="1" height="2" fill="#ff6b6b"/><rect x="8" y="7" width="1" height="1" fill="#ff6b6b"/><rect x="10" y="7" width="1" height="1" fill="#ff6b6b"/></svg>`;
+const SVG_MUSIC_ON = `<svg viewBox="0 0 12 12" shape-rendering="crispEdges" aria-hidden="true"><rect x="4" y="2" width="6" height="2" fill="currentColor"/><rect x="4" y="4" width="1" height="5" fill="currentColor"/><rect x="9" y="4" width="1" height="4" fill="currentColor"/><rect x="2" y="8" width="3" height="2" fill="currentColor"/><rect x="7" y="7" width="3" height="2" fill="currentColor"/></svg>`;
+const SVG_MUSIC_OFF = `<svg viewBox="0 0 12 12" shape-rendering="crispEdges" aria-hidden="true"><rect x="4" y="2" width="6" height="2" fill="currentColor"/><rect x="4" y="4" width="1" height="5" fill="currentColor"/><rect x="9" y="4" width="1" height="4" fill="currentColor"/><rect x="2" y="8" width="3" height="2" fill="currentColor"/><rect x="7" y="7" width="3" height="2" fill="currentColor"/><rect x="2" y="2" width="1" height="1" fill="#ff6b6b"/><rect x="3" y="3" width="1" height="1" fill="#ff6b6b"/><rect x="4" y="4" width="1" height="1" fill="#ff6b6b"/><rect x="5" y="5" width="1" height="1" fill="#ff6b6b"/><rect x="6" y="6" width="1" height="1" fill="#ff6b6b"/><rect x="7" y="7" width="1" height="1" fill="#ff6b6b"/><rect x="8" y="8" width="1" height="1" fill="#ff6b6b"/><rect x="9" y="9" width="1" height="1" fill="#ff6b6b"/></svg>`;
+
+function updateAudioControls() {
+  ensureAudioControls();
+  const sBtn = $("audioBtn"), mBtn = $("musicBtn");
+  if (!sBtn || !mBtn) return;
+  const u = UI[lang];
+  const st = audio.getState();
+  sBtn.innerHTML = st.soundEnabled ? SVG_SPEAKER_ON : SVG_SPEAKER_OFF;
+  sBtn.setAttribute("aria-pressed", String(st.soundEnabled));
+  sBtn.classList.toggle("is-locked", st.soundEnabled && !st.unlocked);
+  const sTitle = !st.soundEnabled ? u.soundOff : (st.unlocked ? u.soundOn : u.soundReady);
+  sBtn.title = sTitle;
+  sBtn.setAttribute("aria-label", sTitle);
+
+  const mOn = st.soundEnabled && st.musicEnabled;
+  mBtn.innerHTML = mOn ? SVG_MUSIC_ON : SVG_MUSIC_OFF;
+  mBtn.setAttribute("aria-pressed", String(mOn));
+  const mTitle = mOn ? u.musicOn : u.musicOff;
+  mBtn.title = mTitle;
+  mBtn.setAttribute("aria-label", mTitle);
+}
 
 function resetCamera() {
   if (!activeEngine) return;
@@ -318,7 +385,7 @@ function renderCatalogModal() {
       b.type = "button";
       b.setAttribute("aria-pressed", String(filterCat === c.id));
       b.textContent = c.label;
-      b.addEventListener("click", () => { filterCat = c.id; renderCatalogModal(); });
+      b.addEventListener("click", () => { audio.playUi("click"); filterCat = c.id; renderCatalogModal(); });
       catsHost.appendChild(b);
     }
   }
@@ -368,8 +435,10 @@ function renderCatalogModal() {
 }
 
 function setCatalogOpen(open) {
+  const prev = catalogOpen;
   catalogOpen = !!open;
   $("catalogModal").hidden = !catalogOpen;
+  if (prev !== catalogOpen) audio.playUi("catalog", catalogOpen);
   renderPicker();
   if (catalogOpen) {
     renderCatalogModal();
@@ -471,6 +540,7 @@ function updateCard() {
   filmLine.innerHTML = `<span>${u.videoPrefix} <a href="${currentEffect.videoUrl}" target="_blank" rel="noopener">${linkLabel}</a></span><span>·</span><button type="button" class="film-more" id="moreFxBtn">${u.moreEffects(EFFECTS.length)}</button>`;
   $("moreFxBtn")?.addEventListener("click", () => setCatalogOpen(true));
 
+  updateAudioControls();
   updateSplitOverlay();
   renderPicker();
   renderStepsBar();
@@ -518,6 +588,9 @@ async function selectEffect(effectId, stepIdx = null, splitOpt = null) {
   }
   syncUrl();
   updateCard();
+  audio.setScene(nextFx.id, nextFx.category, currentStepIdx);
+  if (hasBooted && changed) audio.playUi("effectSwitch", nextFx.category);
+  hasBooted = true;
 
   try {
     const eng = await loadEngine(nextFx.id);
@@ -550,12 +623,15 @@ function selectStep(idx) {
   const n = currentEffect.steps.length;
   currentStepIdx = ((idx % n) + n) % n;
   activeEngine.enterStep(currentStepIdx);
+  audio.setStep(currentStepIdx);
+  audio.playUi("step", currentStepIdx);
   syncUrl();
   updateCard();
 }
 
 function setLang(next) {
   lang = next === "pl" ? "pl" : "en";
+  audio.playUi("lang");
   syncUrl();
   updateCard();
   document.dispatchEvent(new CustomEvent("fxlab:lang", { detail: { lang } }));
@@ -576,6 +652,7 @@ $("prev").addEventListener("click", () => selectStep(currentStepIdx - 1));
 $("next").addEventListener("click", () => selectStep(currentStepIdx + 1));
 $("splitBtn").addEventListener("click", () => {
   split.enabled = !split.enabled;
+  audio.playUi("splitToggle", split.enabled);
   syncUrl();
   updateSplitOverlay();
 });
@@ -583,13 +660,20 @@ $("actionBtn").addEventListener("click", () => {
   const st = currentStep();
   if (!st.action || !activeEngine) return;
   activeEngine.triggerAction(st.action.id);
+  const actOn = st.action.toggle ? activeEngine.isActionActive(st.action.id) : false;
+  audio.playUi("action", st.action.id, actOn);
   updateCard();
 });
 $("pauseBtn").addEventListener("click", () => {
   paused = !paused;
+  audio.setPaused(paused);
+  audio.playUi("pause", paused);
   updateCard();
 });
-$("resetBtn").addEventListener("click", resetCamera);
+$("resetBtn").addEventListener("click", () => {
+  resetCamera();
+  audio.playUi("reset");
+});
 $("lang").addEventListener("click", () => setLang(lang === "en" ? "pl" : "en"));
 
 // Keyboard shortcuts
@@ -601,14 +685,16 @@ window.addEventListener("keydown", ev => {
   }
   if (ev.target && /INPUT|TEXTAREA|SELECT/.test(ev.target.tagName)) return;
   if (ev.key === "e" || ev.key === "E") { ev.preventDefault(); setCatalogOpen(!catalogOpen); return; }
+  if (ev.key === "m" || ev.key === "M") { ev.preventDefault(); audio.toggleSound(); return; }
+  if (ev.key === "b" || ev.key === "B") { ev.preventDefault(); audio.toggleMusic(); return; }
   if (catalogOpen) return;
   if (ev.key === "ArrowRight") { ev.preventDefault(); selectStep(currentStepIdx + 1); }
   else if (ev.key === "ArrowLeft") { ev.preventDefault(); selectStep(currentStepIdx - 1); }
-  else if (ev.key === " ") { ev.preventDefault(); paused = !paused; updateCard(); }
+  else if (ev.key === " ") { ev.preventDefault(); paused = !paused; audio.setPaused(paused); audio.playUi("pause", paused); updateCard(); }
   else if (ev.key === "s" || ev.key === "S") {
-    split.enabled = !split.enabled; syncUrl(); updateSplitOverlay();
+    split.enabled = !split.enabled; audio.playUi("splitToggle", split.enabled); syncUrl(); updateSplitOverlay();
   } else if (ev.key === "r" || ev.key === "R") {
-    resetCamera();
+    resetCamera(); audio.playUi("reset");
   } else if (ev.key >= "1" && ev.key <= "9") {
     const idx = parseInt(ev.key, 10) - 1;
     if (idx < EFFECTS.length) selectEffect(EFFECTS[idx].id);
@@ -677,6 +763,7 @@ canvas.addEventListener("pointermove", ev => {
     const [ndcX, ndcY] = pointerToNdc(ev);
     if (activeEngine && typeof activeEngine.onPointerMove === "function") {
       activeEngine.onPointerMove(ndcX, ndcY, renderW, renderH, currentStep(), cam);
+      if (currentEffect.id === "fur") audio.playCue({ type: "furPet" });
     }
     return;
   }
@@ -705,12 +792,13 @@ function endCanvasPointer(ev) {
   if (wasClick && activeEngine && typeof activeEngine.onCanvasClick === "function") {
     const [ndcX, ndcY] = pointerToNdc(ev);
     activeEngine.onCanvasClick(ndcX, ndcY, renderW, renderH, currentStep(), cam);
+    audio.playCanvasClick(currentEffect.id, currentStepIdx, ndcX);
   }
 }
 canvas.addEventListener("pointerup", endCanvasPointer);
 canvas.addEventListener("pointercancel", endCanvasPointer);
 canvas.addEventListener("dblclick", () => {
-  if (!activeEngine?.disableDblClickReset) resetCamera();
+  if (!activeEngine?.disableDblClickReset) { resetCamera(); audio.playUi("reset"); }
 });
 
 canvas.addEventListener("wheel", ev => {
@@ -731,18 +819,20 @@ splitHit.addEventListener("pointerdown", ev => {
 splitHit.addEventListener("pointermove", ev => {
   if (!draggingSplit) return;
   split.pos = clamp(ev.clientX / Math.max(1, window.innerWidth), 0.08, 0.92);
+  audio.playUi("splitDrag", split.pos);
   updateSplitOverlay();
 });
 splitHit.addEventListener("pointerup", () => { draggingSplit = false; });
 splitHit.addEventListener("pointercancel", () => { draggingSplit = false; });
 splitHit.addEventListener("keydown", ev => {
-  if (ev.key === "ArrowLeft") { ev.preventDefault(); split.pos = clamp(split.pos - 0.05, 0.08, 0.92); updateSplitOverlay(); }
-  else if (ev.key === "ArrowRight") { ev.preventDefault(); split.pos = clamp(split.pos + 0.05, 0.08, 0.92); updateSplitOverlay(); }
+  if (ev.key === "ArrowLeft") { ev.preventDefault(); split.pos = clamp(split.pos - 0.05, 0.08, 0.92); audio.playUi("splitDrag", split.pos); updateSplitOverlay(); }
+  else if (ev.key === "ArrowRight") { ev.preventDefault(); split.pos = clamp(split.pos + 0.05, 0.08, 0.92); audio.playUi("splitDrag", split.pos); updateSplitOverlay(); }
 });
 
 // Public API for the optional in-browser mascot assistant
 window.FXLAB = {
   EFFECTS,
+  audio,
   lang: () => lang,
   backend: () => activeEngine?.backend || "webgl2",
   current: () => ({ effect: currentEffect, step: currentStep(), stepIdx: currentStepIdx, split: split.enabled, backend: activeEngine?.backend || "webgl2" }),

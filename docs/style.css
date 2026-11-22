@@ -103,6 +103,23 @@ nav{flex:none;display:flex;align-items:center;gap:9px;flex-wrap:nowrap}
 nav .source{font-weight:700;font-size:14px}
 #lang{font-family:var(--pix);min-width:42px}
 
+.fx-audio-grp{display:inline-flex;align-items:center;gap:5px}
+.fx-audio-btn{
+  position:relative;display:inline-flex;align-items:center;justify-content:center;
+  width:34px;min-width:34px;padding:0;min-height:34px;color:var(--cream);
+  background:#221e33e8;
+}
+.fx-audio-btn svg{width:15px;height:15px;display:block;image-rendering:pixelated}
+.fx-audio-btn[aria-pressed="true"]{background:#2d4a46;color:var(--turquoise)}
+.fx-audio-btn[aria-pressed="true"]:hover{background:#375c57;color:#a8ffe9}
+.fx-audio-btn[aria-pressed="false"]{color:#8d8180}
+.fx-audio-btn.is-locked::after{
+  content:"";position:absolute;top:4px;right:4px;width:5px;height:5px;
+  background:var(--amber);box-shadow:0 0 0 1px var(--ink);
+  animation:fxAudioPulse 1.1s ease-in-out infinite alternate;
+}
+@keyframes fxAudioPulse{from{opacity:.35}to{opacity:1}}
+
 .fx-picker{
   display:inline-flex;align-items:center;gap:7px;
   background:#2d2744f2;color:#fff3dc;padding:5px 11px 5px 8px;

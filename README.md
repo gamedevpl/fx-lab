@@ -79,6 +79,8 @@ docs/
 - **Drag amber divider / `S`** — Toggle and slide before/after split-screen comparison
 - **`←` / `→`** — Step backward or forward
 - **`Space`** — Pause or resume simulation
+- **`M`** — Toggle procedural sound effects & scene ambience (Web Audio API)
+- **`B`** — Toggle adaptive procedural background music
 - **`E`** — Open the effects catalog
 - **`1`–`9`** — Jump directly to an effect
 - **Click pool (Water Step 8)** — Inject live concentric ripples

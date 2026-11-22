@@ -746,8 +746,15 @@ export function createStageSim(stageIdx, voxelDims = [48, 72, 48]) {
     if (missCount > 0) sim.stressOverlayBoost = Math.max(sim.stressOverlayBoost, 1.0);
   }
 
+  function emitSfx(detail) {
+    if (typeof window !== "undefined" && typeof CustomEvent !== "undefined") {
+      window.dispatchEvent(new CustomEvent("fxlab:sfx", { detail }));
+    }
+  }
+
   function applyBlast(hitPos, radius = 1.35, power = 1.0, kind = "shell") {
     sim.blastCount++;
+    emitSfx({ type: "blast", stage: stageIdx, power });
     sim.flashTime = 0.32;
     sim.flashPos = [hitPos[0], hitPos[1], hitPos[2]];
 
@@ -987,6 +994,7 @@ export function createStageSim(stageIdx, voxelDims = [48, 72, 48]) {
   }
 
   function fireShell(targetPos, radius = 1.35, power = 1.0) {
+    emitSfx({ type: "shellLaunch", stage: stageIdx });
     // Launch glowing shell from front-left/camera direction with crisp 0.24 s travel arc
     const startPos = [
       targetPos[0] + (targetPos[0] < 0 ? -4.8 : 4.2),
@@ -1071,6 +1079,7 @@ export function createStageSim(stageIdx, voxelDims = [48, 72, 48]) {
           const impactSpd = -b.vy;
           b.y = floorY;
           if (impactSpd > 6.5 && (stageIdx === 4 || stageIdx === 7)) {
+            emitSfx({ type: "rubbleCrash", stage: stageIdx });
             // Secondary collapse shatter + sunlit dust burst when upper slabs slam into the plaza!
             spawnDust(b.x, 0.28, b.z, 3, 0.68, false);
             sim.gpuEmitQueue.push({
