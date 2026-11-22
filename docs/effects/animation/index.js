@@ -1,8 +1,8 @@
 // Evolution of Character Animation (1989-2020) — Real Xbot Rig + Real Mixamo Mocap WebGL2 Controller.
-import { clamp, lerp, cameraBasisFromOrbit, makeLookAt, makePerspective, FULL_VS, linkPrograms } from "../../src/gl-utils.js";
+import { clamp, lerp, norm3, cameraBasisFromOrbit, makeLookAt, makePerspective, FULL_VS, linkPrograms } from "../../src/gl-utils.js";
 import {
   loadXbotRig, buildArenaGeometry, getArenaHeight,
-  sampleClipLocal, evaluateFK, applyFootIK, evaluateTwistPose,
+  sampleClipLocal, blendLocalPoses, evaluateFK, applyFootIK, evaluateTwistPose,
   createArticulatedRagdoll, createMotionMatcher,
 } from "./rig.js";
 import { SKY_FS, CHAR_VS, CHAR_FS, ARENA_VS, ARENA_FS, ROTO_VS, ROTO_FS, LINE_VS, LINE_FS } from "./shaders.js";
@@ -67,7 +67,7 @@ export async function createAnimationEffect(gl) {
   const uLoc = (p, names) => Object.fromEntries(names.map(n => [n, gl.getUniformLocation(p, n)]));
   const uSky   = uLoc(progSky,   ["uRetro", "uTime"]);
   const uChar  = uLoc(progChar,  ["uViewProj", "uBones", "uBonesB", "uDqReal", "uDqDual", "uDeformMode", "uMorphT", "uCamPos", "uFlatShade", "uShowTwistPattern"]);
-  const uArena = uLoc(progArena, ["uViewProj", "uPelvisPos", "uFootL", "uFootR", "uShowFootRings", "uTime"]);
+  const uArena = uLoc(progArena, ["uViewProj", "uPelvisPos", "uFootL", "uFootR", "uShowFootRings", "uFloorScroll", "uTime"]);
   const uRoto  = uLoc(progRoto,  ["uViewProj", "uPos", "uCamRight", "uTime"]);
   const uLine  = uLoc(progLine,  ["uViewProj", "uPointSize"]);
 
@@ -96,8 +96,9 @@ export async function createAnimationEffect(gl) {
   let lastMmFK = null;
   let lastMmClip = "walk";
 
-  // Motion Matching interactive steering (WASD or click destination; autonomous stop/walk/run/pivot patrol!)
-  const mm = { x: -0.25, z: 0.15, yaw: 0.65, speed: 1.05, turnRate: 0.35, targetX: 1.4, targetZ: 0.7, manualTimer: 0 };
+  // Motion Matching interactive steering (WASD or exact 3D raycast click-to-move!)
+  const mm = { x: -0.25, z: 0.15, yaw: 0.65, speed: 1.05, turnRate: 0.35, targetX: 1.4, targetZ: 0.7, manualTimer: 0, clickPulse: 0 };
+  let lastMmCam = null;
   const keys = { w: false, a: false, s: false, d: false };
   window.addEventListener("keydown", ev => { const k = ev.key?.toLowerCase(); if (k in keys) keys[k] = true; });
   window.addEventListener("keyup",   ev => { const k = ev.key?.toLowerCase(); if (k in keys) keys[k] = false; });
@@ -135,51 +136,81 @@ export async function createAnimationEffect(gl) {
   }
 
   function drawMotionMatchingOverlay(vp) {
-    // Draw live chosen future trajectory (thick emerald->gold ribbon + target beacon) + rejected candidate branches!
+    // Draw live chosen future trajectory (only while moving toward target -> zero yellow pile-up on arrival!)
     const segs = [], pts = [];
-    let px = mm.x, pz = mm.z, pyaw = mm.yaw;
-    for (let i = 0; i < 18; i++) {
-      const f = i / 18;
-      const dx = mm.targetX - px, dz = mm.targetZ - pz;
-      const desYaw = Math.atan2(dx, dz);
-      let dyaw = desYaw - pyaw;
-      while (dyaw > Math.PI) dyaw -= Math.PI * 2;
-      while (dyaw < -Math.PI) dyaw += Math.PI * 2;
-      pyaw += dyaw * 0.24;
-      const step = 0.14 * Math.max(0.45, mm.speed);
-      const nx = px + Math.sin(pyaw) * step;
-      const nz = pz + Math.cos(pyaw) * step;
-      const y0 = getArenaHeight(px, pz, 2) + 0.05;
-      const y1 = getArenaHeight(nx, nz, 2) + 0.05;
-      const rC = lerp(0.14, 1.0, f), gC = lerp(0.98, 0.72, f), bC = lerp(0.68, 0.20, f);
-      const sideX = Math.cos(pyaw) * 0.035, sideZ = -Math.sin(pyaw) * 0.035;
-      for (const s of [-1, 0, 1]) {
-        segs.push(px + sideX*s, y0, pz + sideZ*s, rC, gC, bC, nx + sideX*s, y1, nz + sideZ*s, rC, gC, bC);
-      }
-      if (i % 3 === 0) pts.push(nx, y1 + 0.02, nz, 1.0, 0.95, 0.35);
-      // Rejected candidate database search trajectories fanning out from root
-      if (i === 0) {
-        for (const candOff of [-0.72, -0.38, 0.38, 0.72]) {
-          let cx = mm.x, cz = mm.z, cy = mm.yaw + candOff;
-          for (let k = 0; k < 6; k++) {
-            const cnx = cx + Math.sin(cy) * 0.16, cnz = cz + Math.cos(cy) * 0.16;
-            segs.push(cx, getArenaHeight(cx, cz, 2) + 0.04, cz, 0.95, 0.36, 0.18,
-                      cnx, getArenaHeight(cnx, cnz, 2) + 0.04, cnz, 0.60, 0.20, 0.12);
-            cx = cnx; cz = cnz;
+    const distToGoal = Math.hypot(mm.targetX - mm.x, mm.targetZ - mm.z);
+    if (distToGoal > 0.20) {
+      let px = mm.x, pz = mm.z, pyaw = mm.yaw;
+      const maxSteps = Math.min(18, Math.max(4, Math.ceil(distToGoal / 0.16)));
+      for (let i = 0; i < maxSteps; i++) {
+        const f = i / maxSteps;
+        const dx = mm.targetX - px, dz = mm.targetZ - pz;
+        const rem = Math.hypot(dx, dz);
+        if (rem < 0.08) break;
+        const desYaw = Math.atan2(dx, dz);
+        let dyaw = desYaw - pyaw;
+        while (dyaw > Math.PI) dyaw -= Math.PI * 2;
+        while (dyaw < -Math.PI) dyaw += Math.PI * 2;
+        pyaw += dyaw * 0.34;
+        const step = Math.min(rem, 0.17);
+        const nx = px + Math.sin(pyaw) * step;
+        const nz = pz + Math.cos(pyaw) * step;
+        const y0 = getArenaHeight(px, pz, 2) + 0.05;
+        const y1 = getArenaHeight(nx, nz, 2) + 0.05;
+        const rC = lerp(0.14, 1.0, f), gC = lerp(0.98, 0.72, f), bC = lerp(0.68, 0.20, f);
+        const sideX = Math.cos(pyaw) * 0.035, sideZ = -Math.sin(pyaw) * 0.035;
+        for (const s of [-1, 0, 1]) {
+          segs.push(px + sideX*s, y0, pz + sideZ*s, rC, gC, bC, nx + sideX*s, y1, nz + sideZ*s, rC, gC, bC);
+        }
+        if (i % 3 === 0) pts.push(nx, y1 + 0.02, nz, 1.0, 0.95, 0.35);
+        if (i === 0) {
+          for (const candOff of [-0.68, -0.34, 0.34, 0.68]) {
+            let cx = mm.x, cz = mm.z, cy = mm.yaw + candOff;
+            for (let k = 0; k < 5; k++) {
+              const cnx = cx + Math.sin(cy) * 0.16, cnz = cz + Math.cos(cy) * 0.16;
+              segs.push(cx, getArenaHeight(cx, cz, 2) + 0.04, cz, 0.95, 0.36, 0.18,
+                        cnx, getArenaHeight(cnx, cnz, 2) + 0.04, cnz, 0.60, 0.20, 0.12);
+              cx = cnx; cz = cnz;
+            }
           }
         }
+        px = nx; pz = nz;
       }
-      px = nx; pz = nz;
     }
-    // Bright gold destination beacon ring on the courtyard floor
+    // Bright gold destination beacon ring (+ expanding pulse ripple right when clicked!)
     const ty = getArenaHeight(mm.targetX, mm.targetZ, 2) + 0.05;
     for (let k = 0; k < 16; k++) {
       const a0 = (k / 16) * Math.PI * 2, a1 = ((k + 1) / 16) * Math.PI * 2;
       segs.push(mm.targetX + Math.cos(a0)*0.22, ty, mm.targetZ + Math.sin(a0)*0.22, 1.0, 0.85, 0.24,
                 mm.targetX + Math.cos(a1)*0.22, ty, mm.targetZ + Math.sin(a1)*0.22, 1.0, 0.85, 0.24);
+      if (mm.clickPulse > 0.01) {
+        const pr = 0.22 + (1.0 - mm.clickPulse) * 0.55;
+        const pa = mm.clickPulse;
+        segs.push(mm.targetX + Math.cos(a0)*pr, ty + 0.01, mm.targetZ + Math.sin(a0)*pr, 0.25*pa + 0.75, 0.98, 0.65*pa + 0.2,
+                  mm.targetX + Math.cos(a1)*pr, ty + 0.01, mm.targetZ + Math.sin(a1)*pr, 0.25*pa + 0.75, 0.98, 0.65*pa + 0.2);
+      }
     }
+    pts.push(mm.targetX, ty + 0.02, mm.targetZ, 1.0, 0.95, 0.45);
     drawLineData(vp, segs, gl.LINES, 1.0);
     drawLineData(vp, pts, gl.POINTS, 10.5);
+  }
+
+  function getStairWalkState(t) {
+    const cyc = ((t % 7.6) + 7.6) % 7.6;
+    if (cyc < 2.8) {
+      const u = cyc / 2.8;
+      return { x: lerp(-1.35, 1.35, u), yaw: Math.PI * 0.5, moving: 1.0, phase: u * 2.65 };
+    } else if (cyc < 3.8) {
+      const u = (cyc - 2.8) / 1.0;
+      const s = u * u * (3 - 2 * u);
+      return { x: 1.35, yaw: lerp(Math.PI * 0.5, -Math.PI * 0.5, s), moving: 0.0, phase: 2.65 };
+    } else if (cyc < 6.6) {
+      const u = (cyc - 3.8) / 2.8;
+      return { x: lerp(1.35, -1.35, u), yaw: -Math.PI * 0.5, moving: 1.0, phase: 2.65 + u * 2.65 };
+    }
+    const u = (cyc - 6.6) / 1.0;
+    const s = u * u * (3 - 2 * u);
+    return { x: -1.35, yaw: lerp(-Math.PI * 0.5, Math.PI * 0.5, s), moving: 0.0, phase: 5.30 };
   }
 
   function renderSingleStage(stage, vp, basis) {
@@ -193,39 +224,46 @@ export async function createAnimationEffect(gl) {
     const arenaMode = (stage === 4 || stage === 6 || stage === 98 || stage === 99) ? 1 : (stage === 7 ? 2 : 0);
     let fk = null, fkB = null, morphT = 0.0;
     let deformMode = 3, useRetro = false, flatShade = 0, showTwist = 0.0;
+    let floorScroll = [0.0, 0.0];
 
     if (stage === 0) {
       fk = { worldPos: [[0, 0.9, 0]] };
+      floorScroll = [2.6, 0.0];
     } else if (stage === 1) {
-      // 1992-93 Alone in the Dark / Virtua Fighter: faceted low-poly rigid 1-bone puppet running real mocap!
-      fk = evaluateFK(rig, sampleClipLocal(rig, "walk", simTime * 1.05), [0, 0, 0], 0.35);
+      // 1992-93 Rigid 1-bone puppet walking forward on stride-matched scrolling tiles (zero treadmill skating!)
+      const yaw = 0.52;
+      fk = evaluateFK(rig, sampleClipLocal(rig, "walk", simTime * 1.05), [0, 0, 0], yaw);
       deformMode = 0; useRetro = true; flatShade = 1;
+      floorScroll = [Math.sin(yaw) * 2.15, Math.cos(yaw) * 2.15];
     } else if (stage === 2) {
-      // 1996 Quake MDL: 4.5 Hz discrete keyframes of real running mocap linearly morphed -> visible limb chord shrinking!
-      const fps = 4.5, kf = Math.floor(simTime * fps);
+      // 1996 Quake MDL: 3.8 Hz discrete keyframes of real running mocap at 3/4 side view -> unmistakable chord shrinking!
+      const fps = 3.8, kf = Math.floor(simTime * fps), yaw = 0.72;
       morphT = simTime * fps - kf;
-      fk  = evaluateFK(rig, sampleClipLocal(rig, "run", kf / fps),       [0, 0, 0], 0.42);
-      fkB = evaluateFK(rig, sampleClipLocal(rig, "run", (kf + 1) / fps), [0, 0, 0], 0.42);
+      fk  = evaluateFK(rig, sampleClipLocal(rig, "run", kf / fps),       [0, 0, 0], yaw);
+      fkB = evaluateFK(rig, sampleClipLocal(rig, "run", (kf + 1) / fps), [0, 0, 0], yaw);
       deformMode = 1;
+      floorScroll = [Math.sin(yaw) * 3.85, Math.cos(yaw) * 3.85];
     } else if (stage === 3) {
-      // 1998 Half-Life -> Linear Blend Skinning (LBS) 190° forearm twist -> textbook Candy-Wrapper Collapse!
-      const twist = twistActive ? (0.76 + 0.24 * Math.sin(simTime * 1.8)) * Math.PI * 1.15 : 0.0;
+      // 1998 Half-Life / LBS: smooth live 0° -> 205° -> 0° forearm twist -> watch it collapse into a candy wrapper!
+      const twist = twistActive ? (0.52 - 0.48 * Math.cos(simTime * 1.45)) * Math.PI * 1.18 : 0.0;
       fk = evaluateTwistPose(rig, simTime, twist);
       deformMode = 2; showTwist = 1.0;
     } else if (stage === 5) {
-      // 2007 Dual Quaternion Skinning (Kavan et al., I3D 2007) — exact same 190° twist, ZERO candy-wrapper collapse!
-      const twist = twistActive ? (0.76 + 0.24 * Math.sin(simTime * 1.8)) * Math.PI * 1.15 : 0.0;
+      // 2007 Dual Quaternion Skinning (Kavan et al., I3D 2007) — exact same live 0° -> 205° twist, ZERO volume collapse!
+      const twist = twistActive ? (0.52 - 0.48 * Math.cos(simTime * 1.45)) * Math.PI * 1.18 : 0.0;
       fk = evaluateTwistPose(rig, simTime, twist);
       deformMode = 3; showTwist = 1.0;
     } else if (stage === 4 || stage === 98) {
-      // 2006-09 Real Mixamo Walk up uneven stone stairs: No IK (98: boots float/clip) vs 2-Bone Foot IK (4: boots lock!)
-      const walkX = Math.sin(simTime * 0.58) * 1.15;
-      const dir = Math.cos(simTime * 0.58) >= 0 ? Math.PI * 0.5 : -Math.PI * 0.5;
+      // 2006-09 Smooth constant-speed stair walk + graceful 180° landing pivots (ZERO snaps, ZERO moonwalking!)
+      const sw = getStairWalkState(simTime);
       const baseY = stage === 98
-        ? clamp((walkX + 1.40) / 2.80, 0, 1) * 5 * 0.13 + 0.08 // averaged slope -> feet float & clip steps!
-        : getArenaHeight(walkX, 0, 1);
-      const rawFk = evaluateFK(rig, sampleClipLocal(rig, "walk", simTime * 1.05), [walkX, baseY, 0], dir);
-      fk = stage === 4 ? applyFootIK(rig, rawFk, 1, dir) : rawFk;
+        ? clamp((sw.x + 1.40) / 2.80, 0, 1) * 5 * 0.13 + 0.09
+        : getArenaHeight(sw.x, 0, 1);
+      const pWalk = sampleClipLocal(rig, "walk", sw.phase);
+      const pIdle = sampleClipLocal(rig, "idle", simTime);
+      const pose = sw.moving > 0.5 ? pWalk : blendLocalPoses(pIdle, pWalk, 0.25);
+      const rawFk = evaluateFK(rig, pose, [sw.x, baseY, 0], sw.yaw);
+      fk = stage === 4 ? applyFootIK(rig, rawFk, 1, sw.yaw) : rawFk;
       deformMode = 3;
     } else if (stage === 6) {
       fk = ragActive.toFK(true);
@@ -234,7 +272,6 @@ export async function createAnimationEffect(gl) {
       fk = ragPassive.toFK(false);
       deformMode = 3;
     } else {
-      // Stage 7: Real Motion Matching (idle / walk / run database + Bollo Inertialization + Foot IK + DQS!)
       fk = lastMmFK || evaluateFK(rig, sampleClipLocal(rig, "walk", simTime), [0, 0, 0], 0);
       deformMode = 3;
     }
@@ -247,7 +284,8 @@ export async function createAnimationEffect(gl) {
     gl.uniform3fv(uArena.uPelvisPos, fk.worldPos[0] || [0, 1.0, 0]);
     gl.uniform3fv(uArena.uFootL, fk.worldPos[16] || [0, 0, 0]);
     gl.uniform3fv(uArena.uFootR, fk.worldPos[20] || [0, 0, 0]);
-    gl.uniform1f(uArena.uShowFootRings, stage === 0 ? -1.0 : ((stage === 4 || stage === 7) ? 1.0 : 0.0));
+    gl.uniform1f(uArena.uShowFootRings, (stage === 4 || stage === 7) ? 1.0 : 0.0);
+    gl.uniform2fv(uArena.uFloorScroll, floorScroll);
     gl.uniform1f(uArena.uTime, simTime);
     gl.drawElements(gl.TRIANGLES, ar.count, gl.UNSIGNED_SHORT, 0);
 
@@ -319,11 +357,34 @@ export async function createAnimationEffect(gl) {
       return false;
     },
 
-    onCanvasClick(ndcX, ndcY) {
-      mm.targetX = clamp(ndcX * 2.1, -2.0, 2.0);
-      mm.targetZ = clamp(-ndcY * 2.1, -1.9, 1.9);
-      mm.manualTimer = 6.0;
-      resetRagdolls();
+    onCanvasClick(ndcX, ndcY, w, h, step) {
+      if (step?.stage === 6) {
+        resetRagdolls();
+        return;
+      }
+      if (!lastMmCam) return;
+      // Exact 3D raycast from clicked pixel through active Stage 7 camera (handles Split off-center frustum & orbit!)
+      const rx = (ndcX - lastMmCam.ndcShiftX) * lastMmCam.aspect * lastMmCam.tanHalfFov;
+      const ry = ndcY * lastMmCam.tanHalfFov;
+      const dir = norm3(
+        lastMmCam.fwd[0] + lastMmCam.right[0] * rx + lastMmCam.up[0] * ry,
+        lastMmCam.fwd[1] + lastMmCam.right[1] * rx + lastMmCam.up[1] * ry,
+        lastMmCam.fwd[2] + lastMmCam.right[2] * rx + lastMmCam.up[2] * ry
+      );
+      if (dir[1] >= -0.02) return; // Clicked sky above horizon
+      // Iterative intersection with exact uneven courtyard surface y = getArenaHeight(x, z, 2)
+      let hy = 0.08, hx = mm.x, hz = mm.z;
+      for (let it = 0; it < 6; it++) {
+        const t = (hy - lastMmCam.pos[1]) / dir[1];
+        if (t <= 0.1 || t > 35.0) return;
+        hx = lastMmCam.pos[0] + dir[0] * t;
+        hz = lastMmCam.pos[2] + dir[2] * t;
+        hy = getArenaHeight(hx, hz, 2);
+      }
+      mm.targetX = clamp(hx, -2.85, 2.85);
+      mm.targetZ = clamp(hz, -2.85, 2.85);
+      mm.manualTimer = 14.0;
+      mm.clickPulse = 1.0;
     },
 
     getTechBadge(stepIdx) {
@@ -352,30 +413,31 @@ export async function createAnimationEffect(gl) {
       ragPassive.step(h, false);
       ragActive.step(h, true);
 
-      // Motion Matching steering: cycle through Sprint -> Sharp Turn -> Walk -> Brief Stop -> Sprint!
+      mm.clickPulse = Math.max(0, mm.clickPulse - h * 2.4);
+      // Motion Matching steering: exact point-to-click / WASD or autonomous figure-8 patrol!
       const kx = (keys.d ? 1 : 0) - (keys.a ? 1 : 0);
       const kz = (keys.s ? 1 : 0) - (keys.w ? 1 : 0);
       let wantSpeed = 1.0;
       if (kx || kz) {
-        mm.targetX = clamp(mm.x + kx * 1.4, -2.1, 2.1);
-        mm.targetZ = clamp(mm.z + kz * 1.4, -2.0, 2.0);
-        mm.manualTimer = 3.5;
-        wantSpeed = 1.25;
+        mm.targetX = clamp(mm.x + kx * 1.6, -2.85, 2.85);
+        mm.targetZ = clamp(mm.z + kz * 1.6, -2.85, 2.85);
+        mm.manualTimer = 8.0;
+        wantSpeed = 1.32;
       } else if (mm.manualTimer > 0) {
         mm.manualTimer = Math.max(0, mm.manualTimer - h);
         const d = Math.hypot(mm.targetX - mm.x, mm.targetZ - mm.z);
-        wantSpeed = clamp(d * 1.3, 0.0, 1.3);
+        wantSpeed = d > 1.05 ? 1.32 : (d > 0.14 ? clamp(d * 1.15, 0.45, 0.88) : 0.0);
       } else {
-      // Autonomous figure-8 sprint/walk/pivot trajectory with generous lookahead so glowing spline reads clearly!
-      const cyc = simTime % 10.0;
-      if (cyc < 1.1) {
-        wantSpeed = 0.0;
-      } else {
-        const ang = simTime * 0.58 + 0.95;
-        mm.targetX = Math.sin(ang) * 1.85;
-        mm.targetZ = Math.sin(ang * 2.0) * 1.20;
-        wantSpeed = (cyc > 4.2 && cyc < 8.6) ? 1.32 : 0.78;
-      }
+        // Front-facing scenic courtyard patrol loop so you see Xbot's face, banking turns & glowing spline!
+        const cyc = simTime % 10.0;
+        if (cyc < 1.1) {
+          wantSpeed = 0.0;
+        } else {
+          const ang = simTime * 0.56;
+          mm.targetX = Math.sin(ang) * 1.75;
+          mm.targetZ = Math.cos(ang) * 1.15 + 0.25;
+          wantSpeed = (cyc > 4.2 && cyc < 8.6) ? 1.32 : 0.78;
+        }
       }
 
       const dx = mm.targetX - mm.x, dz = mm.targetZ - mm.z;
@@ -384,14 +446,18 @@ export async function createAnimationEffect(gl) {
       let dyaw = desYaw - mm.yaw;
       while (dyaw > Math.PI) dyaw -= Math.PI * 2;
       while (dyaw < -Math.PI) dyaw += Math.PI * 2;
-      mm.turnRate = lerp(mm.turnRate, clamp(dyaw * 2.4, -2.5, 2.5), Math.min(1, h * 7.0));
-      mm.yaw += dyaw * Math.min(1, h * 5.0);
-      mm.speed = lerp(mm.speed, dist > 0.10 ? wantSpeed : 0.0, Math.min(1, h * 4.5));
-      const worldSpd = mm.speed > 0.92 ? 1.85 : (mm.speed > 0.22 ? 0.95 : 0.0);
-      mm.x = clamp(mm.x + Math.sin(mm.yaw) * worldSpd * h, -2.15, 2.15);
-      mm.z = clamp(mm.z + Math.cos(mm.yaw) * worldSpd * h, -2.05, 2.05);
+      const turnGain = mm.manualTimer > 0 ? 9.5 : 5.5;
+      mm.turnRate = lerp(mm.turnRate, clamp(dyaw * 2.4, -2.5, 2.5), Math.min(1, h * 8.0));
+      mm.yaw += dyaw * Math.min(1, h * turnGain);
+      mm.speed = lerp(mm.speed, dist > 0.12 ? wantSpeed : 0.0, Math.min(1, h * 6.0));
+      const worldSpd = mm.speed > 0.96 ? 1.95 : (mm.speed > 0.16 ? 1.05 : 0.0);
+      const prevX = mm.x, prevZ = mm.z;
+      const moveStep = Math.min(dist, worldSpd * h);
+      mm.x = clamp(mm.x + Math.sin(mm.yaw) * moveStep, -2.85, 2.85);
+      mm.z = clamp(mm.z + Math.cos(mm.yaw) * moveStep, -2.85, 2.85);
+      const actualMove = Math.hypot(mm.x - prevX, mm.z - prevZ);
 
-      const res = matcher.evaluate(h, mm.speed, mm.turnRate, mm.x, mm.z, mm.yaw, 2);
+      const res = matcher.evaluate(h, mm.speed, actualMove, mm.turnRate, mm.x, mm.z, mm.yaw, 2);
       lastMmFK = res.fk;
       lastMmClip = res.activeClip;
     },
@@ -402,26 +468,33 @@ export async function createAnimationEffect(gl) {
       // Compute stage-centered focus target so walking/stair-climbing/falling Xbot stays framed cleanly!
       const focusFor = (st) => {
         if (st === 4 || st === 98) {
-          const wx = Math.sin(simTime * 0.58) * 1.15;
-          return [wx, getArenaHeight(wx, 0, 1) + 0.94, 0];
+          const sw = getStairWalkState(simTime);
+          return [sw.x, getArenaHeight(sw.x, 0, 1) + 0.94, 0];
         }
         if (st === 6)  return [ragActive.state.x,  getArenaHeight(ragActive.state.x, 0, 1) + 0.90, 0];
         if (st === 99) return [ragPassive.state.x, getArenaHeight(ragPassive.state.x, 0, 1) + 0.52, 0];
-        if (st === 7)  return [mm.x, getArenaHeight(mm.x, mm.z, 2) + 0.94, mm.z];
+        if (st === 7)  return [mm.x * 0.45, getArenaHeight(mm.x, mm.z, 2) + 0.94, mm.z * 0.45];
         if (st === 3 || st === 5) return [0, 1.16, 0];
         return [0, cam.lookY || 1.02, 0];
       };
 
       const buildViewProj = (st, ndcShiftX) => {
         const foc = focusFor(st);
-        const distScale = (st === 3 || st === 5) ? 0.80 : (st === 7 ? 1.14 : 1.0);
+        const distScale = (st === 3 || st === 5) ? 0.80 : (st === 7 ? 1.24 : 1.0);
+        const fovRad = ((cam.fovDeg || 44) * Math.PI) / 180;
         const basis = cameraBasisFromOrbit(cam.yaw, cam.pitch, cam.dist * distScale, foc[1]);
         basis.pos[0] += foc[0]; basis.pos[2] += foc[2];
         basis.target[0] += foc[0]; basis.target[2] += foc[2];
         const view = makeLookAt(basis.pos, basis.target, [0, 1, 0]);
-        const proj = makePerspective(((cam.fovDeg || 44) * Math.PI) / 180, aspect, 0.1, 40.0);
+        const proj = makePerspective(fovRad, aspect, 0.1, 40.0);
         // Frustum off-center shift puts target cleanly at left/right pane center without distorting angles!
         proj[8] -= ndcShiftX;
+        if (st === 7) {
+          lastMmCam = {
+            pos: [...basis.pos], fwd: [...basis.fwd], right: [...basis.right], up: [...basis.up],
+            tanHalfFov: Math.tan(fovRad * 0.5), aspect, ndcShiftX,
+          };
+        }
         return { vp: mulMat4(proj, view), basis };
       };
 

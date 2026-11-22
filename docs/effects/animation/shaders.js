@@ -217,7 +217,8 @@ in vec2 vUv;
 uniform vec3 uPelvisPos;
 uniform vec3 uFootL;
 uniform vec3 uFootR;
-uniform float uShowFootRings; // >0.5 = Foot IK rings, <-0.5 = 1989 side-scrolling floor!
+uniform float uShowFootRings;
+uniform vec2 uFloorScroll;
 uniform float uTime;
 out vec4 oCol;
 
@@ -226,7 +227,7 @@ void main() {
   vec3 L = normalize(vec3(0.55, 0.85, 0.55));
   float ndl = max(dot(N, L), 0.0);
 
-  vec2 tileUv = vUv * 2.0 + (uShowFootRings < -0.5 ? vec2(uTime * 2.6, 0.0) : vec2(0.0));
+  vec2 tileUv = vUv * 2.0 + uFloorScroll * uTime;
   vec2 g = abs(fract(tileUv - 0.5) - 0.5) / max(fwidth(tileUv), vec2(0.002));
   float gridLine = 1.0 - smoothstep(0.0, 1.4, min(g.x, g.y));
 

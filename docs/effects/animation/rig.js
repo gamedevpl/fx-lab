@@ -342,11 +342,23 @@ export function applyFootIK(rig, fk, stairsMode, facingYaw) {
     const dqShin = qFromTo(oldShin, newShin);
     wr[iKnee] = qNorm(qMul(dqShin, wr[iKnee]));
 
-    // Keep foot flat and parallel to the horizontal stone step!
-    const footOff = [newFoot[0] - foot[0], newFoot[1] - foot[1], newFoot[2] - foot[2]];
+    // Smoothly level foot sole parallel to horizontal stone step near ground contact (zero toe-clipping!)
+    const flatWeight = smoothstep(0.09, 0.015, mocapLift);
+    const flatFootQ = qAxisAngle(0, 1, 0, facingYaw);
+    wr[iFoot] = qSlerp(wr[iFoot], flatFootQ, flatWeight * 0.85);
+    const toeRestOff = [
+      rig.restWorld[iToe][0] - rig.restWorld[iFoot][0],
+      rig.restWorld[iToe][1] - rig.restWorld[iFoot][1],
+      rig.restWorld[iToe][2] - rig.restWorld[iFoot][2],
+    ];
+    const toeWorldOff = qRotVec(wr[iFoot], toeRestOff);
     wp[iKnee] = newKnee;
     wp[iFoot] = newFoot;
-    wp[iToe] = [toe[0] + footOff[0], Math.max(groundY + 0.025, toe[1] + footOff[1]), toe[2] + footOff[2]];
+    wp[iToe] = [
+      newFoot[0] + toeWorldOff[0],
+      Math.max(groundY + 0.02, newFoot[1] + toeWorldOff[1]),
+      newFoot[2] + toeWorldOff[2],
+    ];
   }
 
   solveLeg(14, 15, 16, 17, gL);
@@ -373,38 +385,28 @@ export function evaluateTwistPose(rig, tSec, twistAngle) {
   return evaluateFK(rig, pose, [0, 0, 0], 0.0, [0, 0]);
 }
 
-// --- TRUE ARTICULATED JOINT-LIMITED RAGDOLL vs ACTIVE EUPHORIA (Stage 6 — ZERO DETACHED/BROKEN LIMBS!) ---
-// Uses an articulated pelvis rigid body + anatomically clamped angular spring-damper joints!
+// --- TRUE ARTICULATED JOINT-LIMITED RAGDOLL vs REAL MOCAP-BACKED ACTIVE EUPHORIA (Stage 6!) ---
 export function createArticulatedRagdoll(rig) {
-  // State: pelvis position/velocity/pitch/angVel + articulated joint spring angles (all strictly clamped!)
   const state = {
-    x: 0.45, y: 0.0, z: 0.0, vx: 0, vy: 0,
+    x: 0.55, y: 0.0, z: 0.0, vx: 0, vy: 0,
     pitch: 0, vp: 0, roll: 0, vr: 0,
-    spine: 0, vSpine: 0, head: 0, vHead: 0,
-    lArmX: 0, lArmZ: 0, rArmX: 0, rArmZ: 0,
-    lElbow: 0, rElbow: 0, lHip: 0, rHip: 0, lKnee: 0, rKnee: 0,
-    t: 0,
+    t: 0, stridePhase: 0,
   };
 
   function reset(startX = 0.55) {
     const g = getArenaHeight(startX, 0, 1);
     Object.assign(state, {
-      x: startX, y: g + 0.96, z: 0.0, vx: 0, vy: 0,
+      x: startX, y: g + 1.0, z: 0.0, vx: 0, vy: 0,
       pitch: 0, vp: 0, roll: 0, vr: 0,
-      spine: 0, vSpine: 0, head: 0, vHead: 0,
-      lArmX: 0, lArmZ: -1.15, rArmX: 0, rArmZ: 1.15,
-      lElbow: 0.2, rElbow: 0.2, lHip: 0, rHip: 0, lKnee: 0.12, rKnee: 0.12,
-      t: 0,
+      t: 0, stridePhase: 0,
     });
   }
 
   function push(strength = 1.0) {
-    // Shove backward (-X) down the stone stairs!
-    state.vx = -2.35 * strength;
-    state.vy =  0.75 * strength;
-    state.vp = -3.40 * strength; // tips backward onto the stairs!
-    state.vSpine = -2.8 * strength;
-    state.vHead  = -3.5 * strength;
+    state.vx = -2.20 * strength;
+    state.vy =  0.55 * strength;
+    state.vp = -3.30 * strength;
+    state.vr =  0.55 * strength;
   }
 
   function step(dt, activeEuphoria) {
@@ -413,100 +415,85 @@ export function createArticulatedRagdoll(rig) {
     const gUnder = getArenaHeight(state.x, state.z, 1);
 
     if (!activeEuphoria) {
-      // 2000 HITMAN PASSIVE LIMP RAGDOLL: pure gravity, tumbling & settling cleanly on stairs!
+      // 2000 HITMAN PASSIVE LIMP RAGDOLL: pure gravity tumble + asymmetric settling on stairs!
       state.vy -= 9.8 * h;
-      state.x = clamp(state.x + state.vx * h, -2.1, 2.0);
+      state.x = clamp(state.x + state.vx * h, -2.15, 2.0);
       state.y += state.vy * h;
       state.pitch += state.vp * h;
       state.roll  += state.vr * h;
 
-      // Pelvis & shoulder contact with stepped stairs -> tumbles backward cleanly onto back!
-      const minPelvisY = gUnder + 0.19;
+      const minPelvisY = gUnder + 0.16;
       if (state.y < minPelvisY) {
         state.y = minPelvisY;
-        if (state.vy < 0) state.vy = -state.vy * 0.22;
-        state.vx *= 0.86;
-        // Settle cleanly onto back (pitch ~ -1.48 rad) aligned with stair slope!
-        const targetFlat = -1.44;
-        state.vp += (targetFlat - state.pitch) * 26.0 * h;
-        state.vp *= 0.84;
+        if (state.vy < 0) state.vy = -state.vy * 0.18;
+        state.vx *= Math.pow(0.08, h);
+        state.vp += (-1.46 - state.pitch) * 24.0 * h;
+        state.vp *= Math.pow(0.04, h);
+        state.vr *= Math.pow(0.06, h);
       } else {
-        state.vp -= 2.2 * h; // gravitational tumble
-        state.vp *= 0.98;
+        state.vp -= 2.4 * h;
+        state.vp *= 0.985;
       }
-      state.pitch = clamp(state.pitch, -1.62, 0.65);
-
-      // Limp anatomical limbs drape naturally with gravity + strict joint limits!
-      const fallF = smoothstep(0.0, 0.9, Math.abs(state.pitch));
-      state.spine  = lerp(state.spine,  clamp(-state.pitch * 0.22, -0.35, 0.35), h * 6);
-      state.head   = lerp(state.head,   clamp(0.32 * fallF, -0.45, 0.55), h * 5);
-      state.lArmZ  = lerp(state.lArmZ,  -0.35 - 0.55 * fallF, h * 5);
-      state.rArmZ  = lerp(state.rArmZ,   0.45 + 0.50 * fallF, h * 5);
-      state.lArmX  = lerp(state.lArmX,  -0.55 * fallF, h * 5);
-      state.rArmX  = lerp(state.rArmX,  -0.35 * fallF, h * 5);
-      state.lElbow = lerp(state.lElbow,  0.65 * fallF, h * 5);
-      state.rElbow = lerp(state.rElbow,  0.48 * fallF, h * 5);
-      state.lHip   = lerp(state.lHip,   -0.38 * fallF, h * 5);
-      state.rHip   = lerp(state.rHip,   -0.18 * fallF, h * 5);
-      state.lKnee  = lerp(state.lKnee,   0.78 * fallF, h * 5);
-      state.rKnee  = lerp(state.rKnee,   0.52 * fallF, h * 5);
+      state.pitch = clamp(state.pitch, -1.58, 0.45);
+      state.roll  = clamp(state.roll, -0.35, 0.35);
     } else {
       // 2008 GTA IV EUPHORIA ACTIVE MUSCLE REFLEXES:
-      // PD-controller fights to keep pelvis upright, stumbles backward stepping down the stairs,
-      // windmills BOTH arms wildly forward to recover balance, and tucks head forward!
-      state.vx *= Math.pow(0.28, h); // catches horizontal momentum by planting feet!
-      state.x = clamp(state.x + state.vx * h, -1.9, 2.0);
-      const targetH = gUnder + 0.88 + Math.abs(Math.sin(state.t * 9.5)) * 0.04;
-      state.vy += ((targetH - state.y) * 48.0 - state.vy * 8.5) * h;
-      state.y = Math.max(gUnder + 0.65, state.y + state.vy * h);
+      // Stumbles backward down the stairs using real Mixamo backpedal stride + PD upright recovery + wide balance arms!
+      state.vx *= Math.pow(0.24, h);
+      const prevX = state.x;
+      state.x = clamp(state.x + state.vx * h, -1.85, 2.0);
+      const moved = Math.abs(state.x - prevX);
+      state.stridePhase += moved * 1.45 + h * 0.25;
 
-      // Lean back on impact, then actively pull torso upright with PD muscle torque!
-      const leanGoal = state.t < 0.7 ? -0.38 : -0.06 * Math.sin(state.t * 4.5);
-      state.vp += ((leanGoal - state.pitch) * 32.0 - state.vp * 5.2) * h;
-      state.pitch = clamp(state.pitch + state.vp * h, -0.58, 0.35);
-
-      // Dramatic windmilling arms flung OUTWARD & FORWARD to recover balance + protective head tuck!
-      const panic = Math.exp(-state.t * 0.35);
-      state.spine  = lerp(state.spine,  0.30 * panic + 0.14, h * 8);
-      state.head   = lerp(state.head,   0.42 * panic + 0.16, h * 9);
-      state.lArmZ  = lerp(state.lArmZ, -0.18 + Math.sin(state.t * 10.5) * 0.52 * (0.45 + 0.55 * panic), h * 11);
-      state.rArmZ  = lerp(state.rArmZ,  0.18 + Math.cos(state.t * 10.5) * 0.52 * (0.45 + 0.55 * panic), h * 11);
-      state.lArmX  = lerp(state.lArmX,  1.05 * panic + 0.55 + Math.cos(state.t * 10.5) * 0.45 * panic, h * 12);
-      state.rArmX  = lerp(state.rArmX,  1.05 * panic + 0.55 - Math.sin(state.t * 10.5) * 0.45 * panic, h * 12);
-      state.lElbow = lerp(state.lElbow, 0.78, h * 9);
-      state.rElbow = lerp(state.rElbow, 0.78, h * 9);
-      // Rapid stumbling recovery back-steps!
-      const stumble = Math.sin(state.t * 11.5) * (0.25 + 0.75 * panic);
-      state.lHip   = lerp(state.lHip,  -0.25 + stumble * 0.55, h * 14);
-      state.rHip   = lerp(state.rHip,  -0.25 - stumble * 0.55, h * 14);
-      state.lKnee  = lerp(state.lKnee,  0.42 + Math.max(0, -stumble) * 0.55, h * 14);
-      state.rKnee  = lerp(state.rKnee,  0.42 + Math.max(0,  stumble) * 0.55, h * 14);
+      const gNew = getArenaHeight(state.x, state.z, 1);
+      state.y = gNew;
+      // Brief backward recoil on impact, then PD-controller pulls torso cleanly back upright!
+      const leanGoal = state.t < 0.55 ? -0.22 : 0.04 * Math.sin(state.t * 3.8) * Math.exp(-state.t * 0.5);
+      state.vp += ((leanGoal - state.pitch) * 34.0 - state.vp * 6.5) * h;
+      state.pitch = clamp(state.pitch + state.vp * h, -0.36, 0.22);
     }
   }
 
   function toFK(activeEuphoria) {
-    const pose = restPoseLocal(rig);
-    // Apply articulated anatomical rotations strictly around valid joint axes!
-    pose[0].t = [0, 0, 0];
-    pose[1].q  = qMul(pose[1].q,  qEulerXYZ(state.spine, 0, 0));
-    pose[2].q  = qMul(pose[2].q,  qEulerXYZ(state.spine * 0.7, 0, 0));
-    pose[4].q  = qMul(pose[4].q,  qEulerXYZ(state.head * 0.6, 0, 0));
-    pose[5].q  = qMul(pose[5].q,  qEulerXYZ(state.head * 0.6, 0, 0));
-    pose[7].q  = qMul(pose[7].q,  qEulerXYZ(0, -state.lArmX, state.lArmZ));
-    pose[8].q  = qMul(pose[8].q,  qEulerXYZ(0, -state.lElbow, 0));
-    pose[11].q = qMul(pose[11].q, qEulerXYZ(0,  state.rArmX, state.rArmZ));
-    pose[12].q = qMul(pose[12].q, qEulerXYZ(0,  state.rElbow, 0));
-    pose[14].q = qMul(pose[14].q, qEulerXYZ(state.lHip, 0, 0));
-    pose[15].q = qMul(pose[15].q, qEulerXYZ(state.lKnee, 0, 0));
-    pose[18].q = qMul(pose[18].q, qEulerXYZ(state.rHip, 0, 0));
-    pose[19].q = qMul(pose[19].q, qEulerXYZ(state.rKnee, 0, 0));
-
-    // Character faces +X up stairs (yaw = +PI/2); tipping backward tilts around local X!
-    const fk = evaluateFK(rig, pose, [state.x, state.y, state.z], Math.PI * 0.5, [state.pitch, state.roll]);
-    if (activeEuphoria) {
-      return applyFootIK(rig, fk, 1, Math.PI * 0.5);
+    if (!activeEuphoria) {
+      // Asymmetric natural limp ragdoll drape (zero stiff mirror mannequin!)
+      const pose = restPoseLocal(rig);
+      pose[0].t = [0, 0, 0];
+      const f = smoothstep(0.0, 0.85, Math.abs(state.pitch));
+      pose[1].q  = qMul(pose[1].q,  qEulerXYZ(-0.18 * f, 0.12 * f, 0.08 * f));
+      pose[2].q  = qMul(pose[2].q,  qEulerXYZ(-0.14 * f, 0.10 * f, 0.06 * f));
+      pose[5].q  = qMul(pose[5].q,  qEulerXYZ(0.22 * f,  0.34 * f, -0.18 * f));
+      // Left arm flung overhead/sideways; right arm draped loosely across side
+      pose[7].q  = qMul(pose[7].q,  qEulerXYZ(0.0, 0.25 * f, -0.35 + 0.65 * f));
+      pose[8].q  = qMul(pose[8].q,  qEulerXYZ(0.0, -0.45 * f, 0.0));
+      pose[11].q = qMul(pose[11].q, qEulerXYZ(0.0, 0.42 * f,  1.15 - 0.30 * f));
+      pose[12].q = qMul(pose[12].q, qEulerXYZ(0.0,  0.85 * f, 0.0));
+      // Asymmetric bent knees resting across stairs
+      pose[14].q = qMul(pose[14].q, qEulerXYZ(-0.55 * f, 0.14 * f, 0.12 * f));
+      pose[15].q = qMul(pose[15].q, qEulerXYZ( 0.92 * f, 0.0, 0.0));
+      pose[18].q = qMul(pose[18].q, qEulerXYZ(-0.22 * f, -0.12 * f, -0.10 * f));
+      pose[19].q = qMul(pose[19].q, qEulerXYZ( 0.38 * f, 0.0, 0.0));
+      return evaluateFK(rig, pose, [state.x, state.y, state.z], Math.PI * 0.5, [state.pitch, state.roll]);
     }
-    return fk;
+
+    // Active Euphoria: blend REAL Mixamo reverse walk (stumbling backsteps!) -> REAL Mixamo idle as balance recovers!
+    const panic = Math.exp(-state.t * 0.55);
+    const stumbling = smoothstep(0.06, 0.35, Math.abs(state.vx) + panic * 0.35);
+    const pWalk = sampleClipLocal(rig, "walk", -state.stridePhase);
+    const pIdle = sampleClipLocal(rig, "idle", state.t);
+    const pose = blendLocalPoses(pIdle, pWalk, stumbling);
+
+    // Subtle athletic balance crouch + wide asymmetric flailing arms (layered cleanly on real Mixamo clavicles!)
+    pose[0].t[1] -= 0.07 * panic;
+    pose[1].q  = qMul(pose[1].q,  qEulerXYZ(0.14 * panic, Math.sin(state.t * 7.0) * 0.14 * panic, 0));
+    pose[5].q  = qMul(pose[5].q,  qEulerXYZ(0.22 * panic, 0, 0)); // watches stairs footing!
+    // Left arm & right arm flung wide OUT to sides (in Mixamo pose space, lifting arm out is +-Z, swinging is Y!)
+    const flail = Math.sin(state.t * 9.0) * panic;
+    pose[7].q  = qMul(pose[7].q,  qEulerXYZ(0, -0.35 * panic + flail * 0.45,  0.72 * panic + flail * 0.28));
+    pose[11].q = qMul(pose[11].q, qEulerXYZ(0,  0.35 * panic + flail * 0.45, -0.72 * panic + flail * 0.28));
+
+    const fk = evaluateFK(rig, pose, [state.x, state.y, state.z], Math.PI * 0.5, [state.pitch, 0]);
+    return applyFootIK(rig, fk, 1, Math.PI * 0.5);
   }
 
   reset();
@@ -514,20 +501,17 @@ export function createArticulatedRagdoll(rig) {
 }
 
 // --- REAL MOTION MATCHING + DAVID BOLLO (GDC 2017) CUBIC INERTIALIZATION (Stage 7!) ---
-// Searches real Mixamo idle/walk/run/sneak mocap poses by desired speed & turn curvature,
-// then smoothly decays pose discontinuities via critically damped inertialization!
 export function createMotionMatcher(rig) {
   let curClip = "walk";
   let curClipT = 0.0;
   let inertTimer = 1.0;
-  const INERT_DUR = 0.24;
+  const INERT_DUR = 0.22;
   let offsetPose = restPoseLocal(rig).map(() => ({ t: [0, 0, 0], q: qId() }));
   let lastEvalPose = sampleClipLocal(rig, "walk", 0);
   let searchClock = 0.0;
 
   function triggerSwitch(nextClip, nextT) {
     const targetPose = sampleClipLocal(rig, nextClip, nextT);
-    // Bollo (2017) Inertialization: store instantaneous delta = inv(target) * current, decay via cubic polynomial!
     for (let i = 0; i < BONE_COUNT; i++) {
       offsetPose[i] = {
         t: [lastEvalPose[i].t[0] - targetPose[i].t[0], lastEvalPose[i].t[1] - targetPose[i].t[1], lastEvalPose[i].t[2] - targetPose[i].t[2]],
@@ -539,25 +523,30 @@ export function createMotionMatcher(rig) {
     inertTimer = 0.0;
   }
 
-  function evaluate(dt, desiredSpeed, turnRate, x, z, yaw, stairsMode) {
+  function evaluate(dt, desiredSpeed, moveDist, turnRate, x, z, yaw, stairsMode) {
     searchClock += dt;
-    curClipT += dt * (curClip === "run" ? 1.05 : (curClip === "walk" ? clamp(0.75 + desiredSpeed * 0.4, 0.65, 1.35) : 1.0));
+    // Lock animation phase strictly to actual world displacement -> ZERO foot sliding!
+    if (curClip === "idle") {
+      curClipT += dt;
+    } else if (curClip === "walk") {
+      const strideLen = 1.04; // meters per Mixamo walk cycle
+      curClipT += (moveDist / strideLen) * rig.clips.walk.duration;
+    } else {
+      const strideLen = 1.82; // meters per Mixamo run cycle
+      curClipT += (moveDist / strideLen) * rig.clips.run.duration;
+    }
     inertTimer = Math.min(INERT_DUR, inertTimer + dt);
 
-    // Real Motion Matching database cost query every 0.14s: pick optimal mocap clip matching velocity!
-    if (searchClock >= 0.14) {
+    // Immediate stop to idle on arrival; 0.12s database search cadence between walk/run!
+    const want = desiredSpeed < 0.16 ? "idle" : (desiredSpeed < 0.96 ? "walk" : "run");
+    if (want !== curClip && (want === "idle" || curClip === "idle" || searchClock >= 0.12)) {
       searchClock = 0;
-      const want = desiredSpeed < 0.22 ? "idle" : (desiredSpeed < 0.92 ? "walk" : "run");
-      if (want !== curClip) {
-        // Phase-matched entry into new clip (preserves foot stride phase -> zero foot-sliding!)
-        const cOld = rig.clips[curClip], cNew = rig.clips[want];
-        const phase = cOld ? ((curClipT % cOld.duration) / cOld.duration) : 0;
-        triggerSwitch(want, phase * (cNew ? cNew.duration : 1.0));
-      }
+      const cOld = rig.clips[curClip], cNew = rig.clips[want];
+      const phase = (curClip !== "idle" && cOld) ? ((curClipT % cOld.duration) / cOld.duration) : 0;
+      triggerSwitch(want, phase * (cNew ? cNew.duration : 1.0));
     }
 
     const basePose = sampleClipLocal(rig, curClip, curClipT);
-    // Critically damped Bollo quintic/cubic inertialization decay: (1 - u)^3 * (1 + 3u)
     const u = clamp(inertTimer / INERT_DUR, 0, 1);
     const decay = (1 - u) * (1 - u) * (1 - u) * (1 + 3 * u);
 
@@ -569,14 +558,15 @@ export function createMotionMatcher(rig) {
         q: qNorm(qMul(basePose[i].q, qOff)),
       };
     }
-    // Natural spine & head anticipation banking into turns!
-    const bank = clamp(-turnRate * 0.22, -0.26, 0.26);
-    outPose[1].q = qMul(outPose[1].q, qEulerXYZ(0.05 * desiredSpeed, bank * 0.45, bank * 0.55));
-    outPose[5].q = qMul(outPose[5].q, qEulerXYZ(0, bank * 0.85, 0));
+    // Natural spine & head anticipation banking into turns (pelvis stays level so boots never lift!)
+    const bank = clamp(-turnRate * 0.18, -0.22, 0.22);
+    outPose[1].q = qMul(outPose[1].q, qEulerXYZ(0.04 * desiredSpeed, bank * 0.40, bank * 0.45));
+    outPose[2].q = qMul(outPose[2].q, qEulerXYZ(0.0, bank * 0.25, bank * 0.25));
+    outPose[5].q = qMul(outPose[5].q, qEulerXYZ(0, bank * 0.75, 0));
     lastEvalPose = outPose;
 
     const gY = getArenaHeight(x, z, stairsMode);
-    const fk = evaluateFK(rig, outPose, [x, gY, z], yaw, [0, bank * 0.35]);
+    const fk = evaluateFK(rig, outPose, [x, gY, z], yaw, [0, 0]);
     return { fk: applyFootIK(rig, fk, stairsMode, yaw), activeClip: curClip };
   }
 
