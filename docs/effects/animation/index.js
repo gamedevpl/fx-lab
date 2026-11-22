@@ -1,18 +1,10 @@
-// Evolution of Character Animation (1989-2020) — Interactive WebGL2 Controller.
-//   0: 1989      Prince of Persia Rotoscoped 2D Sprites (12 fps VHS-traced silhouette)
-//   1: 1992-93   Alone in the Dark / Virtua Fighter Rigid Faceted Polygon Puppet
-//   2: 1996      Quake MDL Per-Vertex Keyframe Morphing (chord shrinking / swimming limbs!)
-//   3: 1998      Half-Life Skeletal & LBS Candy-Wrapper Collapse (180° wrist twist!)
-//   4: 2006-09   Gears of War UE3 Blend Trees & Foot IK on Uneven Stairs (GDC 2009 / FABRIK 2011)
-//   5: 2007      Dual Quaternion Skinning (Ladislav Kavan et al., I3D 2007 — kills candy-wrapper!)
-//   6: 2008      Ragdoll -> Active Physics (Trespasser '98 / Hitman '00 -> GTA IV Euphoria 2008!)
-//   7: 2016-20   Motion Matching & Neural Locomotion (For Honor '16 · Inertialization '17 · PFNN '17 · LMM '20)
-
+// Evolution of Character Animation (1989-2020) — Real Xbot Rig + Real Mixamo Mocap WebGL2 Controller.
 import { clamp, lerp, cameraBasisFromOrbit, makeLookAt, makePerspective, FULL_VS, linkPrograms } from "../../src/gl-utils.js";
 import {
-  BONE_PARENTS, buildCharacterGeometry, buildRigidPuppetGeometry, buildArenaGeometry,
-  evaluateWalkPose, createRagdollSim, getArenaHeight,
-} from "./mesh.js";
+  loadXbotRig, buildArenaGeometry, getArenaHeight,
+  sampleClipLocal, evaluateFK, applyFootIK, evaluateTwistPose,
+  createArticulatedRagdoll, createMotionMatcher,
+} from "./rig.js";
 import { SKY_FS, CHAR_VS, CHAR_FS, ARENA_VS, ARENA_FS, ROTO_VS, ROTO_FS, LINE_VS, LINE_FS } from "./shaders.js";
 
 function mulMat4(a, b) {
@@ -25,24 +17,23 @@ function mulMat4(a, b) {
   return o;
 }
 
-function makeCharVao(gl, geom) {
+function makeCharVao(gl, verts, indices) {
   const vao = gl.createVertexArray();
   gl.bindVertexArray(vao);
   const vbo = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
-  gl.bufferData(gl.ARRAY_BUFFER, geom.vertices, gl.STATIC_DRAW);
-  const stride = 13 * 4;
+  gl.bufferData(gl.ARRAY_BUFFER, verts, gl.STATIC_DRAW);
+  const stride = 15 * 4;
   gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, stride, 0);
   gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, stride, 12);
-  gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 2, gl.FLOAT, false, stride, 24);
-  gl.enableVertexAttribArray(3); gl.vertexAttribPointer(3, 2, gl.FLOAT, false, stride, 32);
-  gl.enableVertexAttribArray(4); gl.vertexAttribPointer(4, 2, gl.FLOAT, false, stride, 40);
-  gl.enableVertexAttribArray(5); gl.vertexAttribPointer(5, 1, gl.FLOAT, false, stride, 48);
+  gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 4, gl.FLOAT, false, stride, 24);
+  gl.enableVertexAttribArray(3); gl.vertexAttribPointer(3, 4, gl.FLOAT, false, stride, 40);
+  gl.enableVertexAttribArray(4); gl.vertexAttribPointer(4, 1, gl.FLOAT, false, stride, 56);
   const ibo = gl.createBuffer();
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
-  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, geom.indices, gl.STATIC_DRAW);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
   gl.bindVertexArray(null);
-  return { vao, count: geom.indices.length };
+  return { vao, count: indices.length };
 }
 
 function makeArenaVao(gl, geom) {
@@ -51,10 +42,9 @@ function makeArenaVao(gl, geom) {
   const vbo = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
   gl.bufferData(gl.ARRAY_BUFFER, geom.vertices, gl.STATIC_DRAW);
-  const stride = 8 * 4;
-  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, stride, 0);
-  gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, stride, 12);
-  gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 2, gl.FLOAT, false, stride, 24);
+  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 32, 0);
+  gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 32, 12);
+  gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 2, gl.FLOAT, false, 32, 24);
   const ibo = gl.createBuffer();
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
   gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, geom.indices, gl.STATIC_DRAW);
@@ -62,7 +52,10 @@ function makeArenaVao(gl, geom) {
   return { vao, count: geom.indices.length };
 }
 
-export function createAnimationEffect(gl) {
+export async function createAnimationEffect(gl) {
+  const baseUrl = new URL("./", import.meta.url).href;
+  const rig = await loadXbotRig(baseUrl);
+
   const [progSky, progChar, progArena, progRoto, progLine] = linkPrograms(gl, [
     [FULL_VS, SKY_FS],
     [CHAR_VS, CHAR_FS],
@@ -72,68 +65,52 @@ export function createAnimationEffect(gl) {
   ]);
 
   const uLoc = (p, names) => Object.fromEntries(names.map(n => [n, gl.getUniformLocation(p, n)]));
-  const uSky   = uLoc(progSky,   ["uRetro"]);
-  const uChar  = uLoc(progChar,  ["uViewProj", "uBones", "uBonesB", "uDqReal", "uDqDual", "uDeformMode", "uMorphT", "uCamPos", "uFlatShade"]);
+  const uSky   = uLoc(progSky,   ["uRetro", "uTime"]);
+  const uChar  = uLoc(progChar,  ["uViewProj", "uBones", "uBonesB", "uDqReal", "uDqDual", "uDeformMode", "uMorphT", "uCamPos", "uFlatShade", "uShowTwistPattern"]);
   const uArena = uLoc(progArena, ["uViewProj", "uPelvisPos", "uFootL", "uFootR", "uShowFootRings", "uTime"]);
   const uRoto  = uLoc(progRoto,  ["uViewProj", "uPos", "uCamRight", "uTime"]);
   const uLine  = uLoc(progLine,  ["uViewProj", "uPointSize"]);
 
   const fullVao = gl.createVertexArray();
-  const smoothChar = makeCharVao(gl, buildCharacterGeometry());
-  const rigidChar  = makeCharVao(gl, buildRigidPuppetGeometry());
-  const arenas = [
-    makeArenaVao(gl, buildArenaGeometry(0)),
-    makeArenaVao(gl, buildArenaGeometry(1)),
-    makeArenaVao(gl, buildArenaGeometry(2)),
-  ];
+  const smoothChar = makeCharVao(gl, rig.smoothVerts, rig.smoothIdx);
+  const retroChar  = makeCharVao(gl, rig.retroVerts,  rig.retroIdx);
+  const arenas = [0, 1, 2].map(m => makeArenaVao(gl, buildArenaGeometry(m)));
 
-  // Dynamic VBO for X-Ray skeleton bones + Motion Matching trajectory curve
   const lineVao = gl.createVertexArray();
   const lineVbo = gl.createBuffer();
   gl.bindVertexArray(lineVao);
   gl.bindBuffer(gl.ARRAY_BUFFER, lineVbo);
-  gl.bufferData(gl.ARRAY_BUFFER, 512 * 6 * 4, gl.DYNAMIC_DRAW);
+  gl.bufferData(gl.ARRAY_BUFFER, 1024 * 6 * 4, gl.DYNAMIC_DRAW);
   gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 24, 0);
   gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 24, 12);
   gl.bindVertexArray(null);
 
-  // Two parallel ragdoll instances so Split-Screen compares Passive Limp vs Active Euphoria simultaneously!
-  const ragPassive = createRagdollSim();
-  const ragActive  = createRagdollSim();
+  const ragPassive = createArticulatedRagdoll(rig);
+  const ragActive  = createArticulatedRagdoll(rig);
+  const matcher = createMotionMatcher(rig);
 
-  let simTime = 0;
+  let simTime = 2.6;
   let showSkeleton = false;
   let twistActive = true;
   let ragTimer = 0;
+  let lastMmFK = null;
+  let lastMmClip = "walk";
 
-  // Motion Matching autonomous + interactive click/WASD steering state (Stage 7)
-  const mm = {
-    x: 0.0, z: 0.0, yaw: 0.4, speed: 1.0, lean: 0.0,
-    targetX: 1.1, targetZ: 0.6, manualTimer: 0.0,
-  };
+  // Motion Matching interactive steering (WASD or click destination; autonomous stop/walk/run/pivot patrol!)
+  const mm = { x: -0.25, z: 0.15, yaw: 0.65, speed: 1.05, turnRate: 0.35, targetX: 1.4, targetZ: 0.7, manualTimer: 0 };
   const keys = { w: false, a: false, s: false, d: false };
-  const onKey = (down) => (ev) => {
-    const k = ev.key?.toLowerCase();
-    if (k in keys) keys[k] = down;
-  };
-  window.addEventListener("keydown", onKey(true));
-  window.addEventListener("keyup", onKey(false));
+  window.addEventListener("keydown", ev => { const k = ev.key?.toLowerCase(); if (k in keys) keys[k] = true; });
+  window.addEventListener("keyup",   ev => { const k = ev.key?.toLowerCase(); if (k in keys) keys[k] = false; });
 
   function resetRagdolls() {
-    ragPassive.reset(-0.20, 0.0, 1);
-    ragActive.reset(-0.20, 0.0, 1);
-    ragPassive.push(1.05);
-    ragActive.push(1.05);
+    ragPassive.reset(0.55);
+    ragActive.reset(0.55);
+    ragPassive.push(1.0);
+    ragActive.push(1.0);
     ragTimer = 0;
   }
 
-  function stageArenaMode(stage) {
-    if (stage === 4 || stage === 6) return 1; // Stepped stone stairs for Foot IK & Ragdoll!
-    if (stage === 7) return 2;                // Terraced undulating arena for Motion Matching!
-    return 0;                                 // Clean studio floor for Rotoscope / Puppet / Quake / LBS / DQS!
-  }
-
-  function drawLineData(vp, floats, mode, pointSize = 7.0) {
+  function drawLineData(vp, floats, mode, pointSize) {
     if (!floats.length) return;
     gl.useProgram(progLine);
     gl.bindVertexArray(lineVao);
@@ -144,163 +121,162 @@ export function createAnimationEffect(gl) {
     gl.drawArrays(mode, 0, floats.length / 6);
   }
 
-  function drawSkeletonOverlay(vp, worldPos, isHero) {
-    const segs = [];
-    const pts = [];
-    const boneCol = isHero ? [0.22, 0.96, 0.72] : [1.0, 0.78, 0.24];
-    const jointCol = [1.0, 0.96, 0.82];
+  function drawSkeletonOverlay(vp, worldPos) {
+    const segs = [], pts = [];
     for (let i = 0; i < worldPos.length; i++) {
-      const p = BONE_PARENTS[i];
-      if (p >= 0) {
-        segs.push(...worldPos[p], ...boneCol, ...worldPos[i], ...boneCol);
-      }
-      pts.push(...worldPos[i], ...jointCol);
+      const p = rig.parents[i];
+      if (p >= 0) segs.push(...worldPos[p], 0.22, 0.96, 0.72, ...worldPos[i], 0.22, 0.96, 0.72);
+      pts.push(...worldPos[i], 1.0, 0.95, 0.78);
     }
     gl.disable(gl.DEPTH_TEST);
     drawLineData(vp, segs, gl.LINES, 1.0);
-    drawLineData(vp, pts, gl.POINTS, 8.0);
+    drawLineData(vp, pts, gl.POINTS, 7.5);
     gl.enable(gl.DEPTH_TEST);
   }
 
-  function drawTrajectoryRibbon(vp) {
-    // Glowing predicted Motion Matching future path + candidate footstep nodes!
-    const segs = [];
-    const pts = [];
+  function drawMotionMatchingOverlay(vp) {
+    // Draw live chosen future trajectory (thick emerald->gold ribbon + target beacon) + rejected candidate branches!
+    const segs = [], pts = [];
     let px = mm.x, pz = mm.z, pyaw = mm.yaw;
-    for (let i = 0; i <= 14; i++) {
-      const f = i / 14;
+    for (let i = 0; i < 18; i++) {
+      const f = i / 18;
       const dx = mm.targetX - px, dz = mm.targetZ - pz;
       const desYaw = Math.atan2(dx, dz);
       let dyaw = desYaw - pyaw;
       while (dyaw > Math.PI) dyaw -= Math.PI * 2;
       while (dyaw < -Math.PI) dyaw += Math.PI * 2;
-      pyaw += dyaw * 0.22;
-      const nx = px + Math.sin(pyaw) * 0.14;
-      const nz = pz + Math.cos(pyaw) * 0.14;
-      const y0 = getArenaHeight(px, pz, 2) + 0.04;
-      const y1 = getArenaHeight(nx, nz, 2) + 0.04;
-      const col = [lerp(0.24, 1.0, f), lerp(0.95, 0.55, f), lerp(0.88, 0.22, f)];
-      segs.push(px, y0, pz, ...col, nx, y1, nz, ...col);
-      if (i % 3 === 0) pts.push(nx, y1 + 0.01, nz, 1.0, 0.92, 0.35);
+      pyaw += dyaw * 0.24;
+      const step = 0.14 * Math.max(0.45, mm.speed);
+      const nx = px + Math.sin(pyaw) * step;
+      const nz = pz + Math.cos(pyaw) * step;
+      const y0 = getArenaHeight(px, pz, 2) + 0.05;
+      const y1 = getArenaHeight(nx, nz, 2) + 0.05;
+      const rC = lerp(0.14, 1.0, f), gC = lerp(0.98, 0.72, f), bC = lerp(0.68, 0.20, f);
+      const sideX = Math.cos(pyaw) * 0.035, sideZ = -Math.sin(pyaw) * 0.035;
+      for (const s of [-1, 0, 1]) {
+        segs.push(px + sideX*s, y0, pz + sideZ*s, rC, gC, bC, nx + sideX*s, y1, nz + sideZ*s, rC, gC, bC);
+      }
+      if (i % 3 === 0) pts.push(nx, y1 + 0.02, nz, 1.0, 0.95, 0.35);
+      // Rejected candidate database search trajectories fanning out from root
+      if (i === 0) {
+        for (const candOff of [-0.72, -0.38, 0.38, 0.72]) {
+          let cx = mm.x, cz = mm.z, cy = mm.yaw + candOff;
+          for (let k = 0; k < 6; k++) {
+            const cnx = cx + Math.sin(cy) * 0.16, cnz = cz + Math.cos(cy) * 0.16;
+            segs.push(cx, getArenaHeight(cx, cz, 2) + 0.04, cz, 0.95, 0.36, 0.18,
+                      cnx, getArenaHeight(cnx, cnz, 2) + 0.04, cnz, 0.60, 0.20, 0.12);
+            cx = cnx; cz = cnz;
+          }
+        }
+      }
       px = nx; pz = nz;
     }
+    // Bright gold destination beacon ring on the courtyard floor
+    const ty = getArenaHeight(mm.targetX, mm.targetZ, 2) + 0.05;
+    for (let k = 0; k < 16; k++) {
+      const a0 = (k / 16) * Math.PI * 2, a1 = ((k + 1) / 16) * Math.PI * 2;
+      segs.push(mm.targetX + Math.cos(a0)*0.22, ty, mm.targetZ + Math.sin(a0)*0.22, 1.0, 0.85, 0.24,
+                mm.targetX + Math.cos(a1)*0.22, ty, mm.targetZ + Math.sin(a1)*0.22, 1.0, 0.85, 0.24);
+    }
     drawLineData(vp, segs, gl.LINES, 1.0);
-    drawLineData(vp, pts, gl.POINTS, 9.0);
+    drawLineData(vp, pts, gl.POINTS, 10.5);
   }
 
   function renderSingleStage(stage, vp, basis) {
-    // 1) Background sky gradient
     gl.disable(gl.DEPTH_TEST);
     gl.useProgram(progSky);
     gl.bindVertexArray(fullVao);
     gl.uniform1i(uSky.uRetro, stage === 0 ? 1 : 0);
+    gl.uniform1f(uSky.uTime, simTime);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
-    // 2) Compute character pose & skinning for this historical stage
-    const arenaMode = stageArenaMode(stage);
-    let sk = null, skB = null, morphT = 0.0;
-    let deformMode = 3; // default DQS
-    let useRigidMesh = false;
-    let flatShade = 0;
+    const arenaMode = (stage === 4 || stage === 6 || stage === 98 || stage === 99) ? 1 : (stage === 7 ? 2 : 0);
+    let fk = null, fkB = null, morphT = 0.0;
+    let deformMode = 3, useRetro = false, flatShade = 0, showTwist = 0.0;
 
     if (stage === 0) {
-      // 1989 Prince of Persia: 2D rotoscoped sprite running smoothly across the studio floor
-      sk = { worldPos: [[0, 0.92, 0]], footTargets: [[0, 0, 0], [0, 0, 0]] };
+      fk = { worldPos: [[0, 0.9, 0]] };
     } else if (stage === 1) {
-      // 1992-93 Alone in the Dark / Virtua Fighter: rigid disconnected faceted polygon puppet
-      sk = evaluateWalkPose(simTime, { posX: 0, posZ: 0, facingYaw: 0.35, speed: 0.95 });
-      deformMode = 0; useRigidMesh = true; flatShade = 1;
+      // 1992-93 Alone in the Dark / Virtua Fighter: faceted low-poly rigid 1-bone puppet running real mocap!
+      fk = evaluateFK(rig, sampleClipLocal(rig, "walk", simTime * 1.05), [0, 0, 0], 0.35);
+      deformMode = 0; useRetro = true; flatShade = 1;
     } else if (stage === 2) {
-      // 1996 Quake MDL: 8 fps discrete vertex keyframes linearly morphed -> limbs shrink mid-arc!
-      const fps = 4.5;
-      const kf = Math.floor(simTime * fps);
+      // 1996 Quake MDL: 4.5 Hz discrete keyframes of real running mocap linearly morphed -> visible limb chord shrinking!
+      const fps = 4.5, kf = Math.floor(simTime * fps);
       morphT = simTime * fps - kf;
-      sk  = evaluateWalkPose(kf / fps,       { posX: 0, posZ: 0, facingYaw: 0.45, speed: 1.35 });
-      skB = evaluateWalkPose((kf + 1) / fps, { posX: 0, posZ: 0, facingYaw: 0.45, speed: 1.35 });
+      fk  = evaluateFK(rig, sampleClipLocal(rig, "run", kf / fps),       [0, 0, 0], 0.42);
+      fkB = evaluateFK(rig, sampleClipLocal(rig, "run", (kf + 1) / fps), [0, 0, 0], 0.42);
       deformMode = 1;
     } else if (stage === 3) {
-      // 1998 Half-Life -> Linear Blend Skinning (LBS): dramatic 190° forearm twist -> Candy-Wrapper Collapse!
-      const twist = twistActive ? (0.72 + 0.28 * Math.sin(simTime * 1.6)) * Math.PI * 1.12 : 0.0;
-      sk = evaluateWalkPose(simTime, { posX: 0.0, posZ: 0, facingYaw: 0.02, twistMode: true, twistAngle: twist });
-      deformMode = 2; // Genuine LBS matrix blend!
-    } else if (stage === 4) {
-      // 2006-09 Gears of War Blend Trees & Foot IK on Uneven Stone Stairs!
-      const walkX = Math.sin(simTime * 0.65) * 1.05;
-      const dir = Math.cos(simTime * 0.65) >= 0 ? Math.PI * 0.5 : -Math.PI * 0.5;
-      sk = evaluateWalkPose(simTime, { posX: walkX, posZ: 0.0, facingYaw: dir, speed: 0.95, useIK: true, stairsMode: 1 });
-      deformMode = 3;
+      // 1998 Half-Life -> Linear Blend Skinning (LBS) 190° forearm twist -> textbook Candy-Wrapper Collapse!
+      const twist = twistActive ? (0.76 + 0.24 * Math.sin(simTime * 1.8)) * Math.PI * 1.15 : 0.0;
+      fk = evaluateTwistPose(rig, simTime, twist);
+      deformMode = 2; showTwist = 1.0;
     } else if (stage === 5) {
-      // 2007 Dual Quaternion Skinning (Kavan et al., I3D 2007) — exact same 190° twist, ZERO candy-wrapper pinch!
-      const twist = twistActive ? (0.72 + 0.28 * Math.sin(simTime * 1.6)) * Math.PI * 1.12 : 0.0;
-      sk = evaluateWalkPose(simTime, { posX: 0.0, posZ: 0, facingYaw: 0.02, twistMode: true, twistAngle: twist });
-      deformMode = 3; // Exact GPU Dual Quaternion Skinning!
-    } else if (stage === 6) {
-      // 2008 Ragdoll (Trespasser/Hitman) vs Active Euphoria PD-Muscles (GTA IV)!
-      sk = ragActive.toSkinning();
+      // 2007 Dual Quaternion Skinning (Kavan et al., I3D 2007) — exact same 190° twist, ZERO candy-wrapper collapse!
+      const twist = twistActive ? (0.76 + 0.24 * Math.sin(simTime * 1.8)) * Math.PI * 1.15 : 0.0;
+      fk = evaluateTwistPose(rig, simTime, twist);
+      deformMode = 3; showTwist = 1.0;
+    } else if (stage === 4 || stage === 98) {
+      // 2006-09 Real Mixamo Walk up uneven stone stairs: No IK (98: boots float/clip) vs 2-Bone Foot IK (4: boots lock!)
+      const walkX = Math.sin(simTime * 0.58) * 1.15;
+      const dir = Math.cos(simTime * 0.58) >= 0 ? Math.PI * 0.5 : -Math.PI * 0.5;
+      const baseY = stage === 98
+        ? clamp((walkX + 1.40) / 2.80, 0, 1) * 5 * 0.13 + 0.08 // averaged slope -> feet float & clip steps!
+        : getArenaHeight(walkX, 0, 1);
+      const rawFk = evaluateFK(rig, sampleClipLocal(rig, "walk", simTime * 1.05), [walkX, baseY, 0], dir);
+      fk = stage === 4 ? applyFootIK(rig, rawFk, 1, dir) : rawFk;
       deformMode = 3;
-    } else if (stage === 98) {
-      // Special split-left helper: Foot IK OFF on stairs (floating/clipping boots!)
-      const walkX = Math.sin(simTime * 0.65) * 1.05;
-      const dir = Math.cos(simTime * 0.65) >= 0 ? Math.PI * 0.5 : -Math.PI * 0.5;
-      sk = evaluateWalkPose(simTime, { posX: walkX, posZ: 0.0, facingYaw: dir, speed: 0.95, useIK: false, stairsMode: 1 });
+    } else if (stage === 6) {
+      fk = ragActive.toFK(true);
       deformMode = 3;
     } else if (stage === 99) {
-      // Special split-left helper: Passive limp ragdoll (Hitman 2000) vs Active Euphoria (GTA IV 2008)
-      sk = ragPassive.toSkinning();
+      fk = ragPassive.toFK(false);
       deformMode = 3;
     } else {
-      // Stage 7: 2016-20 Motion Matching + Inertialization + Foot IK + DQS on uneven terraced arena!
-      sk = evaluateWalkPose(simTime, {
-        posX: mm.x, posZ: mm.z, facingYaw: mm.yaw, speed: mm.speed,
-        useIK: true, stairsMode: 2, leanRoll: mm.lean,
-      });
+      // Stage 7: Real Motion Matching (idle / walk / run database + Bollo Inertialization + Foot IK + DQS!)
+      fk = lastMmFK || evaluateFK(rig, sampleClipLocal(rig, "walk", simTime), [0, 0, 0], 0);
       deformMode = 3;
     }
 
-    // 3) Render Arena / Stone Staircase
     gl.enable(gl.DEPTH_TEST);
     const ar = arenas[arenaMode];
     gl.useProgram(progArena);
     gl.bindVertexArray(ar.vao);
     gl.uniformMatrix4fv(uArena.uViewProj, false, vp);
-    const pPos = sk.worldPos[0] || [0, 0.9, 0];
-    const fL = sk.worldPos[9]  || sk.footTargets?.[0] || [0, 0, 0];
-    const fR = sk.worldPos[12] || sk.footTargets?.[1] || [0, 0, 0];
-    gl.uniform3fv(uArena.uPelvisPos, pPos);
-    gl.uniform3fv(uArena.uFootL, fL);
-    gl.uniform3fv(uArena.uFootR, fR);
-    gl.uniform1f(uArena.uShowFootRings, (stage === 4 || stage === 7) ? 1.0 : 0.0);
+    gl.uniform3fv(uArena.uPelvisPos, fk.worldPos[0] || [0, 1.0, 0]);
+    gl.uniform3fv(uArena.uFootL, fk.worldPos[16] || [0, 0, 0]);
+    gl.uniform3fv(uArena.uFootR, fk.worldPos[20] || [0, 0, 0]);
+    gl.uniform1f(uArena.uShowFootRings, stage === 0 ? -1.0 : ((stage === 4 || stage === 7) ? 1.0 : 0.0));
     gl.uniform1f(uArena.uTime, simTime);
     gl.drawElements(gl.TRIANGLES, ar.count, gl.UNSIGNED_SHORT, 0);
 
-    // 4) Render Character (2D Rotoscope Billboard for Stage 0, or Real 3D Skinned Mesh for Stages 1..7)
     if (stage === 0) {
       gl.useProgram(progRoto);
       gl.bindVertexArray(fullVao);
       gl.uniformMatrix4fv(uRoto.uViewProj, false, vp);
-      gl.uniform3f(uRoto.uPos, 0.0, 0.0, 0.0);
+      gl.uniform3f(uRoto.uPos, 0, 0, 0);
       gl.uniform3fv(uRoto.uCamRight, basis.right);
       gl.uniform1f(uRoto.uTime, simTime);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     } else {
-      const ch = useRigidMesh ? rigidChar : smoothChar;
+      const ch = useRetro ? retroChar : smoothChar;
       gl.useProgram(progChar);
       gl.bindVertexArray(ch.vao);
       gl.uniformMatrix4fv(uChar.uViewProj, false, vp);
-      gl.uniformMatrix4fv(uChar.uBones, false, sk.mats);
-      gl.uniformMatrix4fv(uChar.uBonesB, false, (skB || sk).mats);
-      gl.uniform4fv(uChar.uDqReal, sk.dqReal);
-      gl.uniform4fv(uChar.uDqDual, sk.dqDual);
+      gl.uniformMatrix4fv(uChar.uBones, false, fk.mats);
+      gl.uniformMatrix4fv(uChar.uBonesB, false, (fkB || fk).mats);
+      gl.uniform4fv(uChar.uDqReal, fk.dqReal);
+      gl.uniform4fv(uChar.uDqDual, fk.dqDual);
       gl.uniform1i(uChar.uDeformMode, deformMode);
       gl.uniform1f(uChar.uMorphT, morphT);
       gl.uniform3fv(uChar.uCamPos, basis.pos);
       gl.uniform1i(uChar.uFlatShade, flatShade);
+      gl.uniform1f(uChar.uShowTwistPattern, showTwist);
       gl.drawElements(gl.TRIANGLES, ch.count, gl.UNSIGNED_SHORT, 0);
 
-      if (showSkeleton || stage === 4 || stage === 7) {
-        if (stage === 7) drawTrajectoryRibbon(vp);
-        if (showSkeleton) drawSkeletonOverlay(vp, sk.worldPos, stage === 5 || stage === 7);
-      }
+      if (stage === 7) drawMotionMatchingOverlay(vp);
+      if (showSkeleton) drawSkeletonOverlay(vp, fk.worldPos);
     }
   }
 
@@ -308,13 +284,13 @@ export function createAnimationEffect(gl) {
     id: "animation",
     maxPixels: 920000,
     defaultCamera: {
-      yaw: 0.28,
-      pitch: 0.20,
-      dist: 3.15,
-      lookY: 1.08,
-      fovDeg: 46,
-      minDist: 1.45,
-      maxDist: 6.2,
+      yaw: 0.16,
+      pitch: 0.17,
+      dist: 3.35,
+      lookY: 1.02,
+      fovDeg: 44,
+      minDist: 1.35,
+      maxDist: 6.4,
       minPitch: -0.05,
       maxPitch: 0.85,
       autoOrbitSpeed: 0.0,
@@ -343,10 +319,9 @@ export function createAnimationEffect(gl) {
       return false;
     },
 
-    // Clicking arena pushes ragdoll (Stage 6), toggles twist (Stage 3/5), or sets Motion Matching destination (Stage 7)!
     onCanvasClick(ndcX, ndcY) {
-      mm.targetX = clamp(ndcX * 1.9, -1.8, 1.8);
-      mm.targetZ = clamp(-ndcY * 1.9, -1.7, 1.7);
+      mm.targetX = clamp(ndcX * 2.1, -2.0, 2.0);
+      mm.targetZ = clamp(-ndcY * 2.1, -1.9, 1.9);
       mm.manualTimer = 6.0;
       resetRagdolls();
     },
@@ -354,13 +329,13 @@ export function createAnimationEffect(gl) {
     getTechBadge(stepIdx) {
       const labels = [
         "1989 · PRINCE OF PERSIA · 12 FPS ROTOSCOPE",
-        "1992–93 · ALONE IN THE DARK / VIRTUA FIGHTER",
+        "1992–93 · RIGID POLYGON PUPPET (1-BONE)",
         "1996 · QUAKE MDL · PER-VERTEX MORPHING",
-        "1998 · HALF-LIFE / LBS · 180° CANDY-WRAPPER",
-        "2006–09 · BLEND TREES & 2-BONE FOOT IK",
+        "1998 · HALF-LIFE / LBS · 190° CANDY-WRAPPER",
+        "2006–09 · MIXAMO WALK + 2-BONE FOOT IK",
         "2007 · DUAL QUATERNION SKINNING (KAVAN)",
-        "2008 · PASSIVE RAGDOLL vs ACTIVE EUPHORIA",
-        "2016–20 · MOTION MATCHING + INERTIALIZATION",
+        "2008 · LIMP RAGDOLL vs ACTIVE EUPHORIA",
+        `2016–20 · MOTION MATCH (${lastMmClip.toUpperCase()}) + INERTIALIZATION`,
       ];
       return labels[stepIdx] || "CHARACTER ANIMATION";
     },
@@ -369,49 +344,86 @@ export function createAnimationEffect(gl) {
 
     update(dt, paused) {
       if (paused) return;
-      const h = Math.min(dt, 0.05);
+      const h = Math.min(dt, 0.04);
       simTime += h;
 
-      // Step Ragdolls & periodically auto-repush every 4.2s so Stage 6 stays lively!
       ragTimer += h;
-      if (ragTimer > 4.2) resetRagdolls();
-      ragPassive.step(h, false, 1);
-      ragActive.step(h, true, 1);
+      if (ragTimer > 4.6) resetRagdolls();
+      ragPassive.step(h, false);
+      ragActive.step(h, true);
 
-      // Update Motion Matching autonomous figure-8 / interactive WASD/click steering
-      const keyX = (keys.d ? 1 : 0) - (keys.a ? 1 : 0);
-      const keyZ = (keys.s ? 1 : 0) - (keys.w ? 1 : 0);
-      if (keyX || keyZ) {
-        mm.targetX = clamp(mm.x + keyX * 1.2, -1.8, 1.8);
-        mm.targetZ = clamp(mm.z + keyZ * 1.2, -1.7, 1.7);
-        mm.manualTimer = 3.0;
+      // Motion Matching steering: cycle through Sprint -> Sharp Turn -> Walk -> Brief Stop -> Sprint!
+      const kx = (keys.d ? 1 : 0) - (keys.a ? 1 : 0);
+      const kz = (keys.s ? 1 : 0) - (keys.w ? 1 : 0);
+      let wantSpeed = 1.0;
+      if (kx || kz) {
+        mm.targetX = clamp(mm.x + kx * 1.4, -2.1, 2.1);
+        mm.targetZ = clamp(mm.z + kz * 1.4, -2.0, 2.0);
+        mm.manualTimer = 3.5;
+        wantSpeed = 1.25;
       } else if (mm.manualTimer > 0) {
         mm.manualTimer = Math.max(0, mm.manualTimer - h);
+        const d = Math.hypot(mm.targetX - mm.x, mm.targetZ - mm.z);
+        wantSpeed = clamp(d * 1.3, 0.0, 1.3);
       } else {
-        // Smooth figure-8 patrol over the terraced hills
-        mm.targetX = Math.sin(simTime * 0.55) * 1.45;
-        mm.targetZ = Math.sin(simTime * 1.10) * 0.95;
+      // Autonomous figure-8 sprint/walk/pivot trajectory with generous lookahead so glowing spline reads clearly!
+      const cyc = simTime % 10.0;
+      if (cyc < 1.1) {
+        wantSpeed = 0.0;
+      } else {
+        const ang = simTime * 0.58 + 0.95;
+        mm.targetX = Math.sin(ang) * 1.85;
+        mm.targetZ = Math.sin(ang * 2.0) * 1.20;
+        wantSpeed = (cyc > 4.2 && cyc < 8.6) ? 1.32 : 0.78;
       }
+      }
+
       const dx = mm.targetX - mm.x, dz = mm.targetZ - mm.z;
       const dist = Math.hypot(dx, dz);
-      const desYaw = dist > 0.08 ? Math.atan2(dx, dz) : mm.yaw;
+      const desYaw = dist > 0.12 ? Math.atan2(dx, dz) : mm.yaw;
       let dyaw = desYaw - mm.yaw;
       while (dyaw > Math.PI) dyaw -= Math.PI * 2;
       while (dyaw < -Math.PI) dyaw += Math.PI * 2;
-      mm.yaw += dyaw * Math.min(1, h * 5.2);
-      mm.lean = lerp(mm.lean, clamp(-dyaw * 0.35, -0.25, 0.25), Math.min(1, h * 6.0));
-      const spd = clamp(dist * 1.4, 0.0, 1.15);
-      mm.speed = lerp(mm.speed, spd, Math.min(1, h * 5.0));
-      mm.x = clamp(mm.x + Math.sin(mm.yaw) * mm.speed * h * 1.15, -1.9, 1.9);
-      mm.z = clamp(mm.z + Math.cos(mm.yaw) * mm.speed * h * 1.15, -1.8, 1.8);
+      mm.turnRate = lerp(mm.turnRate, clamp(dyaw * 2.4, -2.5, 2.5), Math.min(1, h * 7.0));
+      mm.yaw += dyaw * Math.min(1, h * 5.0);
+      mm.speed = lerp(mm.speed, dist > 0.10 ? wantSpeed : 0.0, Math.min(1, h * 4.5));
+      const worldSpd = mm.speed > 0.92 ? 1.85 : (mm.speed > 0.22 ? 0.95 : 0.0);
+      mm.x = clamp(mm.x + Math.sin(mm.yaw) * worldSpd * h, -2.15, 2.15);
+      mm.z = clamp(mm.z + Math.cos(mm.yaw) * worldSpd * h, -2.05, 2.05);
+
+      const res = matcher.evaluate(h, mm.speed, mm.turnRate, mm.x, mm.z, mm.yaw, 2);
+      lastMmFK = res.fk;
+      lastMmClip = res.activeClip;
     },
 
     render(w, h, step, split, cam) {
       const aspect = w / Math.max(1, h);
-      const basis = cameraBasisFromOrbit(cam.yaw, cam.pitch, cam.dist, cam.lookY);
-      const view = makeLookAt(basis.pos, basis.target, [0, 1, 0]);
-      const proj = makePerspective(((cam.fovDeg || 46) * Math.PI) / 180, aspect, 0.1, 40.0);
-      const vp = mulMat4(proj, view);
+
+      // Compute stage-centered focus target so walking/stair-climbing/falling Xbot stays framed cleanly!
+      const focusFor = (st) => {
+        if (st === 4 || st === 98) {
+          const wx = Math.sin(simTime * 0.58) * 1.15;
+          return [wx, getArenaHeight(wx, 0, 1) + 0.94, 0];
+        }
+        if (st === 6)  return [ragActive.state.x,  getArenaHeight(ragActive.state.x, 0, 1) + 0.90, 0];
+        if (st === 99) return [ragPassive.state.x, getArenaHeight(ragPassive.state.x, 0, 1) + 0.52, 0];
+        if (st === 7)  return [mm.x, getArenaHeight(mm.x, mm.z, 2) + 0.94, mm.z];
+        if (st === 3 || st === 5) return [0, 1.16, 0];
+        return [0, cam.lookY || 1.02, 0];
+      };
+
+      const buildViewProj = (st, ndcShiftX) => {
+        const foc = focusFor(st);
+        const distScale = (st === 3 || st === 5) ? 0.80 : (st === 7 ? 1.14 : 1.0);
+        const basis = cameraBasisFromOrbit(cam.yaw, cam.pitch, cam.dist * distScale, foc[1]);
+        basis.pos[0] += foc[0]; basis.pos[2] += foc[2];
+        basis.target[0] += foc[0]; basis.target[2] += foc[2];
+        const view = makeLookAt(basis.pos, basis.target, [0, 1, 0]);
+        const proj = makePerspective(((cam.fovDeg || 44) * Math.PI) / 180, aspect, 0.1, 40.0);
+        // Frustum off-center shift puts target cleanly at left/right pane center without distorting angles!
+        proj[8] -= ndcShiftX;
+        return { vp: mulMat4(proj, view), basis };
+      };
 
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       gl.viewport(0, 0, w, h);
@@ -419,20 +431,27 @@ export function createAnimationEffect(gl) {
 
       if (split.enabled) {
         const sx = Math.max(1, Math.min(w - 1, Math.round(split.pos * w)));
+        // Symmetric forearm twist stages (LBS vs DQS) keep Xbot dead-center so divider splits left/right arms!
+        const isCenterSplit = (step.stage === 3 || step.stage === 5);
+        const leftShift  = isCenterSplit ? 0.0 : -(1.0 - split.pos);
+        const rightShift = isCenterSplit ? 0.0 : split.pos;
+
         gl.enable(gl.SCISSOR_TEST);
-        // Left side of split
         gl.scissor(0, 0, sx, h);
         gl.clear(gl.DEPTH_BUFFER_BIT);
-        renderSingleStage(step.compareLeft, vp, basis);
-        // Right side of split
+        const camL = buildViewProj(step.compareLeft, leftShift);
+        renderSingleStage(step.compareLeft, camL.vp, camL.basis);
+
         gl.scissor(sx, 0, w - sx, h);
         gl.clear(gl.DEPTH_BUFFER_BIT);
-        renderSingleStage(step.compareRight, vp, basis);
+        const camR = buildViewProj(step.compareRight, rightShift);
+        renderSingleStage(step.compareRight, camR.vp, camR.basis);
         gl.disable(gl.SCISSOR_TEST);
       } else {
         gl.disable(gl.SCISSOR_TEST);
         gl.clear(gl.DEPTH_BUFFER_BIT);
-        renderSingleStage(step.stage, vp, basis);
+        const camC = buildViewProj(step.stage, 0.0);
+        renderSingleStage(step.stage, camC.vp, camC.basis);
       }
       gl.bindVertexArray(null);
     },

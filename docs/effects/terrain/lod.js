@@ -1,312 +1,314 @@
-// Real-Time Terrain LOD Geometry Builders (Zero-GC Reusable Buffers, 60 FPS in WebGL2):
-//   - Deterministic multi-octave alpine ridge heightfield (peaks, glacier valley, river)
-//   - ROAM (1997) real recursive Binary Triangle Tree (bintree) with roughness + distance error
-//   - GeoMipMapping (2000) real quadtree blocks with genuine T-junction cracks & discrete LOD popping
-//   - Chunked LOD (2002) real vertical edge skirts sealing every T-junction crack
-//   - Geometry Clipmaps (2004) real concentric nested regular grid rings centered on viewer
-//   - CDLOD (2009) real continuous vertex geomorphing (zero pop-in, zero cracks!)
-//   - Cluster Meshlet LOD (2023 Nanite-style emulation) with per-cluster IDs & Freeze Frustum culling!
+// Watertight Fixed-World Terrain & LOD Engine (1992-2024) powered by Hydraulically Eroded Alpine Heightmap!
+//   - Zero world-origin snapping/jumping: fixed [-80, +80] world-space domain with 16-bit eroded alpine-height.png!
+//   - True Duchaineau (1997) forced-split diamond ROAM bintree (mathematically ZERO T-junction cracks!)
+//   - Fixed-root quadtree patch selector with Filip Strugar (2009) exact CDLOD morph ranges & frustum culling!
+//   - Static GPU patch meshes (8x8 GeoMipMapping, 8x8 + Vertical Skirts, 16x16 CDLOD/BF3/Nanite, 28x28 Clipmap rings)!
 
-import { clamp, lerp, smoothstep } from "../../src/gl-utils.js";
+import { clamp, lerp } from "../../src/gl-utils.js";
 
-// Deterministic fast value noise for dramatic alpine peaks + valley river
-function hash2(ix, iz) {
-  let n = Math.imul(ix, 374761393) + Math.imul(iz, 668265263);
-  n = (n ^ (n >>> 13)) * 1274126177;
-  return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
-}
-function noise2(x, z) {
-  const ix = Math.floor(x), iz = Math.floor(z);
-  const fx = x - ix, fz = z - iz;
-  const ux = fx * fx * (3 - 2 * fx), uz = fz * fz * (3 - 2 * fz);
-  const a = hash2(ix, iz), b = hash2(ix + 1, iz);
-  const c = hash2(ix, iz + 1), d = hash2(ix + 1, iz + 1);
-  return a + (b - a) * ux + (c - a) * uz + (a - b - c + d) * ux * uz;
-}
+export const WORLD_SIZE = 160.0;
+export const HALF_WORLD = WORLD_SIZE * 0.5;
+export const HEIGHT_SCALE = 26.0;
 
-// Dramatic alpine mountain range heightfield (world units, range ~0..9.5)
-export function sampleHeight(x, z, microDetail = false) {
-  // Winding central glacial valley so camera flies dramatically between tall snow peaks!
-  const riverCenter = Math.sin(z * 0.085) * 6.5 + Math.cos(z * 0.04) * 3.0;
-  const valleyDist = Math.abs(x - riverCenter);
-  const valley = smoothstep(2.2, 11.5, valleyDist);
+// --- Async loader for 384x384 RGBA8 alpine-height.png (16-bit R*256+G height + B flow + A sediment) ---
+const heightCache = new Map();
 
-  // Dramatic ridged alpine peaks (steep crests -> makes LOD popping, T-junction cracks & ROAM unmistakable!)
-  let h = 0.0;
-  let amp = 6.8, freq = 0.046;
-  for (let i = 0; i < 4; i++) {
-    const n = noise2(x * freq + 17.3 * i, z * freq - 11.7 * i);
-    const ridge = 1.0 - Math.abs(n * 2.0 - 1.0);
-    h += ridge * ridge * ridge * amp;
-    amp *= 0.48;
-    freq *= 2.12;
-  }
-  let y = h * (0.14 + 0.92 * valley) + smoothstep(0.0, 4.5, valleyDist) * 0.42;
-  if (microDetail) {
-    // Crisp rocky strata micro-displacement (Stage 5 DX11 Tessellation / Stage 7 Nanite!)
-    const m1 = 1.0 - Math.abs(noise2(x * 0.68, z * 0.68) * 2.0 - 1.0);
-    const m2 = noise2(x * 1.75, z * 1.75) - 0.5;
-    y += (m1 * 0.34 + m2 * 0.14) * smoothstep(0.5, 2.6, y);
-  }
-  return y;
-}
+export async function loadAlpineHeightmap(baseUrl) {
+  if (heightCache.has(baseUrl)) return heightCache.get(baseUrl);
+  const img = await new Promise((resolve, reject) => {
+    const im = new Image();
+    im.crossOrigin = "anonymous";
+    im.onload = () => resolve(im);
+    im.onerror = () => reject(new Error("Failed to load alpine-height.png"));
+    im.src = `${baseUrl}alpine-height.png`;
+  });
+  const w = img.naturalWidth, h = img.naturalHeight;
+  const cvs = document.createElement("canvas");
+  cvs.width = w; cvs.height = h;
+  const ctx = cvs.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0);
+  const rgba = ctx.getImageData(0, 0, w, h).data;
 
-export function sampleNormal(x, z, eps = 0.25, microDetail = false) {
-  const hL = sampleHeight(x - eps, z, microDetail);
-  const hR = sampleHeight(x + eps, z, microDetail);
-  const hD = sampleHeight(x, z - eps, microDetail);
-  const hU = sampleHeight(x, z + eps, microDetail);
-  const nx = hL - hR, ny = 2.0 * eps, nz = hD - hU;
-  const l = Math.hypot(nx, ny, nz) || 1;
-  return [nx / l, ny / l, nz / l];
-}
-
-// Reusable dynamic non-indexed triangle buffer (for crisp per-triangle barycentric wireframe + cluster ID!):
-// Vertex layout (10 floats): [px, py, pz, nx, ny, nz, baryX, baryY, lodLevel, clusterId]
-export function createTerrainMeshBuilder(maxTris = 26000) {
-  const data = new Float32Array(maxTris * 3 * 10);
-  let vertCount = 0;
-  const maxVerts = maxTris * 3;
-
-  function reset() { vertCount = 0; }
-
-  function pushTri(p0, n0, p1, n1, p2, n2, lodLevel, clusterId) {
-    if (vertCount + 3 > maxVerts) return;
-    let o = vertCount * 10;
-    data[o++] = p0[0]; data[o++] = p0[1]; data[o++] = p0[2];
-    data[o++] = n0[0]; data[o++] = n0[1]; data[o++] = n0[2];
-    data[o++] = 1; data[o++] = 0; data[o++] = lodLevel; data[o++] = clusterId;
-
-    data[o++] = p1[0]; data[o++] = p1[1]; data[o++] = p1[2];
-    data[o++] = n1[0]; data[o++] = n1[1]; data[o++] = n1[2];
-    data[o++] = 0; data[o++] = 1; data[o++] = lodLevel; data[o++] = clusterId;
-
-    data[o++] = p2[0]; data[o++] = p2[1]; data[o++] = p2[2];
-    data[o++] = n2[0]; data[o++] = n2[1]; data[o++] = n2[2];
-    data[o++] = 0; data[o++] = 0; data[o++] = lodLevel; data[o++] = clusterId;
-    vertCount += 3;
+  // Unpack exact 16-bit heights on CPU so CPU & GPU (texelFetch) match to 1e-6 meters!
+  const heights = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) {
+    heights[i] = ((rgba[i * 4] * 256 + rgba[i * 4 + 1]) / 65535.0) * HEIGHT_SCALE;
   }
 
-  function pushQuad(ax, az, bx, bz, cx, cz, dx, dz, lodLevel, clusterId, micro = false, morphFn = null) {
-    const evalPt = (x, z) => {
-      let y = sampleHeight(x, z, micro);
-      if (morphFn) y = morphFn(x, z, y);
-      return [x, y, z];
+  function sampleHeight(wx, wz) {
+    const u = clamp((wx + HALF_WORLD) / WORLD_SIZE, 0.0, 1.0) * (w - 1);
+    const v = clamp((wz + HALF_WORLD) / WORLD_SIZE, 0.0, 1.0) * (h - 1);
+    const x0 = Math.floor(u), z0 = Math.floor(v);
+    const x1 = Math.min(w - 1, x0 + 1), z1 = Math.min(h - 1, z0 + 1);
+    const fx = u - x0, fz = v - z0;
+    const h00 = heights[z0 * w + x0];
+    const h10 = heights[z0 * w + x1];
+    const h01 = heights[z1 * w + x0];
+    const h11 = heights[z1 * w + x1];
+    return lerp(lerp(h00, h10, fx), lerp(h01, h11, fx), fz);
+  }
+
+  const res = { w, h, rgba, heights, sampleHeight };
+  heightCache.set(baseUrl, res);
+  return res;
+}
+
+// --- Static GPU Patch Geometry Builders (aGrid.xy, aBary.xy, aSkirt, aClusterLocal) ---
+// Vertex layout: 6 floats -> [gx, gz, bx, by, isSkirt, clusterId]
+export function buildGridPatchGeometry(N, withSkirts = false, clusterSub = 4) {
+  const verts = [];
+  const pushTri = (ax, az, ask, bx, bz, bsk, cx, cz, csk, cid) => {
+    verts.push(
+      ax, az, 1, 0, ask, cid,
+      bx, bz, 0, 1, bsk, cid,
+      cx, cz, 0, 0, csk, cid,
+    );
+  };
+
+  for (let iz = 0; iz < N; iz++) {
+    for (let ix = 0; ix < N; ix++) {
+      // Sub-cluster ID inside patch (e.g., 4x4 meshlets inside a 16x16 patch -> vivid Nanite cluster mosaic!)
+      const cx = Math.floor((ix * clusterSub) / N);
+      const cz = Math.floor((iz * clusterSub) / N);
+      const cid = cz * clusterSub + cx;
+      // Uniform '/' diagonal guarantees exact bit-for-bit parent quad topology when CDLOD morph reaches 1.0!
+      pushTri(ix, iz, 0, ix, iz + 1, 0, ix + 1, iz, 0, cid);
+      pushTri(ix + 1, iz, 0, ix, iz + 1, 0, ix + 1, iz + 1, 0, cid);
+    }
+  }
+
+  if (withSkirts) {
+    // 4 vertical perimeter curtains dropping smoothly below tile edges to seal 2000 GeoMipMapping T-junction cracks!
+    const addEdgeSkirt = (x0, z0, x1, z1) => {
+      pushTri(x0, z0, 0, x0, z0, 1, x1, z1, 0, 0);
+      pushTri(x1, z1, 0, x0, z0, 1, x1, z1, 1, 0);
     };
-    const pA = evalPt(ax, az), pB = evalPt(bx, bz), pC = evalPt(cx, cz), pD = evalPt(dx, dz);
-    const eps = Math.max(0.18, Math.abs(bx - ax) * 0.45);
-    const nA = sampleNormal(ax, az, eps, micro);
-    const nB = sampleNormal(bx, bz, eps, micro);
-    const nC = sampleNormal(cx, cz, eps, micro);
-    const nD = sampleNormal(dx, dz, eps, micro);
-    pushTri(pA, nA, pC, nC, pB, nB, lodLevel, clusterId);
-    pushTri(pB, nB, pC, nC, pD, nD, lodLevel, clusterId);
+    for (let i = 0; i < N; i++) {
+      addEdgeSkirt(i, 0, i + 1, 0);
+      addEdgeSkirt(i + 1, N, i, N);
+      addEdgeSkirt(0, i + 1, 0, i);
+      addEdgeSkirt(N, i, N, i + 1);
+    }
   }
 
-  // Helper: frustum test against frozen/active LOD camera (allows dramatic "Freeze Frustum" inspection!)
-  function inFrustum(cx, cz, radius, lodCam) {
-    if (!lodCam.cullFrustum) return true;
-    const dx = cx - lodCam.pos[0];
-    const dz = cz - lodCam.pos[2];
-    const fwdDist = dx * lodCam.fwd[0] + dz * lodCam.fwd[2];
-    if (fwdDist < -radius * 1.4) return false;
-    const sideDist = Math.abs(dx * lodCam.right[0] + dz * lodCam.right[2]);
-    const maxSide = Math.max(0, fwdDist) * lodCam.tanHalfH + radius * 1.65;
-    return sideDist <= maxSide;
+  return { data: new Float32Array(verts), vertCount: verts.length / 6, N };
+}
+
+// Nested Concentric Clipmap Ring Mesh (Losasso & Hoppe, SIGGRAPH 2004):
+// Ring 0 is solid M x M; Rings 1..4 are hollow frames skipping the exact child footprint shifted by (offX, offZ) in {-1, 0, +1}!
+export function buildClipmapRingGeometry(M, hollow, offX = 0, offZ = 0) {
+  const verts = [];
+  const half = M >> 1;
+  const inner = M >> 2;
+  const pushTri = (ax, az, bx, bz, cx, cz) => {
+    verts.push(
+      ax, az, 1, 0, 0, 0,
+      bx, bz, 0, 1, 0, 0,
+      cx, cz, 0, 0, 0, 0,
+    );
+  };
+  for (let iz = 0; iz < M; iz++) {
+    for (let ix = 0; ix < M; ix++) {
+      if (hollow) {
+        const dx = ix - half - offX, dz = iz - half - offZ;
+        if (dx >= -inner && dx < inner && dz >= -inner && dz < inner) continue;
+      }
+      pushTri(ix, iz, ix, iz + 1, ix + 1, iz);
+      pushTri(ix + 1, iz, ix, iz + 1, ix + 1, iz + 1);
+    }
+  }
+  return { data: new Float32Array(verts), vertCount: verts.length / 6, M };
+}
+
+// --- Frustum AABB Test (for Freeze Frustum Culling Inspection!) ---
+function boxInFrustum(cam, minX, maxX, minY, maxY, minZ, maxZ) {
+  if (!cam.cullFrustum) return true;
+  const cx = (minX + maxX) * 0.5, cy = (minY + maxY) * 0.5, cz = (minZ + maxZ) * 0.5;
+  const r = Math.hypot((maxX - minX) * 0.5, (maxY - minY) * 0.5, (maxZ - minZ) * 0.5);
+  const dx = cx - cam.pos[0], dy = cy - cam.pos[1], dz = cz - cam.pos[2];
+  const f = dx * cam.fwd[0] + dy * cam.fwd[1] + dz * cam.fwd[2];
+  if (f + r < 0.25 || f - r > 155.0) return false;
+  const h = dx * cam.right[0] + dy * cam.right[1] + dz * cam.right[2];
+  const v = dx * cam.up[0] + dy * cam.up[1] + dz * cam.up[2];
+  const limH = Math.max(0.5, f) * cam.tanHalfH + r * 1.15;
+  const limV = Math.max(0.5, f) * cam.tanHalfFov + r * 1.15;
+  return Math.abs(h) <= limH && Math.abs(v) <= limV;
+}
+
+// --- Fixed-Root World-Space Quadtree Selector (ZERO origin jumping, exact Filip Strugar CDLOD morph ranges!) ---
+export function selectQuadtreePatches(lodCam, mode, errScale = 1.0) {
+  const patches = [];
+  const maxDepth = (mode === "geomip_cracks" || mode === "chunked_skirts") ? 4 : 5;
+  const baseSplitMul = (mode === "geomip_cracks" || mode === "chunked_skirts") ? 1.22 : (mode === "nanite" ? 2.10 : 1.85);
+  const splitMul = baseSplitMul * clamp(errScale, 0.65, 1.55);
+
+  let patchCounter = 0;
+
+  function recurse(x0, z0, size, depth) {
+    if (!boxInFrustum(lodCam, x0, x0 + size, -1.0, HEIGHT_SCALE + 2.0, z0, z0 + size)) return;
+
+    const nearX = clamp(lodCam.pos[0], x0, x0 + size);
+    const nearZ = clamp(lodCam.pos[2], z0, z0 + size);
+    const dist = Math.hypot(nearX - lodCam.pos[0], nearZ - lodCam.pos[2], Math.max(0, lodCam.pos[1] - 10.0) * 0.45);
+
+    const splitDist = size * splitMul;
+    if (depth < maxDepth && dist < splitDist) {
+      const half = size * 0.5;
+      recurse(x0,        z0,        half, depth + 1);
+      recurse(x0 + half, z0,        half, depth + 1);
+      recurse(x0,        z0 + half, half, depth + 1);
+      recurse(x0 + half, z0 + half, half, depth + 1);
+      return;
+    }
+
+    const parentSplitDist = (size * 2.0) * splitMul;
+    const morphStart = parentSplitDist * 0.64;
+    const morphEnd   = parentSplitDist * 0.98;
+
+    patches.push({
+      x0, z0, size,
+      level: maxDepth - depth,
+      morphStart,
+      morphEnd,
+      patchId: patchCounter++,
+    });
   }
 
-  // ------------------------------------------------------------------------
-  // STAGE 1: 1996-97 LINDSTROM CLOD & ROAM (Adaptive Binary Triangle Tree!)
-  // ------------------------------------------------------------------------
-  function buildROAM(lodCam, errScale = 1.0) {
-    reset();
-    const half = 42.0;
-    const ox = Math.floor(lodCam.center[0] / 8) * 8;
-    const oz = Math.floor(lodCam.center[2] / 8) * 8;
+  recurse(-HALF_WORLD, -HALF_WORLD, WORLD_SIZE, 0);
+  return patches;
+}
 
-    function splitTri(x0, z0, x1, z1, x2, z2, depth) {
-      // Midpoint of hypotenuse (x1,z1)-(x2,z2)
-      const mx = 0.5 * (x1 + x2), mz = 0.5 * (z1 + z2);
-      const cx = (x0 + x1 + x2) / 3, cz = (z0 + z1 + z2) / 3;
-      const edgeLen = Math.hypot(x2 - x1, z2 - z1);
-      if (!inFrustum(cx, cz, edgeLen * 0.8, lodCam)) return;
+// --- True Watertight Forced-Split Diamond ROAM Bintree (Lindstrom '96 / Duchaineau '97) ---
+// Fixed root [-80, +80]^2 (ZERO world jumping!) + forced base-neighbor diamond splits (ZERO T-junction cracks!)
+export function createWatertightROAM(heightmap, maxNodes = 26000) {
+  const ax = new Float32Array(maxNodes), az = new Float32Array(maxNodes);
+  const bx = new Float32Array(maxNodes), bz = new Float32Array(maxNodes);
+  const cx = new Float32Array(maxNodes), cz = new Float32Array(maxNodes);
+  const depthArr = new Uint8Array(maxNodes);
+  const lc = new Int32Array(maxNodes);
+  const rc = new Int32Array(maxNodes);
+  const ln = new Int32Array(maxNodes);
+  const rn = new Int32Array(maxNodes);
+  const bn = new Int32Array(maxNodes);
+  const outBuf = new Float32Array(maxNodes * 3 * 6);
+  let count = 0;
 
-      const dist = Math.hypot(mx - lodCam.pos[0], mz - lodCam.pos[2]) + 2.0;
-      const h1 = sampleHeight(x1, z1, false);
-      const h2 = sampleHeight(x2, z2, false);
-      const hm = sampleHeight(mx, mz, false);
-      const geomErr = Math.abs(hm - 0.5 * (h1 + h2));
-      const screenErr = ((geomErr * 2.4 + edgeLen * 0.085) / dist) * 14.0 * errScale;
+  function alloc(xA, zA, xB, zB, xC, zC, d, leftN, rightN, baseN) {
+    if (count >= maxNodes) return -1;
+    const id = count++;
+    ax[id] = xA; az[id] = zA;
+    bx[id] = xB; bz[id] = zB;
+    cx[id] = xC; cz[id] = zC;
+    depthArr[id] = d;
+    lc[id] = -1; rc[id] = -1;
+    ln[id] = leftN; rn[id] = rightN; bn[id] = baseN;
+    return id;
+  }
 
-      if (depth < 11 && edgeLen > 0.72 && screenErr > 0.42 && vertCount + 12 < maxVerts) {
-        splitTri(mx, mz, x0, z0, x1, z1, depth + 1);
-        splitTri(mx, mz, x2, z2, x0, z0, depth + 1);
+  function replaceNeighbor(triId, oldN, newN) {
+    if (triId < 0) return;
+    if (ln[triId] === oldN) ln[triId] = newN;
+    else if (rn[triId] === oldN) rn[triId] = newN;
+    else if (bn[triId] === oldN) bn[triId] = newN;
+  }
+
+  function split(id) {
+    if (id < 0 || lc[id] >= 0 || count + 4 >= maxNodes) return;
+
+    const base = bn[id];
+    if (base >= 0 && bn[base] !== id) {
+      split(base);
+    }
+
+    const mx = 0.5 * (bx[id] + cx[id]);
+    const mz = 0.5 * (bz[id] + cz[id]);
+    const d1 = depthArr[id] + 1;
+
+    const L = alloc(mx, mz, ax[id], az[id], bx[id], bz[id], d1, -1, -1, ln[id]);
+    const R = alloc(mx, mz, cx[id], cz[id], ax[id], az[id], d1, -1, -1, rn[id]);
+    if (L < 0 || R < 0) return;
+    lc[id] = L; rc[id] = R;
+
+    ln[L] = R;
+    rn[R] = L;
+    replaceNeighbor(ln[id], id, L);
+    replaceNeighbor(rn[id], id, R);
+
+    const bNow = bn[id];
+    if (bNow >= 0 && bn[bNow] === id) {
+      const bL = alloc(mx, mz, ax[bNow], az[bNow], bx[bNow], bz[bNow], depthArr[bNow] + 1, -1, -1, ln[bNow]);
+      const bR = alloc(mx, mz, cx[bNow], cz[bNow], ax[bNow], az[bNow], depthArr[bNow] + 1, -1, -1, rn[bNow]);
+      if (bL < 0 || bR < 0) return;
+      lc[bNow] = bL; rc[bNow] = bR;
+
+      ln[bL] = bR;
+      rn[bR] = bL;
+      replaceNeighbor(ln[bNow], bNow, bL);
+      replaceNeighbor(rn[bNow], bNow, bR);
+
+      // Exact Duchaineau (1997) cross-stitching across shared diagonal hypotenuse!
+      // id's left edge meets bNow's right edge, and id's right edge meets bNow's left edge!
+      rn[L]  = bR;
+      ln[bR] = L;
+      ln[R]  = bL;
+      rn[bL] = R;
+    }
+  }
+
+  function build(lodCam, errScale = 1.0) {
+    count = 0;
+    const S = HALF_WORLD;
+    alloc(-S,  S, -S, -S,  S,  S, 0, -1, -1,  1);
+    alloc( S, -S,  S,  S, -S, -S, 0, -1, -1,  0);
+
+    const maxDepth = 11;
+    const budget = 1.35 * clamp(errScale, 0.65, 1.55);
+
+    for (let i = 0; i < count; i++) {
+      if (lc[i] >= 0 || depthArr[i] >= maxDepth || count + 12 >= maxNodes) continue;
+      const mx = 0.5 * (bx[i] + cx[i]);
+      const mz = 0.5 * (bz[i] + cz[i]);
+      const edgeLen = Math.hypot(cx[i] - bx[i], cz[i] - bz[i]);
+      if (lodCam.cullFrustum) {
+        const minX = Math.min(ax[i], bx[i], cx[i]), maxX = Math.max(ax[i], bx[i], cx[i]);
+        const minZ = Math.min(az[i], bz[i], cz[i]), maxZ = Math.max(az[i], bz[i], cz[i]);
+        if (!boxInFrustum(lodCam, minX, maxX, -1, HEIGHT_SCALE + 2, minZ, maxZ)) continue;
+      }
+      const hm = heightmap.sampleHeight(mx, mz);
+      const hb = heightmap.sampleHeight(bx[i], bz[i]);
+      const hc = heightmap.sampleHeight(cx[i], cz[i]);
+      const geomErr = Math.abs(hm - 0.5 * (hb + hc));
+      const dist = Math.max(3.5, Math.hypot(mx - lodCam.pos[0], hm - lodCam.pos[1], mz - lodCam.pos[2]));
+      const screenScore = ((edgeLen * 0.22 + geomErr * 2.4) / dist) * budget;
+      if (depthArr[i] < 4 || screenScore > 0.088) {
+        split(i);
+      }
+    }
+
+    let vc = 0;
+    for (let i = 0; i < count; i++) {
+      if (lc[i] >= 0) continue;
+      if (lodCam.cullFrustum) {
+        const minX = Math.min(ax[i], bx[i], cx[i]), maxX = Math.max(ax[i], bx[i], cx[i]);
+        const minZ = Math.min(az[i], bz[i], cz[i]), maxZ = Math.max(az[i], bz[i], cz[i]);
+        if (!boxInFrustum(lodCam, minX, maxX, -1, HEIGHT_SCALE + 2, minZ, maxZ)) continue;
+      }
+      const lod = clamp(Math.floor((maxDepth - depthArr[i]) * 0.65), 0, 5);
+      const o = vc * 6;
+      const crossY = (bz[i] - az[i]) * (cx[i] - ax[i]) - (bx[i] - ax[i]) * (cz[i] - az[i]);
+      if (crossY >= 0) {
+        outBuf[o]    = ax[i]; outBuf[o+1]  = az[i]; outBuf[o+2]  = 1; outBuf[o+3]  = 0; outBuf[o+4]  = lod; outBuf[o+5]  = i;
+        outBuf[o+6]  = bx[i]; outBuf[o+7]  = bz[i]; outBuf[o+8]  = 0; outBuf[o+9]  = 1; outBuf[o+10] = lod; outBuf[o+11] = i;
+        outBuf[o+12] = cx[i]; outBuf[o+13] = cz[i]; outBuf[o+14] = 0; outBuf[o+15] = 0; outBuf[o+16] = lod; outBuf[o+17] = i;
       } else {
-        const y0 = sampleHeight(x0, z0, false);
-        const y1 = sampleHeight(x1, z1, false);
-        const y2 = sampleHeight(x2, z2, false);
-        const eps = Math.max(0.22, edgeLen * 0.25);
-        const lod = clamp(6.0 - depth * 0.55, 0.0, 5.0);
-        pushTri(
-          [x0, y0, z0], sampleNormal(x0, z0, eps),
-          [x1, y1, z1], sampleNormal(x1, z1, eps),
-          [x2, y2, z2], sampleNormal(x2, z2, eps),
-          lod, (depth * 17 + Math.floor(cx) * 7 + Math.floor(cz) * 13) & 255
-        );
+        outBuf[o]    = ax[i]; outBuf[o+1]  = az[i]; outBuf[o+2]  = 1; outBuf[o+3]  = 0; outBuf[o+4]  = lod; outBuf[o+5]  = i;
+        outBuf[o+6]  = cx[i]; outBuf[o+7]  = cz[i]; outBuf[o+8]  = 0; outBuf[o+9]  = 1; outBuf[o+10] = lod; outBuf[o+11] = i;
+        outBuf[o+12] = bx[i]; outBuf[o+13] = bz[i]; outBuf[o+14] = 0; outBuf[o+15] = 0; outBuf[o+16] = lod; outBuf[o+17] = i;
       }
+      vc += 3;
     }
-
-    // Two root right-triangles covering the world square
-    const xA = ox - half, xB = ox + half, zA = oz - half, zB = oz + half;
-    splitTri(xA, zA, xA, zB, xB, zA, 0);
-    splitTri(xB, zB, xB, zA, xA, zB, 0);
-    return { data, vertCount };
+    return { data: outBuf, vertCount: vc };
   }
 
-  // ------------------------------------------------------------------------
-  // STAGE 2 (2000 GeoMipMapping w/ CRACKS!) & STAGE 3 (2002 Chunked LOD w/ SKIRTS!)
-  // & STAGE 5/6/7 (CDLOD Geomorphing / BF3 Virtual Texture / Nanite Cluster Meshlets!)
-  // ------------------------------------------------------------------------
-  function buildQuadtreeLOD(lodCam, mode, errScale = 1.0) {
-    // mode: 'geomip_cracks' | 'chunked_skirts' | 'cdlod' | 'bf3' | 'nanite'
-    reset();
-    const isNanite = mode === "nanite";
-    const isMicro  = mode === "cdlod" || mode === "bf3" || mode === "nanite";
-    const isMorph  = mode === "cdlod" || mode === "bf3" || mode === "nanite";
-    const addSkirts = mode === "chunked_skirts";
-    const exposeCracks = mode === "geomip_cracks";
-
-    const worldHalf = 44.0;
-    const ox = Math.floor(lodCam.center[0] / 11) * 11;
-    const oz = Math.floor(lodCam.center[2] / 11) * 11;
-    const maxDepth = isNanite ? 4 : (mode === "cdlod" || mode === "bf3" ? 4 : 3);
-    let clusterCounter = 1;
-
-    function visitNode(x0, z0, size, depth) {
-      const cx = x0 + size * 0.5, cz = z0 + size * 0.5;
-      if (!inFrustum(cx, cz, size * 0.85, lodCam)) return;
-
-      const dist = Math.hypot(cx - lodCam.pos[0], cz - lodCam.pos[2]);
-      // GeoMipMapping uses stark coarse-vs-fine tile boundaries so T-junction cracks rip cleanly open!
-      const splitThreshold = size * (exposeCracks ? 1.48 : (isNanite ? 2.15 : 1.95)) * errScale;
-
-      if (depth < maxDepth && dist < splitThreshold) {
-        const hs = size * 0.5;
-        visitNode(x0,      z0,      hs, depth + 1);
-        visitNode(x0 + hs, z0,      hs, depth + 1);
-        visitNode(x0,      z0 + hs, hs, depth + 1);
-        visitNode(x0 + hs, z0 + hs, hs, depth + 1);
-        return;
-      }
-
-      const lodLevel = maxDepth - depth; // 0 = finest near camera, 3..4 = coarsest far
-      const cells = isNanite ? 6 : (exposeCracks || addSkirts ? (lodLevel >= 1 ? 3 : 6) : 6);
-      const step = size / cells;
-      const cid = (clusterCounter++ * 37) % 251;
-
-      // CDLOD smooth vertex geomorphing factor (morphs odd vertices onto parent coarse edge!)
-      const morphRangeEnd = splitThreshold;
-      const morphRangeStart = splitThreshold * 0.62;
-      const morphFn = isMorph ? (x, z, y) => {
-        const vd = Math.hypot(x - lodCam.pos[0], z - lodCam.pos[2]);
-        const m = smoothstep(morphRangeStart, morphRangeEnd, vd);
-        if (m <= 0.001) return y;
-        // Snap odd grid coordinates toward coarse parent cell midpoint to eliminate ALL popping & T-junction cracks!
-        const ix = Math.round((x - x0) / step);
-        const iz = Math.round((z - z0) / step);
-        const oxOdd = (ix & 1) !== 0, ozOdd = (iz & 1) !== 0;
-        if (!oxOdd && !ozOdd) return y;
-        let yCoarse = y;
-        if (oxOdd && !ozOdd) yCoarse = 0.5 * (sampleHeight(x - step, z, isMicro) + sampleHeight(x + step, z, isMicro));
-        else if (!oxOdd && ozOdd) yCoarse = 0.5 * (sampleHeight(x, z - step, isMicro) + sampleHeight(x, z + step, isMicro));
-        else yCoarse = 0.5 * (sampleHeight(x - step, z - step, isMicro) + sampleHeight(x + step, z + step, isMicro));
-        return lerp(y, yCoarse, m);
-      } : null;
-
-      // Emit cells x cells patch
-      for (let iz = 0; iz < cells; iz++) {
-        const za = z0 + iz * step, zb = za + step;
-        for (let ix = 0; ix < cells; ix++) {
-          const xa = x0 + ix * step, xb = xa + step;
-          // In Nanite Cluster mode, give each 2x2 sub-block its own vivid meshlet cluster ID!
-          const subCid = isNanite ? ((cid + (ix >> 1) * 19 + (iz >> 1) * 53) & 255) : cid;
-          pushQuad(xa, za, xb, za, xa, zb, xb, zb, lodLevel, subCid, isMicro, morphFn);
-        }
-      }
-
-      // Stage 3 (2002 Thatcher Ulrich Chunked LOD): drop vertical SKIRTS along all 4 chunk borders!
-      if (addSkirts) {
-        const skirtDrop = step * 0.95;
-        const skirtLod = 7.0; // special marker so shader can optionally highlight skirts!
-        const addSkirtEdge = (ax, az, bx, bz) => {
-          const ya = sampleHeight(ax, az, false), yb = sampleHeight(bx, bz, false);
-          const n = sampleNormal(0.5 * (ax + bx), 0.5 * (az + bz), step * 0.5, false);
-          pushTri([ax, ya, az], n, [ax, ya - skirtDrop, az], n, [bx, yb, bz], n, skirtLod, cid);
-          pushTri([bx, yb, bz], n, [ax, ya - skirtDrop, az], n, [bx, yb - skirtDrop, bz], n, skirtLod, cid);
-        };
-        for (let i = 0; i < cells; i++) {
-          const t0 = i * step, t1 = (i + 1) * step;
-          addSkirtEdge(x0 + t0, z0,        x0 + t1, z0);
-          addSkirtEdge(x0 + t1, z0 + size, x0 + t0, z0 + size);
-          addSkirtEdge(x0,      z0 + t1,   x0,      z0 + t0);
-          addSkirtEdge(x0 + size, z0 + t0, x0 + size, z0 + t1);
-        }
-      }
-    }
-
-    visitNode(ox - worldHalf, oz - worldHalf, worldHalf * 2.0, 0);
-    return { data, vertCount };
-  }
-
-  // ------------------------------------------------------------------------
-  // STAGE 4: 2004-05 GEOMETRY CLIPMAPS (Losasso & Hoppe, SIGGRAPH 2004)
-  // Concentric nested regular grid rings sliding seamlessly with the viewer!
-  // ------------------------------------------------------------------------
-  function buildClipmaps(lodCam) {
-    reset();
-    const rings = 5;
-    const halfCells = 10; // inner block 20x20, outer hollow rings 20x20 minus inner 10x10!
-    let baseStep = 0.65;
-
-    for (let lv = 0; lv < rings; lv++) {
-      const step = baseStep * (1 << lv);
-      // Snap ring origin to 2*step grid so vertices NEVER swim when camera moves!
-      const snap = step * 2.0;
-      const cx = Math.round(lodCam.pos[0] / snap) * snap;
-      const cz = Math.round(lodCam.pos[2] / snap) * snap;
-
-      // Inner hole bounds covered by finer level (lv - 1)
-      const innerHalf = lv === 0 ? -1 : halfCells * 0.5;
-      const outerRad = halfCells * step;
-
-      const morphFn = (x, z, y) => {
-        // GPU clipmap border blend zone (smoothly morphs outer 20% of ring to next coarser ring!)
-        const rx = Math.abs(x - cx) / outerRad;
-        const rz = Math.abs(z - cz) / outerRad;
-        const m = smoothstep(0.76, 1.0, Math.max(rx, rz));
-        if (m <= 0.001) return y;
-        const ix = Math.round((x - cx) / step);
-        const iz = Math.round((z - cz) / step);
-        const oxOdd = (ix & 1) !== 0, ozOdd = (iz & 1) !== 0;
-        if (!oxOdd && !ozOdd) return y;
-        let yc = y;
-        if (oxOdd && !ozOdd) yc = 0.5 * (sampleHeight(x - step, z) + sampleHeight(x + step, z));
-        else if (!oxOdd && ozOdd) yc = 0.5 * (sampleHeight(x, z - step) + sampleHeight(x, z + step));
-        else yc = 0.5 * (sampleHeight(x - step, z - step) + sampleHeight(x + step, z + step));
-        return lerp(y, yc, m);
-      };
-
-      for (let iz = -halfCells; iz < halfCells; iz++) {
-        for (let ix = -halfCells; ix < halfCells; ix++) {
-          if (lv > 0 && ix >= -innerHalf && ix < innerHalf && iz >= -innerHalf && iz < innerHalf) continue;
-          const x0 = cx + ix * step, z0 = cz + iz * step;
-          if (!inFrustum(x0 + step * 0.5, z0 + step * 0.5, step * 1.4, lodCam)) continue;
-          pushQuad(x0, z0, x0 + step, z0, x0, z0 + step, x0 + step, z0 + step, lv, (lv * 47 + 19) & 255, lv === 0, morphFn);
-        }
-      }
-    }
-    return { data, vertCount };
-  }
-
-  return { buildROAM, buildQuadtreeLOD, buildClipmaps };
+  return { build };
 }
