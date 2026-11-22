@@ -376,6 +376,18 @@ const ICONS = {
     `<rect x="8" y="2" width="2" height="1" fill="#c95b38"/>` +
     `<rect x="9" y="5" width="2" height="2" fill="#d9cfc0"/>` +
     `<rect x="8" y="8" width="2" height="1" fill="#a84325"/>`,
+
+  // Collision Detection & Tunneling: glowing cyan/crimson bullet ghosting through a thin steel wall
+  collisions:
+    `<rect x="1" y="1" width="10" height="10" fill="#0d1424"/>` +
+    `<rect x="5" y="1" width="2" height="10" fill="#526582"/>` +
+    `<rect x="5" y="1" width="2" height="1" fill="#22f090"/>` +
+    `<rect x="1" y="5" width="2" height="2" fill="#38d4ff"/>` +
+    `<rect x="3" y="5" width="1" height="2" fill="#7be8ff"/>` +
+    `<rect x="8" y="5" width="2" height="2" fill="#ff334b"/>` +
+    `<rect x="10" y="5" width="1" height="2" fill="#ff8fa0"/>` +
+    `<rect x="4" y="4" width="1" height="1" fill="#ffd166"/>` +
+    `<rect x="4" y="7" width="1" height="1" fill="#ffd166"/>`,
 };
 
 const FALLBACK_ICON =

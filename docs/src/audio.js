@@ -94,6 +94,7 @@ const SCENE_AMBIENCE = {
   grass:        { kind: "meadow",     baseFreq: 1450, q: 1.6, gain: 0.14, detail: "bird" },
   fog:          { kind: "cathedral",  baseFreq: 146.83, q: 2.0, gain: 0.16, detail: "organ" },
   destruction:  { kind: "outdoor",    baseFreq: 310, q: 1.0, gain: 0.12, detail: "gravel" },
+  collisions:   { kind: "portal",     baseFreq: 92,  q: 3.0, gain: 0.10, detail: "ballistics" },
   motionblur:   { kind: "rotor",      baseFreq: 170, q: 2.8, gain: 0.14, detail: "rotor" },
   dof:          { kind: "rain",       baseFreq: 1050, q: 0.9, gain: 0.14, detail: "night" },
   animation:    { kind: "studio",     baseFreq: 240, q: 1.0, gain: 0.08, detail: "arena" },
