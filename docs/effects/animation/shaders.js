@@ -291,6 +291,7 @@ void main() {
   oCol = vec4(col, 1.0);
 }`;
 
+// 1989 Rotoscope Light-Table: real CC BY 4.0 running footage (Arellano et al., PLOS ONE 2015) traced live into a 12 FPS EGA pixel sprite!
 export const ROTO_VS = /* glsl */`#version 300 es
 precision highp float;
 uniform mat4 uViewProj;
@@ -300,49 +301,160 @@ out vec2 vUv;
 void main() {
   vec2 c = vec2((gl_VertexID & 1) == 1 ? 1.0 : -1.0, (gl_VertexID & 2) == 2 ? 1.0 : 0.0);
   vUv = vec2(c.x * 0.5 + 0.5, c.y);
-  vec3 p = uPos + uCamRight * (c.x * 0.65) + vec3(0.0, c.y * 1.82, 0.0);
+  vec3 p = uPos + uCamRight * (c.x * 0.96) + vec3(0.0, 0.04 + c.y * 1.92, 0.0);
   gl_Position = uViewProj * vec4(p, 1.0);
 }`;
 
 export const ROTO_FS = /* glsl */`#version 300 es
 precision highp float;
 in vec2 vUv;
+uniform sampler2D uRotoAtlas;
 uniform float uTime;
 out vec4 oCol;
-float sdSeg(vec2 p, vec2 a, vec2 b) {
-  vec2 pa = p - a, ba = b - a;
-  float h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-5), 0.0, 1.0);
-  return length(pa - ba * h);
+
+float sdRoundBox(vec2 p, vec2 b, float r) {
+  vec2 q = abs(p) - b + r;
+  return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
 }
+
+float hash21(vec2 p) {
+  p = fract(p * vec2(123.34, 456.21));
+  p += dot(p, p + 45.32);
+  return fract(p.x * p.y);
+}
+
 void main() {
-  vec2 grid = vec2(32.0, 48.0);
-  vec2 p = (floor(vUv * grid) + 0.5) / grid;
-  float ph = floor(uTime * 11.0) * 0.785398;
-  float s = sin(ph), c = cos(ph);
-  vec2 hip = vec2(0.50, 0.44 + abs(s) * 0.03);
-  vec2 sh  = hip + vec2(0.04, 0.25);
-  vec2 hd  = sh + vec2(0.03, 0.11);
-  vec2 kL = hip + vec2( s * 0.14 + 0.04, -0.17 + max(0.0, c) * 0.06);
-  vec2 fL = kL  + vec2( s * 0.10 - max(0.0, -c) * 0.11, -0.20 + max(0.0, c) * 0.05);
-  vec2 kR = hip + vec2(-s * 0.14 + 0.04, -0.17 + max(0.0, -c) * 0.06);
-  vec2 fR = kR  + vec2(-s * 0.10 - max(0.0,  c) * 0.11, -0.20 + max(0.0, -c) * 0.05);
-  vec2 eL = sh + vec2(-s * 0.13, -0.11);
-  vec2 hL = eL + vec2(-s * 0.08 + 0.08, -0.04 + max(0.0, -s) * 0.08);
-  vec2 eR = sh + vec2( s * 0.13, -0.11);
-  vec2 hR = eR + vec2( s * 0.08 + 0.08, -0.04 + max(0.0,  s) * 0.08);
-  float dHead = length(p - hd) - 0.058;
-  float dTorso = sdSeg(p, hip, sh) - 0.058;
-  float dLegs = min(min(sdSeg(p, hip, kL), sdSeg(p, kL, fL)), min(sdSeg(p, hip, kR), sdSeg(p, kR, fR))) - 0.034;
-  float dArms = min(min(sdSeg(p, sh, eL), sdSeg(p, eL, hL)), min(sdSeg(p, sh, eR), sdSeg(p, eR, hR))) - 0.028;
-  float d = min(min(dHead, dTorso), min(dLegs, dArms));
-  if (d > 0.018) discard;
-  vec3 col = vec3(0.08, 0.06, 0.12);
-  if (d <= 0.0) {
-    if (dHead <= 0.0) col = p.y > hd.y + 0.015 ? vec3(0.32, 0.18, 0.10) : vec3(0.95, 0.76, 0.58);
-    else if (dTorso <= 0.0) col = abs(p.y - (hip.y + 0.04)) < 0.028 ? vec3(0.88, 0.16, 0.22) : vec3(0.96, 0.94, 0.88);
-    else if (dArms <= 0.0) col = vec3(0.92, 0.88, 0.80);
-    else col = vec3(0.32, 0.36, 0.56);
+  // Rounded 1989 rotoscope light-table / studio monitor bezel
+  float dOuter = sdRoundBox(vUv - 0.5, vec2(0.485, 0.485), 0.032);
+  if (dOuter > 0.0) discard;
+
+  float fi = mod(floor(uTime * 12.0), 12.0);
+  vec2 scrMin = vec2(0.055, 0.095);
+  float scrSize = 0.89;
+  vec2 s = (vUv - scrMin) / scrSize;
+  bool inScreen = (s.x >= 0.0 && s.x <= 1.0 && s.y >= 0.0 && s.y <= 1.0);
+
+  if (!inScreen) {
+    // Brushed studio monitor bezel + subtle rim highlight
+    vec3 bezel = mix(vec3(0.055, 0.062, 0.082), vec3(0.105, 0.118, 0.148), vUv.y);
+    float rim = smoothstep(-0.016, -0.002, dOuter);
+    bezel += vec3(0.14, 0.17, 0.22) * rim;
+    // Inner recessed screen frame shadow
+    float dScr = sdRoundBox(vUv - (scrMin + scrSize * 0.5), vec2(scrSize * 0.5), 0.004);
+    bezel *= mix(0.45, 1.0, smoothstep(0.0, 0.014, dScr));
+
+    // Bottom 12-frame cinema filmstrip indicator bar (lights up active 12 FPS frame 0..11!)
+    if (vUv.y >= 0.025 && vUv.y <= 0.068 && vUv.x >= 0.055 && vUv.x <= 0.945) {
+      float fx = (vUv.x - 0.055) / 0.89 * 12.0;
+      float idx = floor(fx);
+      float cellX = fract(fx);
+      float cellY = (vUv.y - 0.025) / 0.043;
+      if (cellX > 0.10 && cellX < 0.90 && cellY > 0.14 && cellY < 0.86) {
+        bool isActive = abs(idx - fi) < 0.5;
+        vec3 pip = isActive ? vec3(0.28, 0.96, 1.0) : vec3(0.16, 0.20, 0.28);
+        if (isActive) pip += vec3(0.25, 0.18, 0.0) * smoothstep(0.5, 0.0, abs(cellX - 0.5));
+        bezel = pip;
+      } else {
+        bezel = vec3(0.03, 0.035, 0.048);
+      }
+    }
+    oCol = vec4(bezel, 1.0);
+    return;
   }
+
+  // Exact 1:1 tile coordinates (Row 0 = real CC BY 4.0 footage, Row 1 = traced 1989 EGA sprite)
+  float tx = clamp(s.x, 0.008, 0.992);
+  float ty = clamp(1.0 - s.y, 0.008, 0.992);
+  float tileBase = fi / 12.0;
+  float tileW = 1.0 / 12.0;
+
+  // Sample real VHS frame with gentle horizontal analog chroma bleed (strictly clamped within tile!)
+  float txL = clamp(tx - 0.0045, 0.008, 0.992);
+  float txR = clamp(tx + 0.0045, 0.008, 0.992);
+  vec3 rawC = texture(uRotoAtlas, vec2(tileBase + tx  * tileW, ty * 0.5)).rgb;
+  vec3 rawL = texture(uRotoAtlas, vec2(tileBase + txL * tileW, ty * 0.5)).rgb;
+  vec3 rawR = texture(uRotoAtlas, vec2(tileBase + txR * tileW, ty * 0.5)).rgb;
+  vec3 vhs = vec3(
+    mix(rawC.r, rawR.r, 0.35),
+    0.50 * rawC.g + 0.25 * rawL.g + 0.25 * rawR.g,
+    mix(rawC.b, rawL.b, 0.35)
+  );
+  // Subtle 1989 CRT scanlines & analog film grain
+  float scan = 0.90 + 0.10 * sin(s.y * 280.0);
+  float grain = (hash21(floor(s * 128.0) + vec2(fi * 7.1, fi * 13.7)) - 0.5) * 0.035;
+  vhs = clamp(vhs * scan + grain, 0.0, 1.0);
+  vhs = mix(vhs, smoothstep(vec3(0.03), vec3(0.97), vhs), 0.35);
+
+  // Sample exact pixel-locked 1989 EGA sprite (Row 1) + 4-neighbor silhouette edge for live cyan trace outline!
+  vec2 uvSpr = vec2(tileBase + tx * tileW, 0.5 + ty * 0.5);
+  vec4 spr = texture(uRotoAtlas, uvSpr);
+  float stepX = 1.0 / 48.0;
+  float stepY = 1.0 / 48.0;
+  float aL = texture(uRotoAtlas, vec2(tileBase + clamp(tx - stepX, 0.008, 0.992) * tileW, 0.5 + ty * 0.5)).a;
+  float aR = texture(uRotoAtlas, vec2(tileBase + clamp(tx + stepX, 0.008, 0.992) * tileW, 0.5 + ty * 0.5)).a;
+  float aU = texture(uRotoAtlas, vec2(tileBase + tx * tileW, 0.5 + clamp(ty - stepY, 0.008, 0.992) * 0.5)).a;
+  float aD = texture(uRotoAtlas, vec2(tileBase + tx * tileW, 0.5 + clamp(ty + stepY, 0.008, 0.992) * 0.5)).a;
+  float sprOutline = (spr.a > 0.5 && min(min(aL, aR), min(aU, aD)) < 0.5) ? 1.0 : 0.0;
+
+  // Live animated rotoscoping trace laser sweeping left <-> right across the real runner (exact 4.5s period)!
+  float traceX = 0.50 + 0.42 * sin(uTime * 1.3962634);
+  float nearBeam = exp(-abs(s.x - traceX) * 14.0);
+
+  // Left of sweep: Real CC BY 4.0 VHS footage + animator's cyan pixel tracing grid + glowing traced contour!
+  vec2 pGrid = abs(fract(s * 48.0) - 0.5);
+  float gridLine = step(0.43, max(pGrid.x, pGrid.y));
+  vec3 vhsSide = vhs;
+  vhsSide = mix(vhsSide, vec3(0.20, 0.85, 1.0), gridLine * (0.10 + 0.24 * nearBeam));
+  vhsSide = mix(vhsSide, vec3(0.18, 0.92, 1.0), spr.a * (0.08 + 0.16 * nearBeam));
+  vhsSide = mix(vhsSide, vec3(0.32, 0.98, 1.0), sprOutline * (0.82 + 0.18 * nearBeam));
+  // Blinking red VCR REC indicator dot (top-left of VHS pane)
+  float dRec = length(s - vec2(0.085, 0.915));
+  float recBlink = step(0.35, fract(uTime * 1.4));
+  if (dRec < 0.022) {
+    vhsSide = mix(vec3(0.28, 0.04, 0.06), vec3(1.0, 0.18, 0.20), recBlink);
+  } else if (dRec < 0.036 && recBlink > 0.5) {
+    vhsSide += vec3(0.45, 0.06, 0.08) * smoothstep(0.036, 0.022, dRec);
+  }
+
+  // Right of sweep: 1989 Prince of Persia scrolling stone palace dungeon + crisp EGA traced sprite!
+  vec2 qPix = floor(s * 48.0) / 48.0;
+  float scrollX = uTime * 0.52;
+  vec2 bUv = vec2(qPix.x + scrollX, qPix.y);
+  float rowIdx = floor(bUv.y * 12.0);
+  float brickOff = mod(rowIdx, 2.0) * 0.5;
+  vec2 brickCell = vec2(bUv.x * 5.0 + brickOff, bUv.y * 12.0);
+  vec2 bf = fract(brickCell);
+  float mortar = (bf.x < 0.07 || bf.y < 0.11) ? 1.0 : 0.0;
+  float brickVar = hash21(floor(brickCell));
+  vec3 palBg = mix(vec3(0.11, 0.08, 0.17), vec3(0.18, 0.13, 0.24), brickVar);
+  float torchDist = length(vec2(fract(bUv.x * 0.85) - 0.5, qPix.y - 0.62) * vec2(1.4, 1.0));
+  float torchFlicker = 0.88 + 0.12 * sin(uTime * 13.0 + sin(uTime * 5.7));
+  palBg += vec3(0.38, 0.18, 0.06) * exp(-torchDist * 4.2) * torchFlicker;
+  palBg = mix(palBg, vec3(0.04, 0.03, 0.07), mortar * 0.85);
+  // Palace stone floor ledge under runner's boots
+  if (qPix.y < 0.085) {
+    float flTile = step(0.08, fract((qPix.x + scrollX) * 6.0));
+    palBg = mix(vec3(0.06, 0.05, 0.10), vec3(0.24, 0.19, 0.28), flTile);
+    if (qPix.y > 0.062) palBg += vec3(0.12, 0.09, 0.13);
+  }
+  float footSh = smoothstep(0.22, 0.02, length(vec2((s.x - 0.52) * 1.1, (s.y - 0.078) * 5.2)));
+  palBg *= (1.0 - 0.55 * footSh);
+  palBg = mix(palBg, vec3(0.22, 0.68, 0.82), gridLine * 0.18 * nearBeam);
+  vec3 sprSide = mix(palBg, spr.rgb, step(0.5, spr.a));
+
+  // Combine VHS (left) -> Traced Sprite (right) across live tracing sweep!
+  vec3 col = s.x < traceX ? vhsSide : sprSide;
+
+  // Luminous cyan-to-gold tracing laser + hot digitizer spark where beam intersects the runner!
+  float dBeam = abs(s.x - traceX);
+  float beamCore = exp(-dBeam * 145.0);
+  float beamGlow = exp(-dBeam * 32.0);
+  col += vec3(0.22, 0.90, 1.0) * beamGlow * 0.42;
+  col += mix(vec3(0.60, 0.98, 1.0), vec3(1.0, 0.86, 0.32), spr.a) * beamCore * 1.15;
+
+  // Subtle CRT glass vignette at screen corners
+  vec2 v2 = (s - 0.5) * 2.0;
+  col *= 1.0 - 0.12 * dot(v2, v2);
   oCol = vec4(col, 1.0);
 }`;
 

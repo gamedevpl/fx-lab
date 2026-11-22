@@ -54,7 +54,25 @@ function makeArenaVao(gl, geom) {
 
 export async function createAnimationEffect(gl) {
   const baseUrl = new URL("./", import.meta.url).href;
-  const rig = await loadXbotRig(baseUrl);
+  const [rig, rotoImg] = await Promise.all([
+    loadXbotRig(baseUrl),
+    new Promise((res, rej) => {
+      const im = new Image();
+      im.crossOrigin = "anonymous";
+      im.onload = () => res(im);
+      im.onerror = () => rej(new Error("Failed to load roto-atlas.png"));
+      im.src = `${baseUrl}roto-atlas.png`;
+    }),
+  ]);
+
+  const rotoTex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, rotoTex);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, rotoImg);
+  gl.bindTexture(gl.TEXTURE_2D, null);
 
   const [progSky, progChar, progArena, progRoto, progLine] = linkPrograms(gl, [
     [FULL_VS, SKY_FS],
@@ -68,7 +86,7 @@ export async function createAnimationEffect(gl) {
   const uSky   = uLoc(progSky,   ["uRetro", "uTime"]);
   const uChar  = uLoc(progChar,  ["uViewProj", "uBones", "uBonesB", "uDqReal", "uDqDual", "uDeformMode", "uMorphT", "uCamPos", "uFlatShade", "uShowTwistPattern"]);
   const uArena = uLoc(progArena, ["uViewProj", "uShadowPts", "uFootL", "uFootR", "uShowFootRings", "uFloorScroll", "uTime"]);
-  const uRoto  = uLoc(progRoto,  ["uViewProj", "uPos", "uCamRight", "uTime"]);
+  const uRoto  = uLoc(progRoto,  ["uViewProj", "uPos", "uCamRight", "uRotoAtlas", "uTime"]);
   const uLine  = uLoc(progLine,  ["uViewProj", "uPointSize"]);
 
   const fullVao = gl.createVertexArray();
@@ -284,7 +302,7 @@ export async function createAnimationEffect(gl) {
     // Pack 8 multi-bone height-aware contact & directional shadow capsules (Hips, Chest, Head, L/R Feet, L/R Knees, Hands)
     const shPts = new Float32Array(32);
     if (stage === 0) {
-      shPts.set([0, 0.15, 0, 0.28], 0);
+      shPts.set([-0.46, 0.12, 0, 0.36, 0.0, 0.12, 0, 0.38, 0.46, 0.12, 0, 0.36], 0);
     } else if (fk && fk.worldPos && fk.worldPos.length >= 22) {
       const wp = fk.worldPos;
       const spec = [[0, 0.26], [3, 0.24], [5, 0.17], [16, 0.15], [20, 0.15], [15, 0.15], [19, 0.15], [9, 0.12]];
@@ -304,9 +322,12 @@ export async function createAnimationEffect(gl) {
     if (stage === 0) {
       gl.useProgram(progRoto);
       gl.bindVertexArray(fullVao);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, rotoTex);
       gl.uniformMatrix4fv(uRoto.uViewProj, false, vp);
       gl.uniform3f(uRoto.uPos, 0, 0, 0);
       gl.uniform3fv(uRoto.uCamRight, basis.right);
+      gl.uniform1i(uRoto.uRotoAtlas, 0);
       gl.uniform1f(uRoto.uTime, simTime);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     } else {
