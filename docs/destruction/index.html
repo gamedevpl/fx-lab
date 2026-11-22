@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en" data-fx="destruction">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Evolution of Destruction &amp; Fracturing (1998–2023) — FX Lab | gamedev.pl</title>
+<meta name="description" content="25 years of real-time game destruction running live on WebGPU Compute + automatic WebGL2 fallback: 1998 Half-Life gib swap, 2001 Red Faction Geo-Mod CSG carving, 2003 Max Payne 2 Havok rigid bodies, 2008 Bad Company &amp; Force Unleashed DMM material bending, 2009 Red Faction: Guerrilla structural stress collapse, 2013–19 Real-Time Voronoi fracture, 2020–22 Teardown 165K 3D voxels &amp; island detachment, and 2023 The Finals compound demolition with 8,192 GPU debris.">
+<link rel="canonical" href="https://gamedevpl.github.io/fx-lab/destruction/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://gamedevpl.github.io/fx-lab/destruction/">
+<meta property="og:title" content="Evolution of Destruction &amp; Fracturing (1998–2023) — FX Lab">
+<meta property="og:description" content="Blast the same watchtower across 8 eras of game destruction on WebGPU Compute (+ WebGL2 fallback): CSG floating roofs, Guerrilla stress collapse, live Voronoi fracture &amp; 165K Teardown voxels.">
+<meta property="og:image" content="https://gamedevpl.github.io/fx-lab/og-destruction.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Evolution of Destruction &amp; Fracturing (1998–2023) — FX Lab">
+<meta name="twitter:description" content="8 eras of real-time game destruction on WebGPU Compute + WebGL2 fallback — click the watchtower to fire shells or remove a corner pillar.">
+<meta name="twitter:image" content="https://gamedevpl.github.io/fx-lab/og-destruction.png">
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
+<link rel="modulepreload" href="../src/app.js">
+<link rel="modulepreload" href="../src/catalog.js">
+<link rel="modulepreload" href="../src/icons.js">
+<link rel="modulepreload" href="../src/gl-utils.js">
+<link rel="modulepreload" href="../effects/destruction/index.js">
+<link rel="modulepreload" href="../effects/destruction/shared.js">
+<link rel="modulepreload" href="../effects/destruction/webgpu.js">
+<link rel="modulepreload" href="../effects/destruction/wgsl.js">
+<link rel="stylesheet" href="../ask/ask.css">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<main>
+  <canvas id="c" aria-label="Interactive WebGPU and WebGL2 destruction and fracturing viewport"></canvas>
+
+  <header>
+    <div class="brand">
+      <a id="backLink" href="https://gamedev.pl" target="_blank" rel="noopener">← gamedev.pl</a>
+      <h1>FX <em>LAB</em></h1>
+    </div>
+
+    <nav>
+      <button id="catalogBtn" class="fx-picker" type="button" aria-haspopup="dialog" aria-expanded="false">
+        <span class="fx-dot" id="pickerDot" aria-hidden="true"></span>
+        <span class="fx-name" id="pickerName">All 26</span>
+        <span class="fx-count" id="pickerCount">26/26</span>
+        <span class="fx-caret" aria-hidden="true">▾</span>
+      </button>
+      <a id="sourceLink" class="source" href="https://github.com/gamedevpl/fx-lab/tree/main/docs/effects/destruction" target="_blank" rel="noopener">Source</a>
+      <button id="lang" type="button" aria-label="Switch language">PL</button>
+    </nav>
+  </header>
+
+  <section class="stage" id="stage">
+    <div class="split-ui" id="splitUi" hidden>
+      <div class="split-tags" id="splitTags">
+        <span class="tag left" id="splitLeftTag"></span>
+        <span class="tag right" id="splitRightTag"></span>
+      </div>
+      <div class="split-hit" id="splitHit" role="slider" tabindex="0" aria-label="Split comparison position" aria-valuemin="8" aria-valuemax="92" aria-valuenow="50">
+        <div class="split-line"></div>
+        <div class="split-grip" aria-hidden="true"></div>
+      </div>
+    </div>
+
+    <article class="card" id="card">
+      <p class="kicker" id="kicker"></p>
+      <h2 id="stepTitle"></h2>
+      <p id="stepNote"></p>
+      <div class="row">
+        <button id="prev" type="button" aria-label="Previous step">◀</button>
+        <span id="count">01 / 08</span>
+        <button id="next" type="button" aria-label="Next step">▶</button>
+        <button id="splitBtn" type="button" aria-pressed="true">Split: ON</button>
+        <button id="actionBtn" type="button" hidden></button>
+        <button id="pauseBtn" type="button">Pause</button>
+        <button id="resetBtn" type="button" title="Reset camera (R)">Reset</button>
+      </div>
+      <p class="hint" id="hintLine"></p>
+      <p class="film" id="filmLine"></p>
+    </article>
+  </section>
+
+  <footer>
+    <div class="chapters" id="stepsBar" role="tablist" aria-label="Steps"></div>
+  </footer>
+</main>
+
+<div class="catalog-backdrop" id="catalogModal" role="dialog" aria-modal="true" aria-labelledby="catalogTitle" hidden>
+  <div class="catalog-box">
+    <div class="catalog-head">
+      <div>
+        <h2 id="catalogTitle">Effects</h2>
+        <p id="catalogSub"></p>
+      </div>
+      <button id="catalogClose" class="catalog-close" type="button" aria-label="Close">×</button>
+    </div>
+    <div class="catalog-filters" id="catalogFilters" hidden>
+      <input id="catalogSearch" type="search" autocomplete="off">
+      <div class="catalog-cats" id="catalogCats"></div>
+    </div>
+    <div class="catalog-grid" id="catalogGrid"></div>
+  </div>
+</div>
+
+<div id="nogl" hidden>
+  <b id="noglTitle">WebGL2 is required</b>
+  <p id="noglBody"></p>
+</div>
+
+<script type="module" src="../src/app.js"></script>
+<script type="module">
+if ("LanguageModel" in self || self.__fxLabModel) {
+  import("../src/assistant.js").catch(() => {});
+}
+</script>
+</body>
+</html>

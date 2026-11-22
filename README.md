@@ -31,6 +31,7 @@ Interactive WebGL2 & WebGPU sandbox for real-time graphics effects from [gamedev
 23. **[Evolution of Terrain & Level of Detail](https://gamedevpl.github.io/fx-lab/terrain/)** (8 eras, 1992–2024 · [source & notes](./docs/effects/terrain/)) — Real-time dynamic alpine mountain range with color-coded barycentric wireframe split-screen & Freeze Frustum inspector: 1992 *Comanche* Voxel Space, 1996–97 Lindstrom CLOD & ROAM adaptive binary triangle tree, 2000 GeoMipMapping T-junction cracks & popping, 2002 Chunked LOD vertical skirts, 2004–05 Geometry Clipmaps concentric rings, 2009–10 CDLOD geomorphing & *H.A.W.X 2* DX11 tessellation (emulated), 2011–12 *Battlefield 3* virtual terrain textures, and 2021–24 UE5 Nanite cluster meshlet LOD (emulated).
 24. **[Evolution of Motion Blur](https://gamedevpl.github.io/fx-lab/motionblur/)** (8 eras, 1999–2024 · [source & notes](./docs/effects/motionblur/)) — 4-pass `RGBA16F` aerospace/motorsport test studio with spinning 3-blade rotor, speeding racing capsule, swinging pendulum & static foreground pillar: 1999 *GTA III* frame-blending trails, 2004 Camera-Only nausea blur, 2007 *Crysis* per-object velocity silhouette clipping, 2012 McGuire `TileMax` + `NeighborMax`, 2014 Guertin & McGuire Soft-Z depth weighting, 2016 *DOOM* curved rotational arc blur, 2019 180° cinema shutter (`24 FPS Strobe` toggle), and 2024 16-tap reconstruction with live RGB Velocity Buffer inspector.
 25. **[Evolution of Depth of Field & Bokeh](https://gamedevpl.github.io/fx-lab/dof/)** (8 eras, 1998–2024 · [source & notes](./docs/effects/dof/)) — 4-pass `RGBA16F` HDR optical studio with 32 real HDR pinpoint night lights, wet reflections, near-field crystal & sharp centerpiece: 1998 pinhole camera, 2001 *Metal Gear Solid 2* Gaussian Z-blur halo bleed, 2004 *GPU Gems 1* depth-aware gather, 2007 *Crysis* layered near/far CoC dilation, 2011 *Battlefield 3* 6-blade hexagonal aperture bokeh, 2014 *UE4* Vogel spiral disk + optical rim, 2018 cat's-eye mechanical barrel vignetting, and 2024 2× anamorphic oval bokeh + LoCA with live click-to-focus & CoC heatmap.
+26. **[Evolution of Destruction & Fracturing](https://gamedevpl.github.io/fx-lab/destruction/)** (8 eras, 1998–2023 · **WebGPU Compute + WebGL2 fallback** · [source & notes](./docs/effects/destruction/)) — Blast the same brick-and-concrete watchtower across 8 parallel eras of real-time destruction: 1998 *Half-Life* `func_breakable` gib swap, 2001 *Red Faction* `Geo-Mod` CSG boolean carving (floating upper floors!), 2003 *Max Payne 2* Havok rigid-body debris, 2008 *Bad Company* pre-cut walls vs *The Force Unleashed* DMM material bending, 2009 *Red Faction: Guerrilla* structural load-stress collapse (*Bad Company 2* '10 noted), 2013–19 real-time impact Voronoi fracture (Müller '13 · *R6 Siege* '15 · *UE 4.23 Chaos* '19), 2020–22 *Teardown* `48×72×48` 3D DDA voxel destruction & flood-fill island detachment, and 2023 *The Finals*-scale compound demolition with 8,192 GPU-simulated debris chunks (`?renderer=webgl2` inspects the 49K-voxel / 1,024-debris WebGL2 fallback).
 
 ## Project structure
 
@@ -39,7 +40,7 @@ Each effect lives in its own self-contained folder under `docs/effects/<id>/` wi
 ```text
 docs/
 ├── index.html                                                                                              # Root entry (loads default effect)
-├── splats/ fire/ water/ shadows/ cloth/ fur/ glass/ clouds/ grass/ pathtracing/ toon/ aa/ reflections/ surface/ fog/ gi/ textures/ portals/ tonemapping/ pixel3d/ animation/ skin/ terrain/ motionblur/ dof/ # Clean per-effect routes with dedicated Open Graph cards
+├── splats/ fire/ water/ shadows/ cloth/ fur/ glass/ clouds/ grass/ pathtracing/ toon/ aa/ reflections/ surface/ fog/ gi/ textures/ portals/ tonemapping/ pixel3d/ animation/ skin/ terrain/ motionblur/ dof/ destruction/ # Clean per-effect routes with dedicated Open Graph cards
 ├── src/                                                                                                    # Shared app shell, catalog metadata, WebGL2 helpers
 └── effects/
     ├── splats/                                                                                             # README.md · scene.js · shaders.js · index.js
@@ -66,7 +67,8 @@ docs/
     ├── skin/                                                                                               # shaders.js · index.js
     ├── terrain/                                                                                            # lod.js · shaders.js · index.js
     ├── motionblur/                                                                                         # shaders.js · index.js
-    └── dof/                                                                                                # shaders.js · index.js
+    ├── dof/                                                                                                # shaders.js · index.js
+    └── destruction/                                                                                        # shared.js · wgsl.js · webgpu.js · webgl2.js · index.js
 ```
 
 ## Controls

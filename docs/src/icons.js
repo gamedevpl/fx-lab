@@ -362,6 +362,20 @@ const ICONS = {
     `<rect x="5" y="5" width="2" height="2" fill="#38c8ff"/>` +
     `<rect x="4" y="3" width="4" height="1" fill="#f5b83d"/>` +
     `<rect x="4" y="8" width="4" height="1" fill="#f5b83d"/>`,
+
+  // Destruction & Fracturing: terracotta brick watchtower shattering mid-blast with flying chunks & fiery orange burst
+  destruction:
+    `<rect x="1" y="1" width="10" height="10" fill="#1b263b"/>` +
+    `<rect x="2" y="9" width="8" height="2" fill="#9c8f7a"/>` +
+    `<rect x="3" y="3" width="4" height="6" fill="#c95b38"/>` +
+    `<rect x="3" y="3" width="1" height="6" fill="#d9cfc0"/>` +
+    `<rect x="6" y="6" width="1" height="3" fill="#d9cfc0"/>` +
+    `<rect x="2" y="2" width="5" height="1" fill="#3a4254"/>` +
+    `<rect x="6" y="3" width="3" height="3" fill="#ff731d"/>` +
+    `<rect x="7" y="4" width="1" height="1" fill="#fff2a6"/>` +
+    `<rect x="8" y="2" width="2" height="1" fill="#c95b38"/>` +
+    `<rect x="9" y="5" width="2" height="2" fill="#d9cfc0"/>` +
+    `<rect x="8" y="8" width="2" height="1" fill="#a84325"/>`,
 };
 
 const FALLBACK_ICON =
