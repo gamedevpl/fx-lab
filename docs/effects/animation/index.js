@@ -177,16 +177,24 @@ export async function createAnimationEffect(gl) {
     gl.drawArrays(mode, 0, floats.length / 6);
   }
 
-  function drawSkeletonOverlay(vp, worldPos) {
+  function drawSkeletonOverlay(vp, worldPos, camRight = [1, 0, 0]) {
     const segs = [], pts = [];
     for (let i = 0; i < worldPos.length; i++) {
       const p = rig.parents[i];
-      if (p >= 0) segs.push(...worldPos[p], 0.22, 0.96, 0.72, ...worldPos[i], 0.22, 0.96, 0.72);
-      pts.push(...worldPos[i], 1.0, 0.95, 0.78);
+      if (p >= 0) {
+        const a = worldPos[p], b = worldPos[i];
+        // Bold 3-strand camera-facing bone lines so X-ray skeleton pops crisply even on 1px WebGL2 Metal drivers!
+        for (const off of [-0.007, 0.0, 0.007]) {
+          const ox = camRight[0] * off, oy = camRight[1] * off, oz = camRight[2] * off;
+          const k = off === 0 ? 1.0 : 0.72;
+          segs.push(a[0]+ox, a[1]+oy, a[2]+oz, 0.14*k, 1.0*k, 0.78*k, b[0]+ox, b[1]+oy, b[2]+oz, 0.14*k, 1.0*k, 0.78*k);
+        }
+      }
+      pts.push(...worldPos[i], 1.0, 0.94, 0.42);
     }
     gl.disable(gl.DEPTH_TEST);
     drawLineData(vp, segs, gl.LINES, 1.0);
-    drawLineData(vp, pts, gl.POINTS, 7.5);
+    drawLineData(vp, pts, gl.POINTS, 10.5);
     gl.enable(gl.DEPTH_TEST);
   }
 
@@ -248,6 +256,37 @@ export async function createAnimationEffect(gl) {
     pts.push(mm.targetX, ty + 0.02, mm.targetZ, 1.0, 0.95, 0.45);
     drawLineData(vp, segs, gl.LINES, 1.0);
     drawLineData(vp, pts, gl.POINTS, 10.5);
+  }
+
+  function drawPushImpulseOverlay(vp, rag) {
+    // Crisp 3D shove arrow + expanding impact ripple at chest height right when the push hits (0..0.38s)!
+    if (!rag.state.pushed || rag.state.rwStart || rag.state.pushAge > 0.38) return;
+    const u = rag.state.pushAge / 0.38;
+    const fade = 1.0 - u;
+    const cy = getSmoothStairRamp(rag.state.startX) + 1.32;
+    const cx = rag.state.startX + 0.14;
+    const segs = [], pts = [];
+    // Expanding orange-gold shock ring in YZ impact plane right in front of chest
+    const rad = 0.08 + u * 0.34;
+    for (let k = 0; k < 16; k++) {
+      const a0 = (k / 16) * Math.PI * 2, a1 = ((k + 1) / 16) * Math.PI * 2;
+      const rC = 1.0, gC = 0.42 + 0.45 * fade, bC = 0.14;
+      segs.push(cx, cy + Math.cos(a0)*rad, Math.sin(a0)*rad, rC, gC, bC,
+                cx, cy + Math.cos(a1)*rad, Math.sin(a1)*rad, rC, gC, bC);
+    }
+    // Bold 3D force vector arrow pointing -X directly into chest!
+    const ax0 = cx + 0.56 - u * 0.22;
+    const ax1 = cx - 0.04 - u * 0.10;
+    for (const dz of [-0.015, 0, 0.015]) {
+      segs.push(ax0, cy, dz, 1.0, 0.82, 0.24, ax1, cy, dz, 1.0, 0.28, 0.16);
+      segs.push(ax1, cy, dz, 1.0, 0.28, 0.16, ax1 + 0.14, cy + 0.10, dz, 1.0, 0.55, 0.18);
+      segs.push(ax1, cy, dz, 1.0, 0.28, 0.16, ax1 + 0.14, cy - 0.10, dz, 1.0, 0.55, 0.18);
+    }
+    pts.push(ax1, cy, 0, 1.0, 0.94, 0.55);
+    gl.disable(gl.DEPTH_TEST);
+    drawLineData(vp, segs, gl.LINES, 1.0);
+    drawLineData(vp, pts, gl.POINTS, 12.0 * fade + 4.0);
+    gl.enable(gl.DEPTH_TEST);
   }
 
   function renderSingleStage(stage, vp, basis) {
@@ -363,8 +402,15 @@ export async function createAnimationEffect(gl) {
       gl.uniform1f(uChar.uShowTwistPattern, showTwist);
       gl.drawElements(gl.TRIANGLES, ch.count, gl.UNSIGNED_SHORT, 0);
 
+      if (stage === 6) drawPushImpulseOverlay(vp, ragActive);
+      if (stage === 99) drawPushImpulseOverlay(vp, ragPassive);
       if (stage === 7) drawMotionMatchingOverlay(vp);
-      if (showSkeleton) drawSkeletonOverlay(vp, fk.worldPos);
+      if (showSkeleton) {
+        const skPos = (stage === 2 && fkB)
+          ? fk.worldPos.map((p, i) => [lerp(p[0], fkB.worldPos[i][0], morphT), lerp(p[1], fkB.worldPos[i][1], morphT), lerp(p[2], fkB.worldPos[i][2], morphT)])
+          : fk.worldPos;
+        drawSkeletonOverlay(vp, skPos, basis.right);
+      }
     }
   }
 
@@ -387,6 +433,7 @@ export async function createAnimationEffect(gl) {
     enterStep(stepIdx) {
       if (stepIdx === 6) resetRagdolls(false);
       if (stepIdx === 3 || stepIdx === 5) twistActive = true;
+      showSkeleton = (stepIdx === 1 || stepIdx === 2);
     },
 
     onReset() {
