@@ -123,6 +123,23 @@ function rigidMatToDQ(m) {
 }
 
 // --- Stepped Stone Arena Terrain Height (shared by Foot IK, Ragdoll, Motion Matching & Arena Mesh!) ---
+export function getSmoothStairRamp(x) {
+  // Exact continuous centerline passing through all 5 stair centers (-1.68 -> 0.00 up to +1.12 -> 0.65)!
+  return clamp((x + 1.68) / 2.80, 0, 1) * 5 * 0.13;
+}
+
+export function getSmoothFootGround(x, z, stairsMode) {
+  if (stairsMode !== 1) return getArenaHeight(x, z, stairsMode);
+  const zMask = smoothstep(1.62, 1.48, Math.abs(z));
+  let h = 0.0;
+  for (let k = 0; k < 5; k++) {
+    const rx = -1.40 + k * 0.56;
+    // C1 smooth ramp over 17cm right before each riser: locks flat onto every tread AND clears risers with ZERO snap!
+    h += 0.13 * smoothstep(rx - 0.18, rx - 0.01, x);
+  }
+  return h * zMask;
+}
+
 export function getArenaHeight(x, z, stairsMode) {
   if (stairsMode === 0) return 0.0;
   if (stairsMode === 1) {
@@ -297,30 +314,40 @@ export function applyFootIK(rig, fk, stairsMode, facingYaw) {
   const wr = fk.worldRot.map(v => [...v]);
   const fwd = [Math.sin(facingYaw), 0, Math.cos(facingYaw)];
 
-  // Sample exact stair ground height under BOTH ankle AND toe box so boots NEVER clip into stair risers!
+  // Smooth C1 ground height on treads (zero riser snaps) + smooth stair-nose envelope for swinging feet!
   const footGround = (iFoot, iToe) => Math.max(
-    getArenaHeight(wp[iFoot][0], wp[iFoot][2], stairsMode),
-    getArenaHeight(wp[iToe][0],  wp[iToe][2],  stairsMode)
+    getSmoothFootGround(wp[iFoot][0], wp[iFoot][2], stairsMode),
+    getSmoothFootGround(wp[iToe][0],  wp[iToe][2],  stairsMode)
   );
   const gL = footGround(16, 17);
   const gR = footGround(20, 21);
-  // Smooth continuous ramp baseline under pelvis (eliminates 13cm vertical snapping at stair risers!)
+  // Exact continuous centerline ramp under pelvis (ZERO pelvis snapping on stair edges!)
   const gCenter = stairsMode === 1
-    ? clamp((wp[0][0] + 1.40) / 2.80, 0, 1) * 5 * 0.13
+    ? getSmoothStairRamp(wp[0][0])
     : getArenaHeight(wp[0][0], wp[0][2], stairsMode);
 
-  // Drop pelvis smoothly so the lower foot reaches its step without over-stretching!
-  const desiredBaseY = Math.min(gL, gR);
-  const pelvisDrop = clamp(desiredBaseY - gCenter, -0.26, 0.08);
+  // Smooth, constant athletic knee-flex drop on stairs so BOTH upper & lower feet reach cleanly with ZERO 7cm pelvis jumps!
+  const onStairs = stairsMode === 1
+    ? smoothstep(-1.85, -1.35, wp[0][0]) * (1.0 - smoothstep(1.15, 1.55, wp[0][0]))
+    : 0.0;
+  const pelvisDrop = stairsMode === 1
+    ? -0.068 * onStairs
+    : clamp(Math.min(gL, gR) - gCenter, -0.18, 0.04);
   for (let i = 0; i < BONE_COUNT; i++) wp[i][1] += pelvisDrop;
 
   function solveLeg(iHip, iKnee, iFoot, iToe, groundY) {
     const hip = wp[iHip], knee = wp[iKnee], foot = wp[iFoot], toe = wp[iToe];
     const upperLen = Math.hypot(knee[0]-hip[0], knee[1]-hip[1], knee[2]-hip[2]);
     const lowerLen = Math.hypot(foot[0]-knee[0], foot[1]-knee[1], foot[2]-knee[2]);
-    // Preserve mocap foot lift above neutral floor + generous sole thickness clearance (0.098m -> zero stair clipping!)
+    // Preserve mocap foot lift above neutral floor; blend swinging foot cleanly onto smooth stair-nose ramp -> ZERO 11cm riser snaps!
     const mocapLift = Math.max(0.0, (foot[1] - pelvisDrop - gCenter) - 0.088);
-    const target = [foot[0], groundY + 0.098 + mocapLift, foot[2]];
+    let effGround = groundY;
+    if (stairsMode === 1) {
+      const swingW = smoothstep(0.012, 0.058, mocapLift);
+      const noseEnv = getSmoothStairRamp(Math.max(foot[0], toe[0])) + 0.055;
+      effGround = lerp(groundY, Math.max(groundY, noseEnv), swingW);
+    }
+    const target = [foot[0], effGround + 0.098 + mocapLift, foot[2]];
 
     const dx = target[0] - hip[0], dy = target[1] - hip[1], dz = target[2] - hip[2];
     const dist = clamp(Math.hypot(dx, dy, dz), 0.16, upperLen + lowerLen - 0.006);
@@ -392,89 +419,123 @@ export function evaluateTwistPose(rig, tSec, twistAngle) {
 }
 
 // --- TRUE ARTICULATED JOINT-LIMITED RAGDOLL vs REAL MOCAP-BACKED ACTIVE EUPHORIA (Stage 6!) ---
-export function createArticulatedRagdoll(rig) {
+export function createArticulatedRagdoll(rig, isActive = false) {
   const state = {
-    x: 0.55, y: 0.0, z: 0.0, vx: 0, vy: 0,
+    x: 0.78, y: 0.0, z: 0.0, vx: 0, vy: 0,
     pitch: 0, vp: 0, roll: 0, vr: 0,
     t: 0, stridePhase: 0,
+    startX: 0.78, pushed: false, pushAge: 0, pushStrength: 1.0,
+    rwStart: null, rwT: 0, rwDur: 1.25,
   };
 
-  function reset(startX = 0.55) {
-    const g = getArenaHeight(startX, 0, 1);
+  function reset(startX = 0.78, activeOverride = isActive) {
+    const baseY = getSmoothStairRamp(startX);
     Object.assign(state, {
-      x: startX, y: g + 1.0, z: 0.0, vx: 0, vy: 0,
-      pitch: 0, vp: 0, roll: 0, vr: 0,
-      t: 0, stridePhase: 0,
+      x: startX, y: activeOverride ? baseY : baseY + 0.96, z: 0.0,
+      vx: 0, vy: 0, pitch: 0, vp: 0, roll: 0, vr: 0,
+      t: 0, stridePhase: 0, startX, pushed: false, pushAge: 0, pushStrength: 1.0,
+      rwStart: null, rwT: 0,
     });
   }
 
   function push(strength = 1.0) {
-    state.vx = -2.20 * strength;
-    state.vy =  0.55 * strength;
-    state.vp = -3.30 * strength;
-    state.vr =  0.55 * strength;
+    state.pushed = true;
+    state.pushAge = 0;
+    state.pushStrength = strength;
+    state.rwStart = null;
   }
 
-  function step(dt, activeEuphoria) {
+  function startSmoothRewind() {
+    if (state.rwStart) return;
+    state.rwStart = { x: state.x, y: state.y, pitch: state.pitch, roll: state.roll };
+    state.rwT = 0;
+  }
+
+  function step(dt, activeEuphoria = isActive) {
     const h = Math.min(dt, 0.025);
     state.t += h;
-    const gUnder = getArenaHeight(state.x, state.z, 1);
+
+    // Smooth non-teleporting glide back to top step before next shove!
+    if (state.rwStart) {
+      state.rwT = Math.min(state.rwDur, state.rwT + h);
+      const u = smoothstep(0.0, 1.0, state.rwT / state.rwDur);
+      const goalY = activeEuphoria ? getSmoothStairRamp(state.startX) : getSmoothStairRamp(state.startX) + 0.96;
+      state.x = lerp(state.rwStart.x, state.startX, u);
+      state.y = lerp(state.rwStart.y, goalY, u);
+      state.pitch = lerp(state.rwStart.pitch, 0.0, u);
+      state.roll  = lerp(state.rwStart.roll,  0.0, u);
+      state.vx = 0; state.vy = 0; state.vp = 0; state.vr = 0;
+      if (activeEuphoria) state.stridePhase += h * 1.15 * (1.0 - u);
+      return;
+    }
+
+    if (!state.pushed) {
+      const baseY = getSmoothStairRamp(state.x);
+      state.y = activeEuphoria ? baseY : baseY + 0.96;
+      return;
+    }
+
+    state.pushAge += h;
+    // Smooth 0.16s shove impulse ramp (ZERO 1-frame 57cm impact teleport!)
+    if (state.pushAge <= 0.16) {
+      const imp = (h / 0.16) * state.pushStrength;
+      state.vx += -1.85 * imp;
+      state.vy +=  0.34 * imp;
+      state.vp += -2.85 * imp;
+      state.vr +=  0.42 * imp;
+    }
 
     if (!activeEuphoria) {
-      // 2000 HITMAN PASSIVE LIMP RAGDOLL: pure gravity tumble + asymmetric settling on stairs!
-      state.vy -= 9.8 * h;
-      state.x = clamp(state.x + state.vx * h, -2.15, 2.0);
+      // 2000 HITMAN PASSIVE LIMP RAGDOLL: smooth gravity tumble onto C1 stair slope (ZERO riser snapping!)
+      state.vy -= 8.8 * h;
+      state.x = clamp(state.x + state.vx * h, -1.35, 2.0);
       state.y += state.vy * h;
       state.pitch += state.vp * h;
       state.roll  += state.vr * h;
 
-      const minPelvisY = gUnder + 0.16;
+      const smoothFloor = Math.max(getSmoothFootGround(state.x, state.z, 1), getSmoothStairRamp(state.x));
+      const minPelvisY = smoothFloor + 0.21;
       if (state.y < minPelvisY) {
         state.y = minPelvisY;
-        if (state.vy < 0) state.vy = -state.vy * 0.18;
-        state.vx *= Math.pow(0.08, h);
-        state.vp += (-1.46 - state.pitch) * 24.0 * h;
-        state.vp *= Math.pow(0.04, h);
-        state.vr *= Math.pow(0.06, h);
+        if (state.vy < 0) state.vy = -state.vy * 0.08;
+        state.vx *= Math.pow(0.10, h);
+        state.vp += (-1.38 - state.pitch) * 14.0 * h;
+        state.vp *= Math.pow(0.06, h);
+        state.vr *= Math.pow(0.08, h);
       } else {
-        state.vp -= 2.4 * h;
+        state.vp -= 1.8 * h;
         state.vp *= 0.985;
       }
-      state.pitch = clamp(state.pitch, -1.58, 0.45);
-      state.roll  = clamp(state.roll, -0.35, 0.35);
+      state.pitch = clamp(state.pitch, -1.48, 0.35);
+      state.roll  = clamp(state.roll, -0.32, 0.32);
     } else {
       // 2008 GTA IV EUPHORIA ACTIVE MUSCLE REFLEXES:
-      // Stumbles backward down the stairs using real Mixamo backpedal stride + PD upright recovery + wide balance arms!
-      state.vx *= Math.pow(0.24, h);
+      // Smooth backward stumble down stairs + PD upright recovery + C1 smooth Foot IK (ZERO snaps!)
+      state.vx *= Math.pow(0.28, h);
       const prevX = state.x;
-      state.x = clamp(state.x + state.vx * h, -1.85, 2.0);
+      state.x = clamp(state.x + state.vx * h, -1.25, 2.0);
       const moved = Math.abs(state.x - prevX);
-      state.stridePhase += moved * 1.45 + h * 0.25;
+      state.stridePhase += moved * 0.92;
 
-      const smoothRampY = clamp((state.x + 1.40) / 2.80, 0, 1) * 5 * 0.13;
-      state.y = smoothRampY;
-      // Brief backward recoil on impact, then PD-controller pulls torso cleanly back upright!
-      const leanGoal = state.t < 0.55 ? -0.22 : 0.04 * Math.sin(state.t * 3.8) * Math.exp(-state.t * 0.5);
-      state.vp += ((leanGoal - state.pitch) * 34.0 - state.vp * 6.5) * h;
-      state.pitch = clamp(state.pitch + state.vp * h, -0.36, 0.22);
+      state.y = getSmoothStairRamp(state.x);
+      const leanGoal = state.pushAge < 0.70 ? -0.22 * smoothstep(0.0, 0.20, state.pushAge) : 0.03 * Math.sin(state.pushAge * 3.5) * Math.exp(-state.pushAge * 0.6);
+      state.vp += ((leanGoal - state.pitch) * 22.0 - state.vp * 7.5) * h;
+      state.pitch = clamp(state.pitch + state.vp * h, -0.32, 0.20);
     }
   }
 
-  function toFK(activeEuphoria) {
+  function toFK(activeEuphoria = isActive) {
     if (!activeEuphoria) {
-      // Asymmetric natural limp ragdoll drape (zero stiff mirror mannequin!)
       const pose = restPoseLocal(rig);
       pose[0].t = [0, 0, 0];
-      const f = smoothstep(0.0, 0.85, Math.abs(state.pitch));
+      const f = smoothstep(0.0, 0.90, Math.abs(state.pitch));
       pose[1].q  = qMul(pose[1].q,  qEulerXYZ(-0.18 * f, 0.12 * f, 0.08 * f));
       pose[2].q  = qMul(pose[2].q,  qEulerXYZ(-0.14 * f, 0.10 * f, 0.06 * f));
       pose[5].q  = qMul(pose[5].q,  qEulerXYZ(0.22 * f,  0.34 * f, -0.18 * f));
-      // Left arm flung overhead/sideways; right arm draped loosely across side
-      pose[7].q  = qMul(pose[7].q,  qEulerXYZ(0.0, 0.25 * f, -0.35 + 0.65 * f));
+      pose[7].q  = qMul(pose[7].q,  qEulerXYZ(0.0, 0.25 * f, -0.32 + 0.62 * f));
       pose[8].q  = qMul(pose[8].q,  qEulerXYZ(0.0, -0.45 * f, 0.0));
-      pose[11].q = qMul(pose[11].q, qEulerXYZ(0.0, 0.42 * f,  1.15 - 0.30 * f));
+      pose[11].q = qMul(pose[11].q, qEulerXYZ(0.0, 0.42 * f,  1.05 - 0.28 * f));
       pose[12].q = qMul(pose[12].q, qEulerXYZ(0.0,  0.85 * f, 0.0));
-      // Asymmetric bent knees resting across stairs
       pose[14].q = qMul(pose[14].q, qEulerXYZ(-0.55 * f, 0.14 * f, 0.12 * f));
       pose[15].q = qMul(pose[15].q, qEulerXYZ( 0.92 * f, 0.0, 0.0));
       pose[18].q = qMul(pose[18].q, qEulerXYZ(-0.22 * f, -0.12 * f, -0.10 * f));
@@ -482,28 +543,30 @@ export function createArticulatedRagdoll(rig) {
       return evaluateFK(rig, pose, [state.x, state.y, state.z], Math.PI * 0.5, [state.pitch, state.roll]);
     }
 
-    // Active Euphoria: blend REAL Mixamo reverse walk (stumbling backsteps!) -> REAL Mixamo idle as balance recovers!
-    const panic = Math.exp(-state.t * 0.55);
-    const stumbling = smoothstep(0.06, 0.35, Math.abs(state.vx) + panic * 0.35);
-    const pWalk = sampleClipLocal(rig, "walk", -state.stridePhase);
+    // Active Euphoria: smooth 0.22s attack envelope on panic & stumble blend -> ZERO impact snap!
+    const rwFade = state.rwStart ? (1.0 - smoothstep(0.0, 0.7, state.rwT / state.rwDur)) : 1.0;
+    const attack = state.pushed ? smoothstep(0.0, 0.24, state.pushAge) : 0.0;
+    const panic = attack * Math.exp(-Math.max(0, state.pushAge - 0.15) * 0.65) * rwFade;
+    const stumbling = state.rwStart
+      ? smoothstep(0.0, 0.25, state.rwT / state.rwDur) * (1.0 - smoothstep(0.75, 1.0, state.rwT / state.rwDur)) * 0.65
+      : attack * smoothstep(0.06, 0.48, Math.abs(state.vx));
+    const pWalk = sampleClipLocal(rig, "walk", state.rwStart ? state.stridePhase : -state.stridePhase);
     const pIdle = sampleClipLocal(rig, "idle", state.t);
     const pose = blendLocalPoses(pIdle, pWalk, stumbling);
 
-    // Subtle athletic balance crouch + wide asymmetric flailing arms (layered cleanly on real Mixamo clavicles!)
-    pose[0].t[1] -= 0.07 * panic;
-    pose[1].q  = qMul(pose[1].q,  qEulerXYZ(0.14 * panic, Math.sin(state.t * 7.0) * 0.14 * panic, 0));
-    pose[5].q  = qMul(pose[5].q,  qEulerXYZ(0.22 * panic, 0, 0)); // watches stairs footing!
-    // Left arm & right arm flung wide OUT to sides (in Mixamo pose space, lifting arm out is +-Z, swinging is Y!)
-    const flail = Math.sin(state.t * 9.0) * panic;
-    pose[7].q  = qMul(pose[7].q,  qEulerXYZ(0, -0.35 * panic + flail * 0.45,  0.72 * panic + flail * 0.28));
-    pose[11].q = qMul(pose[11].q, qEulerXYZ(0,  0.35 * panic + flail * 0.45, -0.72 * panic + flail * 0.28));
+    pose[0].t[1] -= 0.05 * panic;
+    pose[1].q  = qMul(pose[1].q,  qEulerXYZ(0.14 * panic, Math.sin(state.t * 6.0) * 0.12 * panic, 0));
+    pose[5].q  = qMul(pose[5].q,  qEulerXYZ(0.18 * panic, 0, 0));
+    const flail = Math.sin(state.t * 7.5) * panic;
+    pose[7].q  = qMul(pose[7].q,  qEulerXYZ(0, -0.32 * panic + flail * 0.36,  0.65 * panic + flail * 0.20));
+    pose[11].q = qMul(pose[11].q, qEulerXYZ(0,  0.32 * panic + flail * 0.36, -0.65 * panic + flail * 0.20));
 
     const fk = evaluateFK(rig, pose, [state.x, state.y, state.z], Math.PI * 0.5, [state.pitch, 0]);
     return applyFootIK(rig, fk, 1, Math.PI * 0.5);
   }
 
-  reset();
-  return { reset, push, step, toFK, state };
+  reset(0.78, isActive);
+  return { reset, push, startSmoothRewind, step, toFK, state };
 }
 
 // --- REAL MOTION MATCHING + PHASE-LOCKED CONTINUOUS BLEND & BOLLO INERTIALIZATION (Stage 7!) ---

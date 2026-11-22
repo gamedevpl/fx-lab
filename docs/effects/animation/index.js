@@ -1,7 +1,7 @@
 // Evolution of Character Animation (1989-2020) — Real Xbot Rig + Real Mixamo Mocap WebGL2 Controller.
-import { clamp, lerp, norm3, cameraBasisFromOrbit, makeLookAt, makePerspective, FULL_VS, linkPrograms } from "../../src/gl-utils.js";
+import { clamp, lerp, smoothstep, norm3, cameraBasisFromOrbit, makeLookAt, makePerspective, FULL_VS, linkPrograms } from "../../src/gl-utils.js";
 import {
-  loadXbotRig, buildArenaGeometry, getArenaHeight,
+  loadXbotRig, buildArenaGeometry, getArenaHeight, getSmoothStairRamp,
   sampleClipLocal, blendLocalPoses, evaluateFK, applyFootIK, evaluateTwistPose,
   createArticulatedRagdoll, createMotionMatcher,
 } from "./rig.js";
@@ -103,8 +103,8 @@ export async function createAnimationEffect(gl) {
   gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 24, 12);
   gl.bindVertexArray(null);
 
-  const ragPassive = createArticulatedRagdoll(rig);
-  const ragActive  = createArticulatedRagdoll(rig);
+  const ragPassive = createArticulatedRagdoll(rig, false);
+  const ragActive  = createArticulatedRagdoll(rig, true);
   const matcher = createMotionMatcher(rig);
 
   let simTime = 2.6;
@@ -114,6 +114,40 @@ export async function createAnimationEffect(gl) {
   let lastMmFK = null;
   let lastMmClip = "walk";
 
+  // Smooth C1 continuous stair-walk state (ZERO turnaround snaps, ZERO loop-wrap teleports, ZERO 13cm jumps!)
+  const stairWalk = { cycleT: 0.4, x: -1.45, yaw: Math.PI * 0.5, moveW: 0.0, walkPhase: 0.0 };
+  function smoothRampEase(u) {
+    const a = 0.14, v = 1.0 / (1.0 - a);
+    if (u <= 0) return 0;
+    if (u >= 1) return 1;
+    if (u < a) return 0.5 * v * u * u / a;
+    if (u > 1 - a) { const r = 1 - u; return 1 - 0.5 * v * r * r / a; }
+    return 0.5 * v * a + v * (u - a);
+  }
+  function stepStairWalk(h) {
+    const prevX = stairWalk.x;
+    stairWalk.cycleT = (stairWalk.cycleT + h) % 8.8;
+    const c = stairWalk.cycleT;
+    if (c < 3.2) {
+      stairWalk.x = lerp(-1.45, 1.18, smoothRampEase(c / 3.2));
+      stairWalk.yaw = Math.PI * 0.5;
+      stairWalk.moveW = smoothstep(0.0, 0.38, c) * (1.0 - smoothstep(2.82, 3.2, c));
+    } else if (c < 4.4) {
+      stairWalk.x = 1.18;
+      stairWalk.yaw = lerp(Math.PI * 0.5, -Math.PI * 0.5, smoothstep(3.25, 4.35, c));
+      stairWalk.moveW = 0.0;
+    } else if (c < 7.6) {
+      stairWalk.x = lerp(1.18, -1.45, smoothRampEase((c - 4.4) / 3.2));
+      stairWalk.yaw = -Math.PI * 0.5;
+      stairWalk.moveW = smoothstep(4.4, 4.78, c) * (1.0 - smoothstep(7.22, 7.6, c));
+    } else {
+      stairWalk.x = -1.45;
+      stairWalk.yaw = lerp(-Math.PI * 0.5, Math.PI * 0.5, smoothstep(7.65, 8.75, c));
+      stairWalk.moveW = 0.0;
+    }
+    stairWalk.walkPhase += Math.abs(stairWalk.x - prevX) * 0.94 + h * 0.08 * stairWalk.moveW;
+  }
+
   // Motion Matching interactive steering (WASD, exact 3D raycast click-to-move, or clean waypoint circuit!)
   const patrolWaypoints = [[1.55, 0.85], [1.45, -1.05], [-1.55, -0.95], [-1.45, 0.95]];
   const mm = { x: -0.25, z: 0.15, yaw: 0.65, speed: 0.8, turnRate: 0.0, targetX: 1.55, targetZ: 0.85, manualTimer: 0, clickPulse: 0, wpIdx: 0, idlePause: 0 };
@@ -122,12 +156,14 @@ export async function createAnimationEffect(gl) {
   window.addEventListener("keydown", ev => { const k = ev.key?.toLowerCase(); if (k in keys) keys[k] = true; });
   window.addEventListener("keyup",   ev => { const k = ev.key?.toLowerCase(); if (k in keys) keys[k] = false; });
 
-  function resetRagdolls() {
-    ragPassive.reset(0.55);
-    ragActive.reset(0.55);
-    ragPassive.push(1.0);
-    ragActive.push(1.0);
-    ragTimer = 0;
+  function resetRagdolls(immediatePush = true) {
+    ragPassive.reset(0.78, false);
+    ragActive.reset(0.78, true);
+    ragTimer = immediatePush ? 0.30 : 0.0;
+    if (immediatePush) {
+      ragPassive.push(1.0);
+      ragActive.push(1.0);
+    }
   }
 
   function drawLineData(vp, floats, mode, pointSize) {
@@ -214,24 +250,6 @@ export async function createAnimationEffect(gl) {
     drawLineData(vp, pts, gl.POINTS, 10.5);
   }
 
-  function getStairWalkState(t) {
-    const cyc = ((t % 7.6) + 7.6) % 7.6;
-    if (cyc < 2.8) {
-      const u = cyc / 2.8;
-      return { x: lerp(-1.35, 1.35, u), yaw: Math.PI * 0.5, moving: 1.0, phase: u * 2.65 };
-    } else if (cyc < 3.8) {
-      const u = (cyc - 2.8) / 1.0;
-      const s = u * u * (3 - 2 * u);
-      return { x: 1.35, yaw: lerp(Math.PI * 0.5, -Math.PI * 0.5, s), moving: 0.0, phase: 2.65 };
-    } else if (cyc < 6.6) {
-      const u = (cyc - 3.8) / 2.8;
-      return { x: lerp(1.35, -1.35, u), yaw: -Math.PI * 0.5, moving: 1.0, phase: 2.65 + u * 2.65 };
-    }
-    const u = (cyc - 6.6) / 1.0;
-    const s = u * u * (3 - 2 * u);
-    return { x: -1.35, yaw: lerp(-Math.PI * 0.5, Math.PI * 0.5, s), moving: 0.0, phase: 5.30 };
-  }
-
   function renderSingleStage(stage, vp, basis) {
     gl.disable(gl.DEPTH_TEST);
     gl.useProgram(progSky);
@@ -273,15 +291,14 @@ export async function createAnimationEffect(gl) {
       fk = evaluateTwistPose(rig, simTime, twist);
       deformMode = 3; showTwist = 1.0;
     } else if (stage === 4 || stage === 98) {
-      // 2006-09 Smooth constant-speed stair walk on continuous ramp baseline -> ZERO camera/hip jumps!
-      const sw = getStairWalkState(simTime);
-      const smoothRampY = clamp((sw.x + 1.40) / 2.80, 0, 1) * 5 * 0.13;
-      const baseY = stage === 98 ? smoothRampY + 0.09 : smoothRampY;
-      const pWalk = sampleClipLocal(rig, "walk", sw.phase);
+      // 2006-09 Smooth C1 stair walk on exact step centerline + C1 smooth-bevel Foot IK -> ZERO snaps!
+      const rampY = getSmoothStairRamp(stairWalk.x);
+      const baseY = stage === 98 ? rampY + 0.09 : rampY;
+      const pWalk = sampleClipLocal(rig, "walk", stairWalk.walkPhase);
       const pIdle = sampleClipLocal(rig, "idle", simTime);
-      const pose = sw.moving > 0.5 ? pWalk : blendLocalPoses(pIdle, pWalk, 0.25);
-      const rawFk = evaluateFK(rig, pose, [sw.x, baseY, 0], sw.yaw);
-      fk = stage === 4 ? applyFootIK(rig, rawFk, 1, sw.yaw) : rawFk;
+      const pose = blendLocalPoses(pIdle, pWalk, stairWalk.moveW);
+      const rawFk = evaluateFK(rig, pose, [stairWalk.x, baseY, 0], stairWalk.yaw);
+      fk = stage === 4 ? applyFootIK(rig, rawFk, 1, stairWalk.yaw) : rawFk;
       deformMode = 3;
     } else if (stage === 6) {
       fk = ragActive.toFK(true);
@@ -368,7 +385,7 @@ export async function createAnimationEffect(gl) {
     },
 
     enterStep(stepIdx) {
-      if (stepIdx === 6) resetRagdolls();
+      if (stepIdx === 6) resetRagdolls(false);
       if (stepIdx === 3 || stepIdx === 5) twistActive = true;
     },
 
@@ -440,9 +457,21 @@ export async function createAnimationEffect(gl) {
       if (paused) return;
       const h = Math.min(dt, 0.04);
       simTime += h;
+      stepStairWalk(h);
 
+      // Smooth non-teleporting Step 7 cycle: 0..0.30s upright -> shove -> 4.55s smooth rewind -> 5.80s exact 0mm wrap!
       ragTimer += h;
-      if (ragTimer > 4.6) resetRagdolls();
+      if (ragTimer >= 0.30 && !ragPassive.state.pushed && !ragPassive.state.rwStart) {
+        ragPassive.push(1.0);
+        ragActive.push(1.0);
+      }
+      if (ragTimer >= 4.55 && !ragPassive.state.rwStart) {
+        ragPassive.startSmoothRewind();
+        ragActive.startSmoothRewind();
+      }
+      if (ragTimer >= 5.80) {
+        resetRagdolls(false);
+      }
       ragPassive.step(h, false);
       ragActive.step(h, true);
 
@@ -504,23 +533,20 @@ export async function createAnimationEffect(gl) {
     render(w, h, step, split, cam) {
       const aspect = w / Math.max(1, h);
 
-      // Smooth continuous ramp camera focus (ZERO 13cm discrete stair-step camera jumping on Steps 5 & 7!)
-      const smoothStairY = (x) => clamp((x + 1.40) / 2.80, 0, 1) * 5 * 0.13;
+      // Smooth C1 cinema tracking cameras on Steps 5 & 7 (lifts boots & fallen ragdoll cleanly ABOVE bottom-left UI card -> ZERO camera jumps!)
       const focusFor = (st) => {
-        if (st === 4 || st === 98) {
-          const sw = getStairWalkState(simTime);
-          return [sw.x * 0.65, smoothStairY(sw.x) + 0.94, 0];
-        }
-        if (st === 6)  return [ragActive.state.x * 0.45,  smoothStairY(ragActive.state.x) + 0.92, 0];
-        if (st === 99) return [ragPassive.state.x * 0.45, smoothStairY(ragPassive.state.x) + 0.56, 0];
-        if (st === 7)  return [mm.x * 0.45, getArenaHeight(mm.x, mm.z, 2) + 0.94, mm.z * 0.45];
+        if (st === 4 || st === 98) return [stairWalk.x * 0.85, getSmoothStairRamp(stairWalk.x) * 0.85 + 0.78, 0];
+        if (st === 6)  return [ragActive.state.x * 0.85,  getSmoothStairRamp(ragActive.state.x) * 0.85 + 0.56, 0];
+        if (st === 99) return [ragPassive.state.x * 0.85, getSmoothStairRamp(ragPassive.state.x) * 0.85 + 0.02, 0];
+        if (st === 7)  return [mm.x * 0.45, getArenaHeight(mm.x, mm.z, 2) + 0.86, mm.z * 0.45];
         if (st === 3 || st === 5) return [0, 1.16, 0];
         return [0, cam.lookY || 1.02, 0];
       };
 
       const buildViewProj = (st, ndcShiftX) => {
         const foc = focusFor(st);
-        const distScale = (st === 3 || st === 5) ? 0.80 : (st === 7 ? 1.24 : 1.0);
+        const distScale = (st === 3 || st === 5) ? 0.80
+          : (st === 4 || st === 98 ? 1.24 : (st === 6 || st === 99 ? 1.24 : (st === 7 ? 1.24 : 1.0)));
         const fovRad = ((cam.fovDeg || 44) * Math.PI) / 180;
         const basis = cameraBasisFromOrbit(cam.yaw, cam.pitch, cam.dist * distScale, foc[1]);
         basis.pos[0] += foc[0]; basis.pos[2] += foc[2];
