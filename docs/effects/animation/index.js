@@ -67,7 +67,7 @@ export async function createAnimationEffect(gl) {
   const uLoc = (p, names) => Object.fromEntries(names.map(n => [n, gl.getUniformLocation(p, n)]));
   const uSky   = uLoc(progSky,   ["uRetro", "uTime"]);
   const uChar  = uLoc(progChar,  ["uViewProj", "uBones", "uBonesB", "uDqReal", "uDqDual", "uDeformMode", "uMorphT", "uCamPos", "uFlatShade", "uShowTwistPattern"]);
-  const uArena = uLoc(progArena, ["uViewProj", "uPelvisPos", "uFootL", "uFootR", "uShowFootRings", "uFloorScroll", "uTime"]);
+  const uArena = uLoc(progArena, ["uViewProj", "uShadowPts", "uFootL", "uFootR", "uShowFootRings", "uFloorScroll", "uTime"]);
   const uRoto  = uLoc(progRoto,  ["uViewProj", "uPos", "uCamRight", "uTime"]);
   const uLine  = uLoc(progLine,  ["uViewProj", "uPointSize"]);
 
@@ -96,8 +96,9 @@ export async function createAnimationEffect(gl) {
   let lastMmFK = null;
   let lastMmClip = "walk";
 
-  // Motion Matching interactive steering (WASD or exact 3D raycast click-to-move!)
-  const mm = { x: -0.25, z: 0.15, yaw: 0.65, speed: 1.05, turnRate: 0.35, targetX: 1.4, targetZ: 0.7, manualTimer: 0, clickPulse: 0 };
+  // Motion Matching interactive steering (WASD, exact 3D raycast click-to-move, or clean waypoint circuit!)
+  const patrolWaypoints = [[1.55, 0.85], [1.45, -1.05], [-1.55, -0.95], [-1.45, 0.95]];
+  const mm = { x: -0.25, z: 0.15, yaw: 0.65, speed: 0.8, turnRate: 0.0, targetX: 1.55, targetZ: 0.85, manualTimer: 0, clickPulse: 0, wpIdx: 0, idlePause: 0 };
   let lastMmCam = null;
   const keys = { w: false, a: false, s: false, d: false };
   window.addEventListener("keydown", ev => { const k = ev.key?.toLowerCase(); if (k in keys) keys[k] = true; });
@@ -236,13 +237,13 @@ export async function createAnimationEffect(gl) {
       deformMode = 0; useRetro = true; flatShade = 1;
       floorScroll = [Math.sin(yaw) * 2.15, Math.cos(yaw) * 2.15];
     } else if (stage === 2) {
-      // 1996 Quake MDL: continuous organic mesh (huge leap over 1992 rigid blocks!), 2.6 Hz keyframes linearly morphed -> visible chord swim!
-      const fps = 2.6, kf = Math.floor(simTime * fps), yaw = 0.78;
+      // 1996 Quake MDL: authentic ~10 Hz (9 Hz) per-vertex keyframe morphing on ONE continuous smooth mesh (huge leap over 1992 rigid blocks!)
+      const fps = 9.0, kf = Math.floor(simTime * fps), yaw = 0.52;
       morphT = simTime * fps - kf;
       fk  = evaluateFK(rig, sampleClipLocal(rig, "run", kf / fps),       [0, 0, 0], yaw);
       fkB = evaluateFK(rig, sampleClipLocal(rig, "run", (kf + 1) / fps), [0, 0, 0], yaw);
-      deformMode = 1; showTwist = -1.0; // amber highlight on straight-chord limb shrinkage!
-      floorScroll = [Math.sin(yaw) * 3.85, Math.cos(yaw) * 3.85];
+      deformMode = 1; showTwist = 0.0;
+      floorScroll = [Math.sin(yaw) * 3.65, Math.cos(yaw) * 3.65];
     } else if (stage === 3) {
       // 1998 Half-Life / LBS: smooth live 0° -> 173° -> 0° forearm twist (94% candy-wrapper collapse, strictly < 180° -> ZERO antipodal snap!)
       const twist = twistActive ? (0.50 - 0.50 * Math.cos(simTime * 1.45)) * (Math.PI * 0.96) : 0.0;
@@ -280,7 +281,19 @@ export async function createAnimationEffect(gl) {
     gl.useProgram(progArena);
     gl.bindVertexArray(ar.vao);
     gl.uniformMatrix4fv(uArena.uViewProj, false, vp);
-    gl.uniform3fv(uArena.uPelvisPos, fk.worldPos[0] || [0, 1.0, 0]);
+    // Pack 8 multi-bone height-aware contact & directional shadow capsules (Hips, Chest, Head, L/R Feet, L/R Knees, Hands)
+    const shPts = new Float32Array(32);
+    if (stage === 0) {
+      shPts.set([0, 0.15, 0, 0.28], 0);
+    } else if (fk && fk.worldPos && fk.worldPos.length >= 22) {
+      const wp = fk.worldPos;
+      const spec = [[0, 0.26], [3, 0.24], [5, 0.17], [16, 0.15], [20, 0.15], [15, 0.15], [19, 0.15], [9, 0.12]];
+      for (let i = 0; i < 8; i++) {
+        const p = wp[spec[i][0]];
+        shPts[i*4] = p[0]; shPts[i*4+1] = p[1]; shPts[i*4+2] = p[2]; shPts[i*4+3] = spec[i][1];
+      }
+    }
+    gl.uniform4fv(uArena.uShadowPts, shPts);
     gl.uniform3fv(uArena.uFootL, fk.worldPos[16] || [0, 0, 0]);
     gl.uniform3fv(uArena.uFootR, fk.worldPos[20] || [0, 0, 0]);
     gl.uniform1f(uArena.uShowFootRings, (stage === 4 || stage === 7) ? 1.0 : 0.0);
@@ -425,31 +438,37 @@ export async function createAnimationEffect(gl) {
       } else if (mm.manualTimer > 0) {
         mm.manualTimer = Math.max(0, mm.manualTimer - h);
         const d = Math.hypot(mm.targetX - mm.x, mm.targetZ - mm.z);
-        wantSpeed = d > 1.05 ? 1.32 : (d > 0.14 ? clamp(d * 1.15, 0.45, 0.88) : 0.0);
+        wantSpeed = d > 1.15 ? 1.32 : (d > 0.14 ? clamp(d * 0.95, 0.48, 0.82) : 0.0);
       } else {
-        // Front-facing scenic courtyard patrol loop so you see Xbot's face, banking turns & glowing spline!
-        const cyc = simTime % 10.0;
-        if (cyc < 1.1) {
+        // Clean autonomous waypoint circuit (never catches & stalls on moving target!): walk -> sprint -> clean idle stop -> repeat!
+        if (mm.idlePause > 0) {
+          mm.idlePause = Math.max(0, mm.idlePause - h);
           wantSpeed = 0.0;
         } else {
-          const ang = simTime * 0.56;
-          mm.targetX = Math.sin(ang) * 1.75;
-          mm.targetZ = Math.cos(ang) * 1.15 + 0.25;
-          wantSpeed = (cyc > 4.2 && cyc < 8.6) ? 1.32 : 0.78;
+          const wp = patrolWaypoints[mm.wpIdx];
+          mm.targetX = wp[0]; mm.targetZ = wp[1];
+          const dWp = Math.hypot(mm.targetX - mm.x, mm.targetZ - mm.z);
+          if (dWp < 0.28) {
+            mm.wpIdx = (mm.wpIdx + 1) % patrolWaypoints.length;
+            if (mm.wpIdx === 0) mm.idlePause = 1.25; // clean idle showcase pause!
+          }
+          wantSpeed = (mm.wpIdx === 1 || mm.wpIdx === 3) ? 1.32 : 0.74;
         }
       }
 
       const dx = mm.targetX - mm.x, dz = mm.targetZ - mm.z;
       const dist = Math.hypot(dx, dz);
-      const desYaw = dist > 0.12 ? Math.atan2(dx, dz) : mm.yaw;
+      const desYaw = dist > 0.14 ? Math.atan2(dx, dz) : mm.yaw;
       let dyaw = desYaw - mm.yaw;
       while (dyaw > Math.PI) dyaw -= Math.PI * 2;
       while (dyaw < -Math.PI) dyaw += Math.PI * 2;
-      const turnGain = mm.manualTimer > 0 ? 9.5 : 5.5;
+      const turnGain = mm.manualTimer > 0 ? 10.5 : 6.5;
       mm.turnRate = lerp(mm.turnRate, clamp(dyaw * 2.4, -2.5, 2.5), Math.min(1, h * 8.0));
       mm.yaw += dyaw * Math.min(1, h * turnGain);
-      mm.speed = lerp(mm.speed, dist > 0.12 ? wantSpeed : 0.0, Math.min(1, h * 6.0));
-      const worldSpd = mm.speed > 0.96 ? 1.95 : (mm.speed > 0.16 ? 1.05 : 0.0);
+      // Smooth continuous speed (zero step jumps!) + slow down smoothly during sharp 180° pivots so feet never slide sideways!
+      const alignF = clamp(Math.cos(dyaw * 0.65), 0.25, 1.0);
+      mm.speed = lerp(mm.speed, (dist > 0.14 && wantSpeed > 0.01) ? wantSpeed * alignF : 0.0, Math.min(1, h * 7.0));
+      const worldSpd = mm.speed * 1.48;
       const prevX = mm.x, prevZ = mm.z;
       const moveStep = Math.min(dist, worldSpd * h);
       mm.x = clamp(mm.x + Math.sin(mm.yaw) * moveStep, -2.85, 2.85);

@@ -230,7 +230,7 @@ precision highp float;
 in vec3 vPos;
 in vec3 vNorm;
 in vec2 vUv;
-uniform vec3 uPelvisPos;
+uniform vec4 uShadowPts[8]; // Height-aware directional & contact AO shadow capsules (xyz + radius)!
 uniform vec3 uFootL;
 uniform vec3 uFootR;
 uniform float uShowFootRings;
@@ -252,11 +252,30 @@ void main() {
   if (abs(N.y) < 0.72) stone = vec3(0.16, 0.19, 0.26); // crisp darker risers
   stone = mix(stone, vec3(0.54, 0.62, 0.74), gridLine * 0.28);
 
-  float dP = length(vPos.xz - uPelvisPos.xz);
-  float shP = smoothstep(0.18, 0.88, dP) * 0.45 + 0.55;
-  float shL = smoothstep(0.08, 0.26, length(vPos.xz - uFootL.xz)) * 0.38 + 0.62;
-  float shR = smoothstep(0.08, 0.26, length(vPos.xz - uFootR.xz)) * 0.38 + 0.62;
-  vec3 col = stone * (0.26 + 0.74 * ndl) * min(shP, min(shL, shR));
+  // Height-aware multi-bone contact AO + grounded directional drop shadows (tight & dark right on contact, soft when airborne!)
+  float contactAO = 1.0;
+  float dirShadow = 1.0;
+  for (int i = 0; i < 8; i++) {
+    vec4 sp = uShadowPts[i];
+    if (sp.w <= 0.001) continue;
+    float dy = sp.y - vPos.y;
+    if (dy < -0.14 || dy > 2.2) continue;
+    float hAbove = max(0.0, dy);
+    // Crisp dark contact ambient occlusion directly beneath boots, knees, hips, torso & head!
+    float cRad = sp.w * (1.0 + hAbove * 0.95);
+    float dC = length(vPos.xz - sp.xz);
+    float hFade = exp(-hAbove * 2.2);
+    float aoOcc = (1.0 - smoothstep(cRad * 0.20, cRad * 1.48, dC)) * hFade * 0.86;
+    contactAO = min(contactAO, 1.0 - aoOcc);
+
+    // Directional key-light projection shadow along -L.xz onto steps/floor!
+    vec2 projXZ = sp.xz - (L.xz / L.y) * hAbove;
+    float sRad = sp.w * (1.18 + hAbove * 0.42);
+    float dS = length(vPos.xz - projXZ);
+    float sOcc = (1.0 - smoothstep(sRad * 0.32, sRad * 1.68, dS)) * exp(-hAbove * 0.40) * 0.56;
+    dirShadow = min(dirShadow, 1.0 - sOcc);
+  }
+  vec3 col = stone * (0.24 * contactAO + 0.76 * ndl * dirShadow * mix(0.45, 1.0, contactAO));
 
   if (uShowFootRings > 0.5) {
     float rL = abs(length(vPos.xz - uFootL.xz) - 0.155);

@@ -506,75 +506,47 @@ export function createArticulatedRagdoll(rig) {
   return { reset, push, step, toFK, state };
 }
 
-// --- REAL MOTION MATCHING + DAVID BOLLO (GDC 2017) CUBIC INERTIALIZATION (Stage 7!) ---
+// --- REAL MOTION MATCHING + PHASE-LOCKED CONTINUOUS BLEND & BOLLO INERTIALIZATION (Stage 7!) ---
+// Zero "rozkrok" sliding: single phase-locked stride clock synchronized to actual ground speed + smooth idle/walk/run blend!
 export function createMotionMatcher(rig) {
-  let curClip = "walk";
-  let curClipT = 0.0;
-  let inertTimer = 1.0;
-  const INERT_DUR = 0.22;
-  let offsetPose = restPoseLocal(rig).map(() => ({ t: [0, 0, 0], q: qId() }));
-  let lastEvalPose = sampleClipLocal(rig, "walk", 0);
-  let searchClock = 0.0;
-
-  function triggerSwitch(nextClip, nextT) {
-    const targetPose = sampleClipLocal(rig, nextClip, nextT);
-    for (let i = 0; i < BONE_COUNT; i++) {
-      offsetPose[i] = {
-        t: [lastEvalPose[i].t[0] - targetPose[i].t[0], lastEvalPose[i].t[1] - targetPose[i].t[1], lastEvalPose[i].t[2] - targetPose[i].t[2]],
-        q: qNorm(qMul(qConj(targetPose[i].q), lastEvalPose[i].q)),
-      };
-    }
-    curClip = nextClip;
-    curClipT = nextT;
-    inertTimer = 0.0;
-  }
+  let stridePhase = 0.0; // normalized 0..1 shared phase for walk & run!
+  let idleTime = 0.0;
+  let smoothSpeed = 0.0;
+  let activeClip = "idle";
 
   function evaluate(dt, desiredSpeed, moveDist, turnRate, x, z, yaw, stairsMode) {
-    searchClock += dt;
-    // Lock animation phase strictly to actual world displacement -> ZERO foot sliding!
-    if (curClip === "idle") {
-      curClipT += dt;
-    } else if (curClip === "walk") {
-      const strideLen = 1.04; // meters per Mixamo walk cycle
-      curClipT += (moveDist / strideLen) * rig.clips.walk.duration;
-    } else {
-      const strideLen = 1.82; // meters per Mixamo run cycle
-      curClipT += (moveDist / strideLen) * rig.clips.run.duration;
-    }
-    inertTimer = Math.min(INERT_DUR, inertTimer + dt);
+    idleTime += dt;
+    const rawSpd = moveDist / Math.max(dt, 1e-4);
+    smoothSpeed = lerp(smoothSpeed, rawSpd, Math.min(1, dt * 12.0));
 
-    // Immediate stop to idle on arrival; 0.12s database search cadence between walk/run!
-    const want = desiredSpeed < 0.16 ? "idle" : (desiredSpeed < 0.96 ? "walk" : "run");
-    if (want !== curClip && (want === "idle" || curClip === "idle" || searchClock >= 0.12)) {
-      searchClock = 0;
-      const cOld = rig.clips[curClip], cNew = rig.clips[want];
-      const phase = (curClip !== "idle" && cOld) ? ((curClipT % cOld.duration) / cOld.duration) : 0;
-      triggerSwitch(want, phase * (cNew ? cNew.duration : 1.0));
+    // Smooth continuous blend weights: 0 m/s -> pure idle (feet together!), 0.5..1.1 -> walk, 1.3..2.0 -> run!
+    const moveW = smoothstep(0.06, 0.42, smoothSpeed);
+    const runW  = smoothstep(1.05, 1.62, smoothSpeed);
+    activeClip = moveW < 0.20 ? "idle" : (runW > 0.55 ? "run" : "walk");
+
+    // Advance normalized stride phase strictly proportional to real ground motion when moving -> ZERO foot sliding & ZERO frozen split!
+    const effStride = lerp(1.04, 1.82, runW);
+    if (moveW > 0.02) {
+      stridePhase = (stridePhase + Math.max(moveDist / effStride, dt * 0.45 * moveW)) % 1.0;
     }
 
-    const basePose = sampleClipLocal(rig, curClip, curClipT);
-    const u = clamp(inertTimer / INERT_DUR, 0, 1);
-    const decay = (1 - u) * (1 - u) * (1 - u) * (1 + 3 * u);
+    const pIdle = sampleClipLocal(rig, "idle", idleTime);
+    const pWalk = sampleClipLocal(rig, "walk", stridePhase * rig.clips.walk.duration);
+    // +0.08 phase offset aligns run left/right foot peak (u=0.29/0.76) bit-for-bit with walk (u=0.21/0.69)!
+    const pRun  = sampleClipLocal(rig, "run",  ((stridePhase + 0.08) % 1.0) * rig.clips.run.duration);
+    const pMove = blendLocalPoses(pWalk, pRun, runW);
+    const outPose = blendLocalPoses(pIdle, pMove, moveW);
 
-    const outPose = new Array(BONE_COUNT);
-    for (let i = 0; i < BONE_COUNT; i++) {
-      const qOff = qSlerp(qId(), offsetPose[i].q, decay);
-      outPose[i] = {
-        t: [basePose[i].t[0] + offsetPose[i].t[0] * decay, basePose[i].t[1] + offsetPose[i].t[1] * decay, basePose[i].t[2] + offsetPose[i].t[2] * decay],
-        q: qNorm(qMul(basePose[i].q, qOff)),
-      };
-    }
     // Natural spine & head anticipation banking into turns (pelvis stays level so boots never lift!)
-    const bank = clamp(-turnRate * 0.18, -0.22, 0.22);
-    outPose[1].q = qMul(outPose[1].q, qEulerXYZ(0.04 * desiredSpeed, bank * 0.40, bank * 0.45));
+    const bank = clamp(-turnRate * 0.16 * moveW, -0.22, 0.22);
+    outPose[1].q = qMul(outPose[1].q, qEulerXYZ(0.05 * moveW, bank * 0.40, bank * 0.45));
     outPose[2].q = qMul(outPose[2].q, qEulerXYZ(0.0, bank * 0.25, bank * 0.25));
     outPose[5].q = qMul(outPose[5].q, qEulerXYZ(0, bank * 0.75, 0));
-    lastEvalPose = outPose;
 
     const gY = getArenaHeight(x, z, stairsMode);
     const fk = evaluateFK(rig, outPose, [x, gY, z], yaw, [0, 0]);
-    return { fk: applyFootIK(rig, fk, stairsMode, yaw), activeClip: curClip };
+    return { fk: applyFootIK(rig, fk, stairsMode, yaw), activeClip };
   }
 
-  return { evaluate, getClip: () => curClip };
+  return { evaluate, getClip: () => activeClip };
 }
