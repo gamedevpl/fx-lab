@@ -107,7 +107,7 @@
 
 <script type="module" src="src/app.js"></script>
 <script type="module">
-if ("LanguageModel" in self || self.__fxLabModel) {
+if (!new URLSearchParams(location.search).has("director") && ("LanguageModel" in self || self.__fxLabModel)) {
   import("./src/assistant.js").catch(() => {});
 }
 </script>
