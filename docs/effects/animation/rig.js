@@ -418,15 +418,132 @@ export function evaluateTwistPose(rig, tSec, twistAngle) {
   return evaluateFK(rig, pose, [0, 0, 0], 0.0, [0, 0]);
 }
 
-// --- TRUE ARTICULATED JOINT-LIMITED RAGDOLL vs REAL MOCAP-BACKED ACTIVE EUPHORIA (Stage 6!) ---
+// --- REAL JAKOBSEN (2001, HITMAN) 15-PARTICLE VERLET RAGDOLL vs REAL MOCAP-BACKED ACTIVE EUPHORIA (Stage 6!) ---
+function quatFromBasis(X, Y, Z) {
+  // Column-major 3x3 -> unit quaternion (columns = X, Y, Z)
+  const m = [
+    X[0], X[1], X[2], 0,
+    Y[0], Y[1], Y[2], 0,
+    Z[0], Z[1], Z[2], 0,
+    0, 0, 0, 1,
+  ];
+  return mat4ToQuat(m);
+}
+
+// Exact 3D sphere-vs-5-stone-steps + base floor position projection (friction applied ONCE per substep -> real stair tumble!)
+function collideParticleWithStairs(p, prev, r, applyVelocityResponse = false) {
+  let hitNx = 0, hitNy = 0, hitNz = 0, hit = false;
+  // 1) Base arena floor y = 0
+  if (p[1] < r) {
+    p[1] = r;
+    hitNx = 0; hitNy = 1; hitNz = 0; hit = true;
+  }
+  // 2) 5 solid architectural stone step blocks (exact match to getArenaHeight(x, z, 1)!)
+  for (let k = 0; k < 5; k++) {
+    const minX = -1.40 + k * 0.56;
+    const maxX = 3.20;
+    const maxY = (k + 1) * 0.13;
+    const minZ = -1.55, maxZ = 1.55;
+    const qx = clamp(p[0], minX, maxX);
+    const qy = clamp(p[1], -1.0, maxY);
+    const qz = clamp(p[2], minZ, maxZ);
+    const dx = p[0] - qx, dy = p[1] - qy, dz = p[2] - qz;
+    const d2 = dx*dx + dy*dy + dz*dz;
+    if (d2 < r * r) {
+      let nx = 0, ny = 1, nz = 0, pen = r;
+      if (d2 > 1e-8) {
+        const d = Math.sqrt(d2);
+        nx = dx / d; ny = dy / d; nz = dz / d;
+        pen = r - d;
+      } else {
+        const toTop = maxY - p[1];
+        const toSide = p[0] - minX;
+        if (toTop <= toSide + 0.04) { nx = 0; ny = 1; nz = 0; pen = toTop + r; }
+        else { nx = -1; ny = 0; nz = 0; pen = toSide + r; }
+      }
+      p[0] += nx * pen; p[1] += ny * pen; p[2] += nz * pen;
+      hitNx = nx; hitNy = ny; hitNz = nz; hit = true;
+    }
+  }
+  if (hit && applyVelocityResponse) {
+    // Realistic stone surface friction + gentle bounce applied ONCE per substep (never Velcro!)
+    const vx = p[0] - prev[0], vy = p[1] - prev[1], vz = p[2] - prev[2];
+    const vn = vx*hitNx + vy*hitNy + vz*hitNz;
+    const tx = vx - vn*hitNx, ty = vy - vn*hitNy, tz = vz - vn*hitNz;
+    const fric = 0.87;
+    const bounce = vn < 0 ? -vn * 0.16 : 0;
+    prev[0] = p[0] - (tx * fric + hitNx * bounce);
+    prev[1] = p[1] - (ty * fric + hitNy * bounce);
+    prev[2] = p[2] - (tz * fric + hitNz * bounce);
+  }
+}
+
 export function createArticulatedRagdoll(rig, isActive = false) {
+  // 15 Verlet particle bone indices mapping 1:1 to Xbot skeleton:
+  // 0:Hips(0), 1:Chest(3), 2:Head(5),
+  // 3:LSh(7), 4:LElb(8), 5:LHand(9),  6:RSh(11), 7:RElb(12), 8:RHand(13),
+  // 9:LHip(14), 10:LKnee(15), 11:LFoot(16), 12:RHip(18), 13:RKnee(19), 14:RFoot(20)
+  const BMAP = [0, 3, 5, 7, 8, 9, 11, 12, 13, 14, 15, 16, 18, 19, 20];
+  const RAD  = [0.115, 0.128, 0.112, 0.078, 0.062, 0.056, 0.078, 0.062, 0.056, 0.086, 0.074, 0.078, 0.086, 0.074, 0.078];
+  const IMAS = [0.32,  0.28,  0.65,  0.80,  1.10,  1.45,  0.80,  1.10,  1.45,  0.68,  0.90,  1.20,  0.68,  0.90,  1.20];
+
+  const restD = (a, b) => {
+    const wa = rig.restWorld[BMAP[a]], wb = rig.restWorld[BMAP[b]];
+    return Math.hypot(wb[0]-wa[0], wb[1]-wa[1], wb[2]-wa[2]);
+  };
+  // Exact bone-length stick constraints
+  const STICKS = [
+    [0, 1], [1, 2],
+    [0, 9], [0, 12], [9, 12],
+    [1, 3], [1, 6],  [3, 6],
+    [3, 4], [4, 5],  [6, 7], [7, 8],
+    [9, 10], [10, 11], [12, 13], [13, 14],
+  ].map(([a, b]) => [a, b, restD(a, b)]);
+
+  // Soft anatomical range constraints [a, b, minD, maxD] so spine/limbs drape naturally without collapsing or flipping!
+  const RANGES = [
+    [0, 3, restD(0, 3) * 0.85, restD(0, 3) * 1.07],
+    [0, 6, restD(0, 6) * 0.85, restD(0, 6) * 1.07],
+    [1, 9, restD(1, 9) * 0.85, restD(1, 9) * 1.07],
+    [1, 12, restD(1, 12) * 0.85, restD(1, 12) * 1.07],
+    [3, 9, restD(3, 9) * 0.82, restD(3, 9) * 1.10],
+    [6, 12, restD(6, 12) * 0.82, restD(6, 12) * 1.10],
+    [0, 2, restD(0, 2) * 0.76, restD(0, 2) * 1.04], // neck bend range
+    [3, 2, restD(3, 2) * 0.78, restD(3, 2) * 1.25],
+    [6, 2, restD(6, 2) * 0.78, restD(6, 2) * 1.25],
+    [9, 11, restD(9, 11) * 0.44, restD(9, 11) * 1.01], // knee bend limit
+    [12, 14, restD(12, 14) * 0.44, restD(12, 14) * 1.01],
+    [3, 5, restD(3, 5) * 0.36, restD(3, 5) * 1.01], // elbow bend limit
+    [6, 8, restD(6, 8) * 0.36, restD(6, 8) * 1.01],
+    [10, 13, 0.14, 1.40], // knees don't interpenetrate
+    [11, 14, 0.14, 1.50], // boots don't interpenetrate
+    [1, 4, 0.18, 2.0], [1, 7, 0.18, 2.0], [0, 5, 0.20, 2.0], [0, 8, 0.20, 2.0], // hands/elbows outside torso
+  ];
+
+  // Live Verlet particle buffers (used when !activeEuphoria)
+  const pos  = Array.from({ length: 15 }, () => [0, 0, 0]);
+  const prev = Array.from({ length: 15 }, () => [0, 0, 0]);
+  const standPos = Array.from({ length: 15 }, () => [0, 0, 0]);
+  const rwPos    = Array.from({ length: 15 }, () => [0, 0, 0]);
+
   const state = {
     x: 0.78, y: 0.0, z: 0.0, vx: 0, vy: 0,
     pitch: 0, vp: 0, roll: 0, vr: 0,
     t: 0, stridePhase: 0,
-    startX: 0.78, pushed: false, pushAge: 0, pushStrength: 1.0,
+    startX: 0.78, pushed: false, pushAge: 0, pushStrength: 1.0, pushSeed: 0,
     rwStart: null, rwT: 0, rwDur: 1.25,
   };
+
+  function initVerletStanding(startX) {
+    const g = getArenaHeight(startX, 0, 1);
+    const fk0 = evaluateFK(rig, sampleClipLocal(rig, "idle", 0), [startX, g, 0], Math.PI * 0.5);
+    for (let i = 0; i < 15; i++) {
+      const p = fk0.worldPos[BMAP[i]];
+      standPos[i] = [p[0], p[1], p[2]];
+      pos[i]  = [p[0], p[1], p[2]];
+      prev[i] = [p[0], p[1], p[2]];
+    }
+  }
 
   function reset(startX = 0.78, activeOverride = isActive) {
     const baseY = getSmoothStairRamp(startX);
@@ -436,81 +553,157 @@ export function createArticulatedRagdoll(rig, isActive = false) {
       t: 0, stridePhase: 0, startX, pushed: false, pushAge: 0, pushStrength: 1.0,
       rwStart: null, rwT: 0,
     });
+    initVerletStanding(startX);
   }
 
-  function push(strength = 1.0) {
+  function push(strength = 1.0, seed = null) {
     state.pushed = true;
     state.pushAge = 0;
     state.pushStrength = strength;
+    state.pushSeed = seed !== null ? seed : (state.pushSeed + 1);
     state.rwStart = null;
   }
 
   function startSmoothRewind() {
     if (state.rwStart) return;
     state.rwStart = { x: state.x, y: state.y, pitch: state.pitch, roll: state.roll };
+    for (let i = 0; i < 15; i++) rwPos[i] = [pos[i][0], pos[i][1], pos[i][2]];
     state.rwT = 0;
+  }
+
+  function stepVerlet(h) {
+    const substeps = 3;
+    const sh = h / substeps;
+    const damp = 0.996;
+    const grav = -9.81 * sh * sh;
+
+    for (let s = 0; s < substeps; s++) {
+      // Smooth 0.14s shove impulse applied mostly to upper chest, head & shoulders (feet catch on step lip -> real backward tumble!)
+      const pushOn = state.pushAge <= 0.14;
+      const pushScale = pushOn ? (sh / 0.14) * state.pushStrength * sh : 0;
+
+      for (let i = 0; i < 15; i++) {
+        const vx = (pos[i][0] - prev[i][0]) * damp;
+        const vy = (pos[i][1] - prev[i][1]) * damp;
+        const vz = (pos[i][2] - prev[i][2]) * damp;
+        prev[i][0] = pos[i][0]; prev[i][1] = pos[i][1]; prev[i][2] = pos[i][2];
+        let ax = 0, ay = grav, az = 0;
+        if (pushOn) {
+          // Real Verlet shove with organic asymmetry: one arm flings wide/overhead, legs split across steps -> unmistakable Hitman/HL2 ragdoll!
+          const sgn = (state.pushSeed % 2 === 0) ? 1.0 : -1.0;
+          let wBack = (i === 1 || i === 2) ? 4.05 : (i === 3 || i === 6) ? 3.55 : (i === 0) ? 2.45 : 0.70;
+          let wUp   = (i === 1 || i === 2) ? 0.70 : (i === 0) ? 0.35 : 0.0;
+          let wSpin = 0.0;
+          if (i === 4 || i === 5)       { wBack = 4.65; wUp = 1.45; wSpin =  2.15 * sgn; } // left arm flings wide & flops overhead
+          else if (i === 7 || i === 8)  { wBack = 2.15; wUp = 0.55; wSpin = -2.25 * sgn; } // right arm splays outward to side
+          else if (i === 3)             { wSpin =  1.25 * sgn; }
+          else if (i === 6)             { wSpin = -1.15 * sgn; }
+          else if (i === 2)             { wSpin =  0.75 * sgn; }
+          else if (i === 10 || i === 11){ wBack = 1.45; wUp = 0.85; wSpin =  0.85 * sgn; } // one knee kicks & bends over step
+          else if (i === 13 || i === 14){ wBack = 0.15; wUp = 0.10; wSpin = -0.65 * sgn; } // other boot trails on higher step
+          ax -= wBack * pushScale;
+          ay += wUp   * pushScale;
+          az += wSpin * pushScale;
+        }
+        pos[i][0] += vx + ax;
+        pos[i][1] += vy + ay;
+        pos[i][2] += vz + az;
+      }
+
+      // 12 Jakobsen PBD constraint + position-only collision iterations (friction applied ONCE on final iteration!)
+      for (let it = 0; it < 12; it++) {
+        for (let k = 0; k < STICKS.length; k++) {
+          const [a, b, d0] = STICKS[k];
+          const dx = pos[b][0]-pos[a][0], dy = pos[b][1]-pos[a][1], dz = pos[b][2]-pos[a][2];
+          const d = Math.hypot(dx, dy, dz) || 1e-6;
+          const diff = (d - d0) / d;
+          const wSum = IMAS[a] + IMAS[b];
+          const wa = IMAS[a] / wSum, wb = IMAS[b] / wSum;
+          pos[a][0] += dx * diff * wa; pos[a][1] += dy * diff * wa; pos[a][2] += dz * diff * wa;
+          pos[b][0] -= dx * diff * wb; pos[b][1] -= dy * diff * wb; pos[b][2] -= dz * diff * wb;
+        }
+        for (let k = 0; k < RANGES.length; k++) {
+          const [a, b, minD, maxD] = RANGES[k];
+          const dx = pos[b][0]-pos[a][0], dy = pos[b][1]-pos[a][1], dz = pos[b][2]-pos[a][2];
+          const d = Math.hypot(dx, dy, dz) || 1e-6;
+          let target = d;
+          if (d < minD) target = minD;
+          else if (d > maxD) target = maxD;
+          else continue;
+          const diff = (d - target) / d;
+          const wSum = IMAS[a] + IMAS[b];
+          const wa = IMAS[a] / wSum, wb = IMAS[b] / wSum;
+          pos[a][0] += dx * diff * wa; pos[a][1] += dy * diff * wa; pos[a][2] += dz * diff * wa;
+          pos[b][0] -= dx * diff * wb; pos[b][1] -= dy * diff * wb; pos[b][2] -= dz * diff * wb;
+        }
+        // Anatomical knee hinge (prevent backward flamingo knees: knees stay on pelvis forward side!)
+        const pL = [pos[9][0]-pos[12][0], pos[9][1]-pos[12][1], pos[9][2]-pos[12][2]];
+        const pU = [pos[1][0]-pos[0][0],  pos[1][1]-pos[0][1],  pos[1][2]-pos[0][2]];
+        const pFwd = norm3(...cross3(pL, pU));
+        for (const [ih, ik, ift] of [[9, 10, 11], [12, 13, 14]]) {
+          const mx = 0.5*(pos[ih][0]+pos[ift][0]), my = 0.5*(pos[ih][1]+pos[ift][1]), mz = 0.5*(pos[ih][2]+pos[ift][2]);
+          const dotF = (pos[ik][0]-mx)*pFwd[0] + (pos[ik][1]-my)*pFwd[1] + (pos[ik][2]-mz)*pFwd[2];
+          if (dotF < -0.015) {
+            const corr = (-0.015 - dotF) * 0.55;
+            pos[ik][0] += pFwd[0]*corr; pos[ik][1] += pFwd[1]*corr; pos[ik][2] += pFwd[2]*corr;
+          }
+        }
+        // Exact 3D collision of EVERY particle against all 5 solid stone steps + floor (friction once on final iter!)
+        const isFinal = (it === 11);
+        for (let i = 0; i < 15; i++) collideParticleWithStairs(pos[i], prev[i], RAD[i], isFinal);
+      }
+    }
+    // Track pelvis position for camera & shadows
+    state.x = pos[0][0];
+    state.y = pos[0][1];
+    state.z = pos[0][2];
   }
 
   function step(dt, activeEuphoria = isActive) {
     const h = Math.min(dt, 0.025);
     state.t += h;
 
-    // Smooth non-teleporting glide back to top step before next shove!
     if (state.rwStart) {
       state.rwT = Math.min(state.rwDur, state.rwT + h);
       const u = smoothstep(0.0, 1.0, state.rwT / state.rwDur);
-      const goalY = activeEuphoria ? getSmoothStairRamp(state.startX) : getSmoothStairRamp(state.startX) + 0.96;
-      state.x = lerp(state.rwStart.x, state.startX, u);
-      state.y = lerp(state.rwStart.y, goalY, u);
-      state.pitch = lerp(state.rwStart.pitch, 0.0, u);
-      state.roll  = lerp(state.rwStart.roll,  0.0, u);
-      state.vx = 0; state.vy = 0; state.vp = 0; state.vr = 0;
-      if (activeEuphoria) state.stridePhase += h * 1.15 * (1.0 - u);
+      if (!activeEuphoria) {
+        for (let i = 0; i < 15; i++) {
+          pos[i][0] = lerp(rwPos[i][0], standPos[i][0], u);
+          pos[i][1] = lerp(rwPos[i][1], standPos[i][1], u);
+          pos[i][2] = lerp(rwPos[i][2], standPos[i][2], u);
+          prev[i][0] = pos[i][0]; prev[i][1] = pos[i][1]; prev[i][2] = pos[i][2];
+        }
+        state.x = pos[0][0]; state.y = pos[0][1]; state.z = pos[0][2];
+      } else {
+        const goalY = getSmoothStairRamp(state.startX);
+        state.x = lerp(state.rwStart.x, state.startX, u);
+        state.y = lerp(state.rwStart.y, goalY, u);
+        state.pitch = lerp(state.rwStart.pitch, 0.0, u);
+        state.roll  = lerp(state.rwStart.roll,  0.0, u);
+        state.vx = 0; state.vy = 0; state.vp = 0; state.vr = 0;
+        state.stridePhase += h * 1.15 * (1.0 - u);
+      }
       return;
     }
 
     if (!state.pushed) {
       const baseY = getSmoothStairRamp(state.x);
-      state.y = activeEuphoria ? baseY : baseY + 0.96;
+      state.y = activeEuphoria ? baseY : pos[0][1];
       return;
     }
 
     state.pushAge += h;
-    // Smooth 0.16s shove impulse ramp (ZERO 1-frame 57cm impact teleport!)
-    if (state.pushAge <= 0.16) {
-      const imp = (h / 0.16) * state.pushStrength;
-      state.vx += -1.85 * imp;
-      state.vy +=  0.34 * imp;
-      state.vp += -2.85 * imp;
-      state.vr +=  0.42 * imp;
-    }
 
     if (!activeEuphoria) {
-      // 2000 HITMAN PASSIVE LIMP RAGDOLL: smooth gravity tumble onto C1 stair slope (ZERO riser snapping!)
-      state.vy -= 8.8 * h;
-      state.x = clamp(state.x + state.vx * h, -1.35, 2.0);
-      state.y += state.vy * h;
-      state.pitch += state.vp * h;
-      state.roll  += state.vr * h;
-
-      const smoothFloor = Math.max(getSmoothFootGround(state.x, state.z, 1), getSmoothStairRamp(state.x));
-      const minPelvisY = smoothFloor + 0.21;
-      if (state.y < minPelvisY) {
-        state.y = minPelvisY;
-        if (state.vy < 0) state.vy = -state.vy * 0.08;
-        state.vx *= Math.pow(0.10, h);
-        state.vp += (-1.38 - state.pitch) * 14.0 * h;
-        state.vp *= Math.pow(0.06, h);
-        state.vr *= Math.pow(0.08, h);
-      } else {
-        state.vp -= 1.8 * h;
-        state.vp *= 0.985;
-      }
-      state.pitch = clamp(state.pitch, -1.48, 0.35);
-      state.roll  = clamp(state.roll, -0.32, 0.32);
+      // 2000 HITMAN GENUINE 15-PARTICLE JAKOBSEN VERLET RAGDOLL!
+      stepVerlet(h);
     } else {
       // 2008 GTA IV EUPHORIA ACTIVE MUSCLE REFLEXES:
-      // Smooth backward stumble down stairs + PD upright recovery + C1 smooth Foot IK (ZERO snaps!)
+      if (state.pushAge <= 0.16) {
+        const imp = (h / 0.16) * state.pushStrength;
+        state.vx += -1.85 * imp;
+        state.vp += -2.65 * imp;
+      }
       state.vx *= Math.pow(0.28, h);
       const prevX = state.x;
       state.x = clamp(state.x + state.vx * h, -1.25, 2.0);
@@ -524,26 +717,81 @@ export function createArticulatedRagdoll(rig, isActive = false) {
     }
   }
 
+  function verletToFK() {
+    // Reconstruct exact orthonormal 22-bone Xbot world transforms directly from the 15 live Verlet particles!
+    const wp = new Array(BONE_COUNT);
+    const wr = new Array(BONE_COUNT);
+    const sub = (b, a) => [b[0]-a[0], b[1]-a[1], b[2]-a[2]];
+    const mix3 = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
+    const alignBone = (parentQ, restDirLocal, liveDirWorld) => {
+      const curDir = qRotVec(parentQ, restDirLocal);
+      return qNorm(qMul(qFromTo(curDir, liveDirWorld), parentQ));
+    };
+
+    // Pelvis basis: +X = LHip - RHip, +Y = Chest - Hips, +Z = cross(X, Y)
+    const pX = norm3(...sub(pos[9], pos[12]));
+    const pUpRaw = norm3(...sub(pos[1], pos[0]));
+    const pZ = norm3(...cross3(pX, pUpRaw));
+    const pY = norm3(...cross3(pZ, pX));
+    const qHips = quatFromBasis(pX, pY, pZ);
+
+    // Chest basis: +X = LSh - RSh, +Y = Chest - Hips, +Z = cross(X, Y)
+    const cX = norm3(...sub(pos[3], pos[6]));
+    const cZ = norm3(...cross3(cX, pUpRaw));
+    const cY = norm3(...cross3(cZ, cX));
+    const qChest = quatFromBasis(cX, cY, cZ);
+
+    // Spine chain (0..5)
+    wp[0] = [...pos[0]]; wr[0] = qHips;
+    wp[1] = mix3(pos[0], pos[1], 0.34); wr[1] = qSlerp(qHips, qChest, 0.35);
+    wp[2] = mix3(pos[0], pos[1], 0.68); wr[2] = qSlerp(qHips, qChest, 0.72);
+    wp[3] = [...pos[1]]; wr[3] = qChest;
+    const headDir = norm3(...sub(pos[2], pos[1]));
+    const qHead = alignBone(qChest, [0, 1, 0], headDir);
+    wp[4] = mix3(pos[1], pos[2], 0.62); wr[4] = qSlerp(qChest, qHead, 0.65);
+    wp[5] = [...pos[2]]; wr[5] = qHead;
+
+    // Left Arm (6..9): rest dir +X
+    wp[6] = mix3(pos[1], pos[3], 0.45); wr[6] = qChest;
+    wp[7] = [...pos[3]]; wr[7] = alignBone(qChest, [1, 0, 0], norm3(...sub(pos[4], pos[3])));
+    wp[8] = [...pos[4]]; wr[8] = alignBone(wr[7],  [1, 0, 0], norm3(...sub(pos[5], pos[4])));
+    wp[9] = [...pos[5]]; wr[9] = wr[8];
+
+    // Right Arm (10..13): rest dir -X
+    wp[10] = mix3(pos[1], pos[6], 0.45); wr[10] = qChest;
+    wp[11] = [...pos[6]]; wr[11] = alignBone(qChest, [-1, 0, 0], norm3(...sub(pos[7], pos[6])));
+    wp[12] = [...pos[7]]; wr[12] = alignBone(wr[11], [-1, 0, 0], norm3(...sub(pos[8], pos[7])));
+    wp[13] = [...pos[8]]; wr[13] = wr[12];
+
+    // Left Leg (14..17): rest dir -Y
+    wp[14] = [...pos[9]];  wr[14] = alignBone(qHips,  [0, -1, 0], norm3(...sub(pos[10], pos[9])));
+    wp[15] = [...pos[10]]; wr[15] = alignBone(wr[14], [0, -1, 0], norm3(...sub(pos[11], pos[10])));
+    wp[16] = [...pos[11]]; wr[16] = wr[15];
+    const lToeOff = qRotVec(wr[16], [0, -0.087, 0.107]);
+    wp[17] = [wp[16][0] + lToeOff[0], wp[16][1] + lToeOff[1], wp[16][2] + lToeOff[2]]; wr[17] = wr[16];
+
+    // Right Leg (18..21): rest dir -Y
+    wp[18] = [...pos[12]]; wr[18] = alignBone(qHips,  [0, -1, 0], norm3(...sub(pos[13], pos[12])));
+    wp[19] = [...pos[13]]; wr[19] = alignBone(wr[18], [0, -1, 0], norm3(...sub(pos[14], pos[13])));
+    wp[20] = [...pos[14]]; wr[20] = wr[19];
+    const rToeOff = qRotVec(wr[20], [0, -0.087, 0.107]);
+    wp[21] = [wp[20][0] + rToeOff[0], wp[20][1] + rToeOff[1], wp[20][2] + rToeOff[2]]; wr[21] = wr[20];
+
+    const wm = new Array(BONE_COUNT);
+    for (let i = 0; i < BONE_COUNT; i++) wm[i] = mat4FromQT(wr[i], wp[i]);
+    return packSkinUniforms(rig, wp, wr, wm);
+  }
+
   function toFK(activeEuphoria = isActive) {
     if (!activeEuphoria) {
-      const pose = restPoseLocal(rig);
-      pose[0].t = [0, 0, 0];
-      const f = smoothstep(0.0, 0.90, Math.abs(state.pitch));
-      pose[1].q  = qMul(pose[1].q,  qEulerXYZ(-0.18 * f, 0.12 * f, 0.08 * f));
-      pose[2].q  = qMul(pose[2].q,  qEulerXYZ(-0.14 * f, 0.10 * f, 0.06 * f));
-      pose[5].q  = qMul(pose[5].q,  qEulerXYZ(0.22 * f,  0.34 * f, -0.18 * f));
-      pose[7].q  = qMul(pose[7].q,  qEulerXYZ(0.0, 0.25 * f, -0.32 + 0.62 * f));
-      pose[8].q  = qMul(pose[8].q,  qEulerXYZ(0.0, -0.45 * f, 0.0));
-      pose[11].q = qMul(pose[11].q, qEulerXYZ(0.0, 0.42 * f,  1.05 - 0.28 * f));
-      pose[12].q = qMul(pose[12].q, qEulerXYZ(0.0,  0.85 * f, 0.0));
-      pose[14].q = qMul(pose[14].q, qEulerXYZ(-0.55 * f, 0.14 * f, 0.12 * f));
-      pose[15].q = qMul(pose[15].q, qEulerXYZ( 0.92 * f, 0.0, 0.0));
-      pose[18].q = qMul(pose[18].q, qEulerXYZ(-0.22 * f, -0.12 * f, -0.10 * f));
-      pose[19].q = qMul(pose[19].q, qEulerXYZ( 0.38 * f, 0.0, 0.0));
-      return evaluateFK(rig, pose, [state.x, state.y, state.z], Math.PI * 0.5, [state.pitch, state.roll]);
+      if (!state.pushed && !state.rwStart) {
+        const g = getArenaHeight(state.startX, 0, 1);
+        return evaluateFK(rig, sampleClipLocal(rig, "idle", state.t), [state.startX, g, 0], Math.PI * 0.5);
+      }
+      return verletToFK();
     }
 
-    // Active Euphoria: smooth 0.22s attack envelope on panic & stumble blend -> ZERO impact snap!
+    // Active Euphoria: smooth 0.24s attack envelope on panic & stumble blend -> ZERO impact snap!
     const rwFade = state.rwStart ? (1.0 - smoothstep(0.0, 0.7, state.rwT / state.rwDur)) : 1.0;
     const attack = state.pushed ? smoothstep(0.0, 0.24, state.pushAge) : 0.0;
     const panic = attack * Math.exp(-Math.max(0, state.pushAge - 0.15) * 0.65) * rwFade;
