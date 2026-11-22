@@ -75,9 +75,12 @@ void main() {
   float pinch = 0.0;
 
   if (uDeformMode == 0) {
-    // 1992-98 Rigid single-bone attachment (hard creases / joint breaking!)
+    // 1992-93 Rigid single-bone polygon puppet (Alone in the Dark / Virtua Fighter):
+    // Inset boundary vertices along joint seams so unmistakable mechanical gaps appear between rigid blocks!
     mat4 M = uBones[b.x];
     posW = (M * vec4(aPos, 1.0)).xyz;
+    float jointSeam = clamp(w.y + w.z + w.w, 0.0, 1.0);
+    posW -= normalize(mat3(M) * aNorm + vec3(1e-5)) * (jointSeam * 0.036);
     nrmW = normalize(mat3(M) * aNorm);
   } else if (uDeformMode == 1) {
     // 1996 Quake MDL Per-Vertex Linear Interpolation between discrete keyframes -> limbs visibly shrink mid-arc!
@@ -86,7 +89,10 @@ void main() {
     vec3 pA = (MA * vec4(aPos, 1.0)).xyz;
     vec3 pB = (MB * vec4(aPos, 1.0)).xyz;
     posW = mix(pA, pB, uMorphT);
-    nrmW = normalize(mix(mat3(MA) * aNorm, mat3(MB) * aNorm, uMorphT) + vec3(1e-5));
+    vec3 rawN = mix(mat3(MA) * aNorm, mat3(MB) * aNorm, uMorphT);
+    // Measure linear-chord normal/volume collapse so viewer sees Quake MDL limb "swimming" directly!
+    pinch = clamp((1.0 - length(rawN)) * 2.8 + length(pB - pA) * 4.0 * uMorphT * (1.0 - uMorphT), 0.0, 1.0);
+    nrmW = normalize(rawN + vec3(1e-5));
   } else if (uDeformMode == 2) {
     // 4-Bone Linear Blend Skinning (LBS): weighted matrix average -> authentic 180° candy-wrapper collapse!
     mat4 M = uBones[b.x] * w.x + uBones[b.y] * w.y + uBones[b.z] * w.z + uBones[b.w] * w.w;
@@ -155,8 +161,14 @@ void main() {
   float metal = isJoint ? 0.65 : 0.14;
   float rough = isJoint ? 0.24 : 0.36;
 
-  // Crisp tangerine/coral tech stripe grid along forearms during twist stages so 190° torsion pops!
-  if (!isJoint && uShowTwistPattern > 0.5 && vForearmMask > 0.05) {
+  // Authentic 1992-93 Virtua Fighter / Alone in the Dark flat-shaded retro color-blocked puppet look!
+  if (uFlatShade == 1) {
+    base = isJoint ? vec3(0.08, 0.09, 0.12)
+         : (vBindPos.y > 1.48 ? vec3(0.92, 0.78, 0.62)
+         : (vBindPos.y > 0.94 ? vec3(0.20, 0.44, 0.88) : vec3(0.86, 0.84, 0.78)));
+    rough = 0.82;
+    metal = 0.0;
+  } else if (!isJoint && uShowTwistPattern > 0.5 && vForearmMask > 0.05) {
     float ang = atan(vBindPos.y - 1.438, vBindPos.z + 0.05);
     float chk = mod(floor((ang / 3.14159) * 4.0 + 4.0) + floor(abs(vBindPos.x) * 28.0), 2.0);
     vec3 stripeCol = mix(vec3(0.95, 0.92, 0.86), vec3(0.94, 0.38, 0.18), chk);
@@ -169,6 +181,10 @@ void main() {
     float isPants = smoothstep(0.96, 0.86, vBindPos.y) * (1.0 - isBoot);
     base = mix(base, vec3(0.22, 0.28, 0.38), isPants * 0.78);
     base = mix(base, vec3(0.92, 0.62, 0.18), isBoot * 0.88);
+    // Highlight Quake MDL chord-shrink swim in warm amber when uShowTwistPattern < -0.5!
+    if (uShowTwistPattern < -0.5) {
+      base = mix(base, vec3(1.0, 0.52, 0.16), smoothstep(0.22, 0.72, vPinch) * 0.62);
+    }
     if (vBindPos.y > 1.57 && vBindPos.y < 1.65 && vBindPos.z > 0.04) {
       base = vec3(0.20, 0.88, 1.0); // crisp cyan visor glow!
     }

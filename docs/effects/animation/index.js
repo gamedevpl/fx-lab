@@ -236,29 +236,28 @@ export async function createAnimationEffect(gl) {
       deformMode = 0; useRetro = true; flatShade = 1;
       floorScroll = [Math.sin(yaw) * 2.15, Math.cos(yaw) * 2.15];
     } else if (stage === 2) {
-      // 1996 Quake MDL: 3.8 Hz discrete keyframes of real running mocap at 3/4 side view -> unmistakable chord shrinking!
-      const fps = 3.8, kf = Math.floor(simTime * fps), yaw = 0.72;
+      // 1996 Quake MDL: continuous organic mesh (huge leap over 1992 rigid blocks!), 2.6 Hz keyframes linearly morphed -> visible chord swim!
+      const fps = 2.6, kf = Math.floor(simTime * fps), yaw = 0.78;
       morphT = simTime * fps - kf;
       fk  = evaluateFK(rig, sampleClipLocal(rig, "run", kf / fps),       [0, 0, 0], yaw);
       fkB = evaluateFK(rig, sampleClipLocal(rig, "run", (kf + 1) / fps), [0, 0, 0], yaw);
-      deformMode = 1;
+      deformMode = 1; showTwist = -1.0; // amber highlight on straight-chord limb shrinkage!
       floorScroll = [Math.sin(yaw) * 3.85, Math.cos(yaw) * 3.85];
     } else if (stage === 3) {
-      // 1998 Half-Life / LBS: smooth live 0° -> 205° -> 0° forearm twist -> watch it collapse into a candy wrapper!
-      const twist = twistActive ? (0.52 - 0.48 * Math.cos(simTime * 1.45)) * Math.PI * 1.18 : 0.0;
+      // 1998 Half-Life / LBS: smooth live 0° -> 173° -> 0° forearm twist (94% candy-wrapper collapse, strictly < 180° -> ZERO antipodal snap!)
+      const twist = twistActive ? (0.50 - 0.50 * Math.cos(simTime * 1.45)) * (Math.PI * 0.96) : 0.0;
       fk = evaluateTwistPose(rig, simTime, twist);
       deformMode = 2; showTwist = 1.0;
     } else if (stage === 5) {
-      // 2007 Dual Quaternion Skinning (Kavan et al., I3D 2007) — exact same live 0° -> 205° twist, ZERO volume collapse!
-      const twist = twistActive ? (0.52 - 0.48 * Math.cos(simTime * 1.45)) * Math.PI * 1.18 : 0.0;
+      // 2007 Dual Quaternion Skinning (Kavan et al., I3D 2007) — exact same 0° -> 173° twist, ZERO collapse & ZERO 180° flip!
+      const twist = twistActive ? (0.50 - 0.50 * Math.cos(simTime * 1.45)) * (Math.PI * 0.96) : 0.0;
       fk = evaluateTwistPose(rig, simTime, twist);
       deformMode = 3; showTwist = 1.0;
     } else if (stage === 4 || stage === 98) {
-      // 2006-09 Smooth constant-speed stair walk + graceful 180° landing pivots (ZERO snaps, ZERO moonwalking!)
+      // 2006-09 Smooth constant-speed stair walk on continuous ramp baseline -> ZERO camera/hip jumps!
       const sw = getStairWalkState(simTime);
-      const baseY = stage === 98
-        ? clamp((sw.x + 1.40) / 2.80, 0, 1) * 5 * 0.13 + 0.09
-        : getArenaHeight(sw.x, 0, 1);
+      const smoothRampY = clamp((sw.x + 1.40) / 2.80, 0, 1) * 5 * 0.13;
+      const baseY = stage === 98 ? smoothRampY + 0.09 : smoothRampY;
       const pWalk = sampleClipLocal(rig, "walk", sw.phase);
       const pIdle = sampleClipLocal(rig, "idle", simTime);
       const pose = sw.moving > 0.5 ? pWalk : blendLocalPoses(pIdle, pWalk, 0.25);
@@ -465,14 +464,15 @@ export async function createAnimationEffect(gl) {
     render(w, h, step, split, cam) {
       const aspect = w / Math.max(1, h);
 
-      // Compute stage-centered focus target so walking/stair-climbing/falling Xbot stays framed cleanly!
+      // Smooth continuous ramp camera focus (ZERO 13cm discrete stair-step camera jumping on Steps 5 & 7!)
+      const smoothStairY = (x) => clamp((x + 1.40) / 2.80, 0, 1) * 5 * 0.13;
       const focusFor = (st) => {
         if (st === 4 || st === 98) {
           const sw = getStairWalkState(simTime);
-          return [sw.x, getArenaHeight(sw.x, 0, 1) + 0.94, 0];
+          return [sw.x * 0.65, smoothStairY(sw.x) + 0.94, 0];
         }
-        if (st === 6)  return [ragActive.state.x,  getArenaHeight(ragActive.state.x, 0, 1) + 0.90, 0];
-        if (st === 99) return [ragPassive.state.x, getArenaHeight(ragPassive.state.x, 0, 1) + 0.52, 0];
+        if (st === 6)  return [ragActive.state.x * 0.45,  smoothStairY(ragActive.state.x) + 0.92, 0];
+        if (st === 99) return [ragPassive.state.x * 0.45, smoothStairY(ragPassive.state.x) + 0.56, 0];
         if (st === 7)  return [mm.x * 0.45, getArenaHeight(mm.x, mm.z, 2) + 0.94, mm.z * 0.45];
         if (st === 3 || st === 5) return [0, 1.16, 0];
         return [0, cam.lookY || 1.02, 0];

@@ -297,24 +297,30 @@ export function applyFootIK(rig, fk, stairsMode, facingYaw) {
   const wr = fk.worldRot.map(v => [...v]);
   const fwd = [Math.sin(facingYaw), 0, Math.cos(facingYaw)];
 
-  // Compute natural foot ground clearances from mocap (ankle rest height is ~0.084m)
-  const fL = wp[16], fR = wp[20];
-  const gL = getArenaHeight(fL[0], fL[2], stairsMode);
-  const gR = getArenaHeight(fR[0], fR[2], stairsMode);
-  const gCenter = getArenaHeight(wp[0][0], wp[0][2], stairsMode);
+  // Sample exact stair ground height under BOTH ankle AND toe box so boots NEVER clip into stair risers!
+  const footGround = (iFoot, iToe) => Math.max(
+    getArenaHeight(wp[iFoot][0], wp[iFoot][2], stairsMode),
+    getArenaHeight(wp[iToe][0],  wp[iToe][2],  stairsMode)
+  );
+  const gL = footGround(16, 17);
+  const gR = footGround(20, 21);
+  // Smooth continuous ramp baseline under pelvis (eliminates 13cm vertical snapping at stair risers!)
+  const gCenter = stairsMode === 1
+    ? clamp((wp[0][0] + 1.40) / 2.80, 0, 1) * 5 * 0.13
+    : getArenaHeight(wp[0][0], wp[0][2], stairsMode);
 
-  // Drop pelvis cleanly so the lower foot can reach its step without over-stretching the leg!
+  // Drop pelvis smoothly so the lower foot reaches its step without over-stretching!
   const desiredBaseY = Math.min(gL, gR);
-  const pelvisDrop = clamp(desiredBaseY - gCenter, -0.32, 0.08);
+  const pelvisDrop = clamp(desiredBaseY - gCenter, -0.26, 0.08);
   for (let i = 0; i < BONE_COUNT; i++) wp[i][1] += pelvisDrop;
 
   function solveLeg(iHip, iKnee, iFoot, iToe, groundY) {
     const hip = wp[iHip], knee = wp[iKnee], foot = wp[iFoot], toe = wp[iToe];
     const upperLen = Math.hypot(knee[0]-hip[0], knee[1]-hip[1], knee[2]-hip[2]);
     const lowerLen = Math.hypot(foot[0]-knee[0], foot[1]-knee[1], foot[2]-knee[2]);
-    // Preserve mocap foot lift above neutral floor (fY - gCenter - pelvisDrop), clamped to ground!
-    const mocapLift = Math.max(0.0, (foot[1] - pelvisDrop - gCenter) - 0.084);
-    const target = [foot[0], groundY + 0.084 + mocapLift, foot[2]];
+    // Preserve mocap foot lift above neutral floor + generous sole thickness clearance (0.098m -> zero stair clipping!)
+    const mocapLift = Math.max(0.0, (foot[1] - pelvisDrop - gCenter) - 0.088);
+    const target = [foot[0], groundY + 0.098 + mocapLift, foot[2]];
 
     const dx = target[0] - hip[0], dy = target[1] - hip[1], dz = target[2] - hip[2];
     const dist = clamp(Math.hypot(dx, dy, dz), 0.16, upperLen + lowerLen - 0.006);
@@ -356,7 +362,7 @@ export function applyFootIK(rig, fk, stairsMode, facingYaw) {
     wp[iFoot] = newFoot;
     wp[iToe] = [
       newFoot[0] + toeWorldOff[0],
-      Math.max(groundY + 0.02, newFoot[1] + toeWorldOff[1]),
+      Math.max(groundY + 0.036, newFoot[1] + toeWorldOff[1]),
       newFoot[2] + toeWorldOff[2],
     ];
   }
@@ -445,8 +451,8 @@ export function createArticulatedRagdoll(rig) {
       const moved = Math.abs(state.x - prevX);
       state.stridePhase += moved * 1.45 + h * 0.25;
 
-      const gNew = getArenaHeight(state.x, state.z, 1);
-      state.y = gNew;
+      const smoothRampY = clamp((state.x + 1.40) / 2.80, 0, 1) * 5 * 0.13;
+      state.y = smoothRampY;
       // Brief backward recoil on impact, then PD-controller pulls torso cleanly back upright!
       const leanGoal = state.t < 0.55 ? -0.22 : 0.04 * Math.sin(state.t * 3.8) * Math.exp(-state.t * 0.5);
       state.vp += ((leanGoal - state.pitch) * 34.0 - state.vp * 6.5) * h;
