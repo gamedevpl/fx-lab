@@ -121,7 +121,8 @@ export async function createTerrainEffect(gl) {
     const anchorX = Math.sin(ph) * 18.0 - 2.0;
     const anchorZ = Math.cos(ph) * 20.0 + 4.0;
     const anchorY = Math.max(hmap.sampleHeight(anchorX, anchorZ) + 4.2, 11.5);
-    const flightYaw = Math.atan2(18.0 - anchorX, 6.0 - anchorZ) + Math.PI; // Gaze toward the tallest peak (uv 0.74, 0.57 -> x~+38, z~+11)!
+    // Gaze cleanly toward the Matterhorn peak (38, 11) — strictly outside the orbit (dist >= 22m, zero atan2 singularity!)
+    const flightYaw = Math.atan2(38.0 - anchorX, 11.0 - anchorZ) + Math.PI;
 
     const yaw = flightYaw + cam.yaw;
     const cp = Math.cos(cam.pitch);
