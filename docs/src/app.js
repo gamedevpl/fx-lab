@@ -52,6 +52,7 @@ const LOADERS = {
   dof: () => import("../effects/dof/index.js").then(m => m.createDofEffect),
   destruction: () => import("../effects/destruction/index.js").then(m => m.createDestructionEffect),
   collisions: () => import("../effects/collisions/index.js").then(m => m.createCollisionsEffect),
+  ascii: () => import("../effects/ascii/index.js").then(m => m.createAsciiEffect),
 };
 const engines = new Map();
 const moduleCache = new Map();
@@ -534,9 +535,10 @@ function updateCard() {
   const isTerrain = currentEffect.id === "terrain";
   const isDestruction = currentEffect.id === "destruction";
   const isCollisions = currentEffect.id === "collisions";
+  const isAscii = currentEffect.id === "ascii";
   $("hintLine").textContent = isWaterLive
     ? u.waterClickHint
-    : (isShadows ? u.shadowsClickHint : (isCloth ? u.clothClickHint : (isFurLive ? u.furClickHint : (isGlass ? u.glassClickHint : (isClouds ? u.cloudsClickHint : (isGrass ? u.grassClickHint : (isPathtracing ? u.pathtracingClickHint : (isToon ? u.toonClickHint : (isAa ? u.aaClickHint : (isReflections ? u.reflectionsClickHint : (isSurface ? u.surfaceClickHint : (isFog ? u.fogClickHint : (isGi ? u.giClickHint : (isTextures ? u.texturesClickHint : (isPortals ? u.portalsClickHint : (isTonemapping ? u.tonemappingClickHint : (isPixel3d ? u.pixel3dClickHint : (isAnimation ? u.animationClickHint : (isSkin ? u.skinClickHint : (isTerrain ? u.terrainClickHint : (isDestruction ? u.destructionClickHint : (isCollisions ? u.collisionsClickHint : u.dragHint))))))))))))))))))))));
+    : (isShadows ? u.shadowsClickHint : (isCloth ? u.clothClickHint : (isFurLive ? u.furClickHint : (isGlass ? u.glassClickHint : (isClouds ? u.cloudsClickHint : (isGrass ? u.grassClickHint : (isPathtracing ? u.pathtracingClickHint : (isToon ? u.toonClickHint : (isAa ? u.aaClickHint : (isReflections ? u.reflectionsClickHint : (isSurface ? u.surfaceClickHint : (isFog ? u.fogClickHint : (isGi ? u.giClickHint : (isTextures ? u.texturesClickHint : (isPortals ? u.portalsClickHint : (isTonemapping ? u.tonemappingClickHint : (isPixel3d ? u.pixel3dClickHint : (isAnimation ? u.animationClickHint : (isSkin ? u.skinClickHint : (isTerrain ? u.terrainClickHint : (isDestruction ? u.destructionClickHint : (isCollisions ? u.collisionsClickHint : (isAscii ? u.asciiClickHint : u.dragHint)))))))))))))))))))))));
   const linkLabel = u[currentEffect.videoLabelKey] || u.channelLink;
   const filmLine = $("filmLine");
   filmLine.innerHTML = `<span>${u.videoPrefix} <a href="${currentEffect.videoUrl}" target="_blank" rel="noopener">${linkLabel}</a></span><span>·</span><button type="button" class="film-more" id="moreFxBtn">${u.moreEffects(EFFECTS.length)}</button>`;

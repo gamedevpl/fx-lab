@@ -388,6 +388,23 @@ const ICONS = {
     `<rect x="10" y="5" width="1" height="2" fill="#ff8fa0"/>` +
     `<rect x="4" y="4" width="1" height="1" fill="#ffd166"/>` +
     `<rect x="4" y="7" width="1" height="1" fill="#ffd166"/>`,
+
+  // Real-Time ASCII & CRT Shading: curved dark CRT bezel glowing with crimson/silver ASCII glyphs & / \ edges
+  ascii:
+    `<rect x="1" y="1" width="10" height="9" fill="#2c3347"/>` +
+    `<rect x="2" y="2" width="8" height="7" fill="#0b0c16"/>` +
+    `<rect x="3" y="10" width="6" height="1" fill="#444e69"/>` +
+    `<rect x="3" y="3" width="1" height="1" fill="#7ea4e8"/>` +
+    `<rect x="4" y="3" width="1" height="1" fill="#ffb866"/>` +
+    `<rect x="5" y="4" width="1" height="1" fill="#ff5c77"/>` +
+    `<rect x="6" y="3" width="1" height="1" fill="#ff5c77"/>` +
+    `<rect x="7" y="4" width="1" height="1" fill="#ffd166"/>` +
+    `<rect x="4" y="5" width="2" height="1" fill="#ff3355"/>` +
+    `<rect x="6" y="5" width="2" height="1" fill="#ff7a8a"/>` +
+    `<rect x="3" y="6" width="1" height="1" fill="#00e4ac"/>` +
+    `<rect x="5" y="6" width="1" height="2" fill="#ff5c77"/>` +
+    `<rect x="7" y="6" width="2" height="1" fill="#7ea4e8"/>` +
+    `<rect x="3" y="8" width="6" height="1" fill="#1e273d"/>`,
 };
 
 const FALLBACK_ICON =
