@@ -528,5 +528,8 @@ export async function createDestructionWebGPU(hostCanvas) {
       rp.end();
       device.queue.submit([enc.finish()]);
     },
+    finishFrame() {
+      return device.queue.onSubmittedWorkDone();
+    },
   };
 }

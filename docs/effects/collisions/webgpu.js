@@ -369,5 +369,8 @@ export async function createCollisionsWebGPU(hostCanvas) {
       rp.end();
       device.queue.submit([enc.finish()]);
     },
+    finishFrame() {
+      return device.queue.onSubmittedWorkDone();
+    },
   };
 }

@@ -84,8 +84,10 @@ async function loadEngine(id) {
 // Parse initial URL state (supports clean /splats/, /fire/, /water/ routes and legacy ?fx=...)
 const basePath = new URL("../", import.meta.url).pathname;
 const params = new URLSearchParams(location.search);
+const directorMode = params.get("director") === "1";
+let directorMaxPixels = Number(params.get("maxPixels")) || 0;
 if (params.get("hud") === "0") document.body.classList.add("no-hud");
-const audio = createAudioEngine({ mutedByUrl: params.get("mute") === "1" || params.get("hud") === "0" });
+const audio = createAudioEngine({ mutedByUrl: directorMode || params.get("mute") === "1" || params.get("hud") === "0" });
 let hasBooted = false;
 let lang = params.get("lang") === "pl" ? "pl" : "en";
 let currentEffect = getEffect(params.get("fx") || document.documentElement.dataset.fx);
@@ -559,8 +561,8 @@ function resizeCanvas(skipCard = false) {
   if (!activeEngine) return;
   const cssW = Math.max(1, window.innerWidth);
   const cssH = Math.max(1, window.innerHeight);
-  const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-  const maxPx = activeEngine.maxPixels || 1200000;
+  const dpr = directorMode ? 1 : Math.min(window.devicePixelRatio || 1, 1.5);
+  const maxPx = directorMaxPixels > 0 ? directorMaxPixels : (activeEngine.maxPixels || 1200000);
   const scale = Math.min(dpr, Math.sqrt(maxPx / (cssW * cssH)));
   const w = Math.max(240, Math.round(cssW * scale));
   const h = Math.max(240, Math.round(cssH * scale));
@@ -880,20 +882,130 @@ window.FXLAB = {
 };
 
 // Boot initial effect non-blockingly so UI shell paints immediately.
-selectEffect(currentEffect.id, currentStepIdx, split.enabled);
+const initialBootPromise = selectEffect(currentEffect.id, currentStepIdx, split.enabled);
 
-let prevNow = performance.now();
-function frame(now) {
-  const dt = Math.min(0.05, Math.max(0.0, (now - prevNow) / 1000));
-  prevNow = now;
-  if (activeEngine && cam) {
-    if (!paused && !userInteracted && activeEngine.defaultCamera.autoOrbitSpeed) {
-      cam.yaw += activeEngine.defaultCamera.autoOrbitSpeed * dt;
+if (directorMode) {
+  const ds = document.createElement("style");
+  ds.id = "fxDirectorStyle";
+  ds.textContent = "*,*::before,*::after{animation:none!important;transition:none!important;} #filmLine{display:none!important;}";
+  document.head.appendChild(ds);
+  let directorTime = 0;
+  const directorAudioLog = [];
+  const logAudio = (ev) => directorAudioLog.push({ t: Number(directorTime.toFixed(6)), ...ev });
+
+  window.FXLAB.__director = {
+    async waitReady() {
+      await initialBootPromise;
+      if (typeof activeEngine?.finishFrame === "function") await activeEngine.finishFrame();
+      return { fx: currentEffect.id, stepIdx: currentStepIdx, w: renderW, h: renderH, backend: activeEngine?.backend || "webgl2" };
+    },
+    async select(effectId, stepIdx = null, splitOpt = null) {
+      await selectEffect(effectId, stepIdx, splitOpt);
+      if (typeof activeEngine?.finishFrame === "function") await activeEngine.finishFrame();
+      logAudio({ kind: "scene", fx: currentEffect.id, category: currentEffect.category, step: currentStepIdx });
+      return { fx: currentEffect.id, stepIdx: currentStepIdx, w: renderW, h: renderH, backend: activeEngine?.backend || "webgl2" };
+    },
+    setStep(idx) {
+      selectStep(idx);
+      logAudio({ kind: "ui", name: "step", arg: currentStepIdx, fx: currentEffect.id });
+      return currentStepIdx;
+    },
+    setHud(visible) {
+      document.body.classList.toggle("no-hud", !visible);
+      return visible;
+    },
+    setSplit(enabled, pos = null, emitDragSound = false) {
+      split.enabled = !!enabled;
+      if (typeof pos === "number") split.pos = clamp(pos, 0.08, 0.92);
+      updateSplitOverlay();
+      if (emitDragSound) logAudio({ kind: "ui", name: "splitDrag", arg: split.pos });
+      return { enabled: split.enabled, pos: split.pos };
+    },
+    setCamera(patch = {}) {
+      if (!cam) return null;
+      for (const k of ["yaw", "pitch", "dist", "lookY", "fovDeg"]) {
+        if (typeof patch[k] === "number") cam[k] = patch[k];
+      }
+      userInteracted = true;
+      return { ...cam };
+    },
+    getCamera() { return cam ? { ...cam } : null; },
+    setMaxPixels(n) {
+      directorMaxPixels = Number(n) || 0;
+      resizeCanvas(true);
+      return { w: renderW, h: renderH };
+    },
+    getRenderSize() { return { w: renderW, h: renderH, backend: activeEngine?.backend || "webgl2" }; },
+    triggerAction() {
+      const st = currentStep();
+      if (!st.action || !activeEngine) return false;
+      activeEngine.triggerAction(st.action.id);
+      updateCard();
+      logAudio({ kind: "action", fx: currentEffect.id, action: st.action.id, step: currentStepIdx });
+      return true;
+    },
+    clickCanvas(ndcX, ndcY) {
+      if (!activeEngine || typeof activeEngine.onCanvasClick !== "function") return false;
+      activeEngine.onCanvasClick(ndcX, ndcY, renderW, renderH, currentStep(), cam);
+      logAudio({ kind: "canvasClick", fx: currentEffect.id, step: currentStepIdx, ndcX, ndcY });
+      return true;
+    },
+    pointerDown(ndcX, ndcY) {
+      if (!activeEngine || typeof activeEngine.onPointerDown !== "function") return false;
+      return !!activeEngine.onPointerDown(ndcX, ndcY, renderW, renderH, currentStep(), cam);
+    },
+    pointerMove(ndcX, ndcY) {
+      if (!activeEngine || typeof activeEngine.onPointerMove !== "function") return false;
+      activeEngine.onPointerMove(ndcX, ndcY, renderW, renderH, currentStep(), cam);
+      return true;
+    },
+    pointerUp() {
+      if (typeof activeEngine?.onPointerUp === "function") activeEngine.onPointerUp();
+    },
+    resetEffect() {
+      if (!activeEngine) return false;
+      if (typeof activeEngine.onReset === "function") activeEngine.onReset();
+      activeEngine.enterStep(currentStepIdx);
+      resetCamera();
+      return true;
+    },
+    setTime(t) { directorTime = Number(t) || 0; },
+    getTime() { return directorTime; },
+    async step(dt = 1 / 60, doRender = true) {
+      if (!activeEngine || !cam) return false;
+      directorTime += dt;
+      const st = currentStep();
+      activeEngine.update(dt, false, st, split);
+      if (doRender) {
+        activeEngine.render(renderW, renderH, st, split, cam);
+        if (typeof activeEngine.finishFrame === "function") await activeEngine.finishFrame();
+      }
+      return true;
+    },
+    drainAudioEvents() {
+      return directorAudioLog.splice(0, directorAudioLog.length);
+    },
+    getElementRect(sel) {
+      const el = document.querySelector(sel);
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return { x: r.left, y: r.top, w: r.width, h: r.height, cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
+    },
+  };
+} else {
+  let prevNow = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, Math.max(0.0, (now - prevNow) / 1000));
+    prevNow = now;
+    if (activeEngine && cam) {
+      if (!paused && !userInteracted && activeEngine.defaultCamera.autoOrbitSpeed) {
+        cam.yaw += activeEngine.defaultCamera.autoOrbitSpeed * dt;
+      }
+      const st = currentStep();
+      activeEngine.update(dt, paused, st, split);
+      activeEngine.render(renderW, renderH, st, split, cam);
     }
-    const st = currentStep();
-    activeEngine.update(dt, paused, st, split);
-    activeEngine.render(renderW, renderH, st, split, cam);
+    requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
 }
-requestAnimationFrame(frame);

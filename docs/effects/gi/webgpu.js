@@ -578,5 +578,8 @@ export async function createGiWebGPU(hostCanvas) {
 
       device.queue.submit([enc.finish()]);
     },
+    finishFrame() {
+      return device.queue.onSubmittedWorkDone();
+    },
   };
 }
