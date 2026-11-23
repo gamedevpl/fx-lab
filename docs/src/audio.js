@@ -115,6 +115,7 @@ const SCENE_AMBIENCE = {
   aa:           { kind: "studio",     baseFreq: 280, q: 1.0, gain: 0.08, detail: "optic" },
   surface:      { kind: "fire",       baseFreq: 210, q: 1.5, gain: 0.13, detail: "torch" },
   skin:         { kind: "studio",     baseFreq: 220, q: 1.0, gain: 0.08, detail: "warm" },
+  ascii:        { kind: "neon",       baseFreq: 110, q: 4.5, gain: 0.12, detail: "crt" },
 };
 
 function readPref(key, fallback) {
@@ -652,7 +653,8 @@ export function createAudioEngine({ mutedByUrl = false } = {}) {
       case "fog":
       case "skin":
       case "surface":
-      case "toon":        playCue({ type: "lightChime" }); break;
+      case "toon":
+      case "ascii":       playCue({ type: "lightChime" }); break;
       default:            playUi("click"); break;
     }
   }
