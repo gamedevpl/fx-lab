@@ -134,8 +134,8 @@ export function getSmoothFootGround(x, z, stairsMode) {
   let h = 0.0;
   for (let k = 0; k < 5; k++) {
     const rx = -1.40 + k * 0.56;
-    // C1 smooth ramp over 17cm right before each riser: locks flat onto every tread AND clears risers with ZERO snap!
-    h += 0.13 * smoothstep(rx - 0.18, rx - 0.01, x);
+    // Tight 4cm C1 fillet centered right on the exact stair riser -> 0.0mm hover on every tread!
+    h += 0.13 * smoothstep(rx - 0.02, rx + 0.02, x);
   }
   return h * zMask;
 }
@@ -160,23 +160,41 @@ export function getArenaHeight(x, z, stairsMode) {
 
 export function buildArenaGeometry(stairsMode) {
   const N = 64, size = 6.4;
+  let xs = [], zs = [];
+  for (let i = 0; i <= N; i++) {
+    const v = (i / N - 0.5) * size;
+    xs.push(v);
+    zs.push(v);
+  }
+  if (stairsMode === 1) {
+    // Inject exact crisp riser/side edge rings so rendered stair geometry matches getArenaHeight() to 0.0mm!
+    const risers = [-1.40, -0.84, -0.28, 0.28, 0.84];
+    xs = xs.filter(x => risers.every(r => Math.abs(x - r) > 0.016));
+    for (const r of risers) xs.push(r - 0.006, r - 0.002, r + 0.002, r + 0.006);
+    xs.sort((a, b) => a - b);
+
+    const sides = [-1.55, 1.55];
+    zs = zs.filter(z => sides.every(s => Math.abs(z - s) > 0.016));
+    for (const s of sides) zs.push(s - 0.006, s - 0.002, s + 0.002, s + 0.006);
+    zs.sort((a, b) => a - b);
+  }
+  const nx = xs.length, nz = zs.length;
   const verts = [], idx = [];
-  for (let iz = 0; iz <= N; iz++) {
-    for (let ix = 0; ix <= N; ix++) {
-      const x = (ix / N - 0.5) * size;
-      const z = (iz / N - 0.5) * size;
+  const e = stairsMode === 1 ? 0.003 : 0.03;
+  for (let iz = 0; iz < nz; iz++) {
+    const z = zs[iz];
+    for (let ix = 0; ix < nx; ix++) {
+      const x = xs[ix];
       const y = getArenaHeight(x, z, stairsMode);
-      const e = 0.03;
       const hx = getArenaHeight(x + e, z, stairsMode) - getArenaHeight(x - e, z, stairsMode);
       const hz = getArenaHeight(x, z + e, stairsMode) - getArenaHeight(x, z - e, stairsMode);
       const n = norm3(-hx, 2 * e, -hz);
       verts.push(x, y, z, n[0], n[1], n[2], x, z);
     }
   }
-  const st = N + 1;
-  for (let iz = 0; iz < N; iz++) {
-    for (let ix = 0; ix < N; ix++) {
-      const a = iz * st + ix, b = a + 1, c = a + st, d = c + 1;
+  for (let iz = 0; iz < nz - 1; iz++) {
+    for (let ix = 0; ix < nx - 1; ix++) {
+      const a = iz * nx + ix, b = a + 1, c = a + nx, d = c + 1;
       idx.push(a, c, b, b, c, d);
     }
   }
@@ -309,48 +327,71 @@ export function packSkinUniforms(rig, worldPos, worldRot, worldMat) {
 }
 
 // --- Real 2-Bone Analytical Foot IK on Mixamo Xbot Legs (14->15->16 and 18->19->20!) ---
+function smoothMin(a, b, k) {
+  const h = clamp(0.5 + 0.5 * (b - a) / k, 0, 1);
+  return lerp(b, a, h) - k * h * (1 - h);
+}
+
 export function applyFootIK(rig, fk, stairsMode, facingYaw) {
   const wp = fk.worldPos.map(v => [...v]);
   const wr = fk.worldRot.map(v => [...v]);
   const fwd = [Math.sin(facingYaw), 0, Math.cos(facingYaw)];
 
-  // Smooth C1 ground height on treads (zero riser snaps) + smooth stair-nose envelope for swinging feet!
-  const footGround = (iFoot, iToe) => Math.max(
-    getSmoothFootGround(wp[iFoot][0], wp[iFoot][2], stairsMode),
-    getSmoothFootGround(wp[iToe][0],  wp[iToe][2],  stairsMode)
-  );
-  const gL = footGround(16, 17);
-  const gR = footGround(20, 21);
   // Exact continuous centerline ramp under pelvis (ZERO pelvis snapping on stair edges!)
   const gCenter = stairsMode === 1
     ? getSmoothStairRamp(wp[0][0])
     : getArenaHeight(wp[0][0], wp[0][2], stairsMode);
 
-  // Smooth, constant athletic knee-flex drop on stairs so BOTH upper & lower feet reach cleanly with ZERO 7cm pelvis jumps!
-  const onStairs = stairsMode === 1
-    ? smoothstep(-1.85, -1.35, wp[0][0]) * (1.0 - smoothstep(1.15, 1.55, wp[0][0]))
-    : 0.0;
-  const pelvisDrop = stairsMode === 1
-    ? -0.068 * onStairs
-    : clamp(Math.min(gL, gR) - gCenter, -0.18, 0.04);
-  for (let i = 0; i < BONE_COUNT; i++) wp[i][1] += pelvisDrop;
-
-  function solveLeg(iHip, iKnee, iFoot, iToe, groundY) {
+  // Measure both legs' exact sole-centered ground height, true mocap sole lift, and exact required pelvis reach drop!
+  const ANKLE_SOLE_H = 0.0884; // Measured from Xbot rest mesh: ankleY(0.0844) - meshFootMinY(-0.0040)
+  function planLeg(iHip, iKnee, iFoot, iToe) {
     const hip = wp[iHip], knee = wp[iKnee], foot = wp[iFoot], toe = wp[iToe];
     const upperLen = Math.hypot(knee[0]-hip[0], knee[1]-hip[1], knee[2]-hip[2]);
     const lowerLen = Math.hypot(foot[0]-knee[0], foot[1]-knee[1], foot[2]-knee[2]);
-    // Preserve mocap foot lift above neutral floor; blend swinging foot cleanly onto smooth stair-nose ramp -> ZERO 11cm riser snaps!
-    const mocapLift = Math.max(0.0, (foot[1] - pelvisDrop - gCenter) - 0.088);
-    let effGround = groundY;
+    const soleX = lerp(foot[0], toe[0], 0.42);
+    const soleZ = lerp(foot[2], toe[2], 0.42);
+    const groundY = getSmoothFootGround(soleX, soleZ, stairsMode);
+
+    // Distinguish true flat stance / toe-roll (soleLift === 0) from airborne swing!
+    const rawAnkleH = foot[1] - gCenter;
+    const rawToeH   = toe[1]  - gCenter;
+    const soleLift  = Math.max(0.0, Math.min(rawAnkleH - 0.090, rawToeH - 0.004));
+    const ankleLift = Math.max(0.0, rawAnkleH - ANKLE_SOLE_H);
+
+    let targetY = groundY + ANKLE_SOLE_H + ankleLift;
     if (stairsMode === 1) {
-      const swingW = smoothstep(0.012, 0.058, mocapLift);
-      const noseEnv = getSmoothStairRamp(Math.max(foot[0], toe[0])) + 0.055;
-      effGround = lerp(groundY, Math.max(groundY, noseEnv), swingW);
+      // Clear stair noses smoothly during swing without double-adding ankleLift on top of the ramp!
+      const swingW = smoothstep(0.012, 0.055, soleLift);
+      const noseClearY = getSmoothStairRamp(Math.max(foot[0], toe[0])) + ANKLE_SOLE_H + 0.032;
+      targetY = lerp(targetY, Math.max(targetY, noseClearY), swingW);
     }
-    const target = [foot[0], effGround + 0.098 + mocapLift, foot[2]];
+    const target = [foot[0], targetY, foot[2]];
+
+    // Exact analytical pelvis height needed so this leg reaches its step tread with ZERO floating!
+    const maxReach = (upperLen + lowerLen) * 0.976;
+    const horiz = Math.hypot(target[0] - hip[0], target[2] - hip[2]);
+    const maxVert = Math.sqrt(Math.max(0.09, maxReach * maxReach - horiz * horiz));
+    const reqDrop = (target[1] + maxVert) - hip[1];
+    return { iHip, iKnee, iFoot, iToe, upperLen, lowerLen, groundY, soleLift, ankleLift, target, reqDrop };
+  }
+
+  const legL = planLeg(14, 15, 16, 17);
+  const legR = planLeg(18, 19, 20, 21);
+
+  // Smooth C1 pelvis drop guaranteeing BOTH upper & lower feet plant 100% flush on every stone step!
+  const onStairs = stairsMode === 1
+    ? smoothstep(-1.85, -1.35, wp[0][0]) * (1.0 - smoothstep(1.15, 1.55, wp[0][0]))
+    : 0.0;
+  const minReq = smoothMin(legL.reqDrop, legR.reqDrop, 0.04);
+  const pelvisDrop = clamp(smoothMin(minReq, -0.04 * onStairs, 0.04), -0.34, 0.02);
+  for (let i = 0; i < BONE_COUNT; i++) wp[i][1] += pelvisDrop;
+
+  function solveLeg(leg) {
+    const { iHip, iKnee, iFoot, iToe, upperLen, lowerLen, groundY, soleLift, ankleLift, target } = leg;
+    const hip = wp[iHip], knee = wp[iKnee], foot = wp[iFoot];
 
     const dx = target[0] - hip[0], dy = target[1] - hip[1], dz = target[2] - hip[2];
-    const dist = clamp(Math.hypot(dx, dy, dz), 0.16, upperLen + lowerLen - 0.006);
+    const dist = clamp(Math.hypot(dx, dy, dz), 0.16, upperLen + lowerLen - 0.005);
     const dir = norm3(dx, dy, dz);
     const right = norm3(...cross3([0, 1, 0], fwd));
     const pole = norm3(...cross3(dir, right)); // Knee bends strictly forward along character facing!
@@ -375,10 +416,10 @@ export function applyFootIK(rig, fk, stairsMode, facingYaw) {
     const dqShin = qFromTo(oldShin, newShin);
     wr[iKnee] = qNorm(qMul(dqShin, wr[iKnee]));
 
-    // Smoothly level foot sole parallel to horizontal stone step near ground contact (zero toe-clipping!)
-    const flatWeight = smoothstep(0.09, 0.015, mocapLift);
+    // Level boot sole strictly flat during flat stance; preserve natural toe-roll during push-off!
+    const flatWeight = smoothstep(0.045, 0.008, soleLift) * smoothstep(0.032, 0.008, ankleLift);
     const flatFootQ = qAxisAngle(0, 1, 0, facingYaw);
-    wr[iFoot] = qSlerp(wr[iFoot], flatFootQ, flatWeight * 0.85);
+    wr[iFoot] = qSlerp(wr[iFoot], flatFootQ, flatWeight * 0.92);
     const toeRestOff = [
       rig.restWorld[iToe][0] - rig.restWorld[iFoot][0],
       rig.restWorld[iToe][1] - rig.restWorld[iFoot][1],
@@ -389,13 +430,13 @@ export function applyFootIK(rig, fk, stairsMode, facingYaw) {
     wp[iFoot] = newFoot;
     wp[iToe] = [
       newFoot[0] + toeWorldOff[0],
-      Math.max(groundY + 0.036, newFoot[1] + toeWorldOff[1]),
+      Math.max(groundY + 0.002, newFoot[1] + toeWorldOff[1]),
       newFoot[2] + toeWorldOff[2],
     ];
   }
 
-  solveLeg(14, 15, 16, 17, gL);
-  solveLeg(18, 19, 20, 21, gR);
+  solveLeg(legL);
+  solveLeg(legR);
 
   const wm = new Array(BONE_COUNT);
   for (let i = 0; i < BONE_COUNT; i++) wm[i] = mat4FromQT(wr[i], wp[i]);

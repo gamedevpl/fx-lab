@@ -278,11 +278,11 @@ void main() {
   vec3 col = stone * (0.24 * contactAO + 0.76 * ndl * dirShadow * mix(0.45, 1.0, contactAO));
 
   if (uShowFootRings > 0.5) {
-    float rL = abs(length(vPos.xz - uFootL.xz) - 0.155);
-    float rR = abs(length(vPos.xz - uFootR.xz) - 0.155);
-    float ring = (1.0 - smoothstep(0.008, 0.028, rL)) * smoothstep(0.24, 0.03, abs(vPos.y - uFootL.y + 0.08))
-               + (1.0 - smoothstep(0.008, 0.028, rR)) * smoothstep(0.24, 0.03, abs(vPos.y - uFootR.y + 0.08));
-    col += vec3(0.20, 0.96, 0.58) * clamp(ring, 0.0, 1.0) * 0.90;
+    float rL = abs(length(vPos.xz - uFootL.xz) - 0.145);
+    float rR = abs(length(vPos.xz - uFootR.xz) - 0.145);
+    float ring = (1.0 - smoothstep(0.008, 0.026, rL)) * smoothstep(0.065, 0.014, abs(vPos.y - (uFootL.y - 0.088)))
+               + (1.0 - smoothstep(0.008, 0.026, rR)) * smoothstep(0.065, 0.014, abs(vPos.y - (uFootR.y - 0.088)));
+    col += vec3(0.20, 0.96, 0.58) * clamp(ring, 0.0, 1.0) * 0.92;
   }
 
   float edge = 1.0 - smoothstep(2.45, 3.18, max(abs(vPos.x), abs(vPos.z)));

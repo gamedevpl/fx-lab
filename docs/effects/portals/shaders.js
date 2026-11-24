@@ -149,18 +149,19 @@ vec3 shadeMarathon(vec3 ro, vec3 rd, bool isDuke, bool glitchOn) {
 // STAGE 2 (2006 Prey), STAGE 3 (2007 Portal Fly-Through 10x), STAGE 6 (2022 Portal with RTX)
 // Alternating Electric Blue & Fiery Orange portals on opposite walls + seamless FPP Fly-Through!
 // ============================================================================
-float mapApertureObstacles(vec3 p, bool rtxMode) {
+float mapApertureObstacles(vec3 p, bool hasPillar) {
   float d = sdBox(p - vec3(1.12, 0.14, -0.35), vec3(0.46, 0.14, 0.46));
   vec3 cp = p - vec3(1.12, 0.60, -0.35);
   cp.xz = rot2(0.45 + sin(uTime * 0.5) * 0.14) * cp.xz;
   d = min(d, sdRoundBox(cp, vec3(0.34), 0.045));
-  if (rtxMode) {
-    d = min(d, sdCylinder(p - vec3(-1.05, 0.68, -0.35), 0.17, 0.68));
+  if (hasPillar) {
+    // Sleek shadow-casting column right inside the Portal RTX golden sunbeam path (clear of P4 fly-through center!)
+    d = min(d, sdCylinder(p - vec3(-0.46, 0.66, -1.05), 0.14, 0.66));
   }
   return d;
 }
 
-vec2 mapApertureChamber(vec3 p, bool rtxMode) {
+vec2 mapApertureChamber(vec3 p, bool hasPillar) {
   float d = p.y; float mat = 0.0;
   float dCeil = 3.45 - p.y; if (dCeil < d) { d = dCeil; mat = 1.0; }
   float dBack = p.z + 2.65; if (dBack < d) { d = dBack; mat = 3.0; } // Blue Portal Wall
@@ -188,26 +189,26 @@ vec2 mapApertureChamber(vec3 p, bool rtxMode) {
   float dOrb = length(vec3(p.x - orbX, p.y - 1.66, dzOrb)) - 0.11;
   if (dOrb < d) { d = dOrb; mat = 7.0; }
 
-  if (rtxMode) {
-    float dP2 = sdCylinder(p - vec3(-1.05, 0.68, -0.35), 0.17, 0.68);
+  if (hasPillar) {
+    float dP2 = sdCylinder(p - vec3(-0.46, 0.66, -1.05), 0.14, 0.66);
     if (dP2 < d) { d = dP2; mat = 8.0; }
   }
   return vec2(d, mat);
 }
 
-vec3 normalAperture(vec3 p, bool rtxMode) {
+vec3 normalAperture(vec3 p, bool hasPillar) {
   vec2 e = vec2(0.0025, 0.0);
   return normalize(vec3(
-    mapApertureChamber(p + e.xyy, rtxMode).x - mapApertureChamber(p - e.xyy, rtxMode).x,
-    mapApertureChamber(p + e.yxy, rtxMode).x - mapApertureChamber(p - e.yxy, rtxMode).x,
-    mapApertureChamber(p + e.yyx, rtxMode).x - mapApertureChamber(p - e.yyx, rtxMode).x
+    mapApertureChamber(p + e.xyy, hasPillar).x - mapApertureChamber(p - e.xyy, hasPillar).x,
+    mapApertureChamber(p + e.yxy, hasPillar).x - mapApertureChamber(p - e.yxy, hasPillar).x,
+    mapApertureChamber(p + e.yyx, hasPillar).x - mapApertureChamber(p - e.yyx, hasPillar).x
   ));
 }
 
-float softShadowAperture(vec3 ro, vec3 rd, float tMax, float k, bool rtxMode) {
+float softShadowAperture(vec3 ro, vec3 rd, float tMax, float k, bool hasPillar) {
   float res = 1.0, t = 0.04, ph = 1e10;
   for (int i = 0; i < 28; i++) {
-    float h = mapApertureObstacles(ro + rd * t, rtxMode);
+    float h = mapApertureObstacles(ro + rd * t, hasPillar);
     if (h < 0.0018) return 0.0;
     float y = (h * h) / (2.0 * ph);
     float d = sqrt(max(0.0, h * h - y * y));
@@ -221,61 +222,74 @@ float softShadowAperture(vec3 ro, vec3 rd, float tMax, float k, bool rtxMode) {
 
 float portalOvalDist(vec2 xy, vec2 cen, vec2 rad) { return length((xy - cen) / rad); }
 
-vec3 shadeApertureSurface(vec3 p, vec3 n, float matId, bool rtxMode, bool frontIsOrange, vec2 blueCen, vec2 orangeCen, vec2 pRad) {
+vec3 shadeApertureSurface(vec3 p, vec3 n, float matId, bool rtxMode, bool hasPillar, bool sunlitRoom, bool frontIsOrange, vec2 blueCen, vec2 orangeCen, vec2 pRad) {
   int m = int(floor(matId + 0.5));
   vec3 alb = vec3(0.42, 0.46, 0.54);
   if (m == 0) {
     float g = max(smoothstep(0.46, 0.495, abs(fract(p.x * 0.9434) - 0.5)), smoothstep(0.46, 0.495, abs(fract((p.z + 2.65) * 0.9434) - 0.5)));
-    alb = mix(rtxMode ? vec3(0.11, 0.14, 0.20) : vec3(0.18, 0.22, 0.29), vec3(0.06, 0.08, 0.12), g * 0.72);
+    alb = mix(rtxMode ? vec3(0.14, 0.18, 0.25) : vec3(0.18, 0.22, 0.29), vec3(0.05, 0.07, 0.11), g * 0.78);
   } else if (m == 1) alb = vec3(0.14, 0.17, 0.24);
   else if (m == 2 || m == 3 || m == 4) {
     vec2 uv = (m == 2) ? vec2((p.z + 2.65) * 0.7547, p.y * 0.85) : (p.xy * 0.85);
     float g = max(smoothstep(0.47, 0.495, abs(fract(uv.x) - 0.5)), smoothstep(0.47, 0.495, abs(fract(uv.y) - 0.5)));
-    vec3 panel = p.y < 1.05 ? vec3(0.11, 0.14, 0.20) : (rtxMode ? vec3(0.24, 0.28, 0.36) : vec3(0.38, 0.43, 0.50));
+    vec3 panel = p.y < 1.05 ? vec3(0.14, 0.17, 0.24) : (rtxMode ? vec3(0.26, 0.31, 0.39) : vec3(0.32, 0.37, 0.44));
     alb = mix(panel, vec3(0.07, 0.09, 0.14), g * 0.72);
   } else if (m == 5) alb = vec3(0.10, 0.12, 0.18);
-  else if (m == 6) alb = mix(vec3(0.46, 0.50, 0.56), vec3(0.96, 0.24, 0.50), smoothstep(0.12, 0.08, abs(p.y - 0.60)));
+  else if (m == 6) alb = mix(vec3(0.54, 0.58, 0.64), vec3(0.96, 0.24, 0.50), smoothstep(0.12, 0.08, abs(p.y - 0.60)));
   else if (m == 7) return vec3(0.25, 1.35, 2.15);
-  else if (m == 8) alb = vec3(0.24, 0.30, 0.40);
+  else if (m == 8) alb = vec3(0.46, 0.52, 0.60);
 
   vec3 lPos = vec3(0.3, 3.15, 0.2);
   vec3 toL = lPos - p; float dL = length(toL); vec3 ld = toL / max(dL, 1e-4);
-  float sh = softShadowAperture(p + n * 0.03, ld, dL - 0.1, 7.0, rtxMode);
-  vec3 light = (rtxMode ? vec3(0.05, 0.07, 0.12) : vec3(0.11, 0.14, 0.20)) * (0.55 + 0.45 * n.y);
-  light += vec3(0.95, 0.94, 0.92) * (max(dot(n, ld), 0.0) * sh * (rtxMode ? 1.1 : 4.2) / (1.5 + dL * dL * 0.36));
+  float sh = softShadowAperture(p + n * 0.03, ld, dL - 0.1, 7.0, hasPillar);
+  vec3 light = (rtxMode ? vec3(0.03, 0.045, 0.08) : vec3(0.09, 0.12, 0.18)) * (0.55 + 0.45 * n.y);
+  light += vec3(0.90, 0.92, 0.96) * (max(dot(n, ld), 0.0) * sh * (rtxMode ? 0.42 : 2.35) / (1.5 + dL * dL * 0.36));
+
+  if (sunlitRoom) {
+    // Warm sunlit golden chamber visible THROUGH the RTX portal so the viewer immediately sees WHERE the sunbeam comes from!
+    vec3 sunDir = normalize(vec3(-0.35, 0.82, 0.45));
+    light += vec3(2.85, 1.85, 0.72) * (0.55 + 0.75 * max(dot(n, sunDir), 0.0));
+  }
 
   vec3 colNegZ = frontIsOrange ? vec3(1.65, 0.48, 0.05) : vec3(0.06, 0.66, 1.55);
   vec3 colPosZ = frontIsOrange ? vec3(0.06, 0.66, 1.55) : vec3(1.65, 0.48, 0.05);
 
   vec3 blueP = vec3(blueCen.x, blueCen.y, -2.58);
   vec3 toB = blueP - p; float dB = length(toB);
-  light += colNegZ * (max(dot(n, toB / max(dB, 1e-4)), 0.0) * 0.78 + 0.22) * ((rtxMode ? 4.4 : 3.8) / (0.85 + dB * dB * 0.50));
+  light += colNegZ * (max(dot(n, toB / max(dB, 1e-4)), 0.0) * 0.78 + 0.22) * ((rtxMode ? 2.4 : 2.9) / (0.85 + dB * dB * 0.50));
 
   vec3 orgP = vec3(orangeCen.x, orangeCen.y, 2.58);
   vec3 toO = orgP - p; float dO = length(toO);
-  light += colPosZ * (max(dot(n, toO / max(dO, 1e-4)), 0.0) * 0.78 + 0.22) * ((rtxMode ? 4.2 : 3.6) / (0.85 + dO * dO * 0.50));
+  light += colPosZ * (max(dot(n, toO / max(dO, 1e-4)), 0.0) * 0.78 + 0.22) * ((rtxMode ? 1.8 : 2.6) / (0.85 + dO * dO * 0.50));
 
-  // STAGE 6 (Portal RTX): Golden sunbeam + razor shadows pouring STRAIGHT OUT of the portal!
-  if (rtxMode) {
-    vec3 virtualSun = vec3(blueCen.x - 0.48, blueCen.y + 0.52, -5.6);
+  // STAGE 6 (Portal RTX): Blazing golden sunbeam + razor-sharp shadows pouring STRAIGHT OUT of the portal onto the floor, pillar & cube!
+  if (rtxMode && !sunlitRoom) {
+    vec3 virtualSun = vec3(blueCen.x - 0.74, blueCen.y + 2.15, -5.20);
     vec3 toV = virtualSun - p; float dV = length(toV); vec3 vd = toV / max(dV, 1e-4);
     if (vd.z < -0.05 && p.z > -2.62) {
       float tBlue = (-2.64 - p.z) / vd.z;
       vec3 hitB = p + vd * tBlue;
-      float oval = portalOvalDist(hitB.xy, blueCen, pRad * 0.96);
+      float oval = portalOvalDist(hitB.xy, blueCen, pRad * 0.94);
       if (oval < 1.0) {
-        float beamEdge = smoothstep(1.0, 0.78, oval);
-        float pSh = softShadowAperture(p + n * 0.03, vd, tBlue - 0.05, 12.0, true);
-        light += vec3(3.15, 1.72, 0.46) * (max(dot(n, vd), 0.0) * pSh * beamEdge * 9.5 / (1.0 + dV * dV * 0.07));
+        float beamEdge = smoothstep(1.0, 0.80, oval);
+        float pSh = softShadowAperture(p + n * 0.025, vd, tBlue - 0.05, 16.0, hasPillar);
+        float ndv = max(dot(n, vd), 0.0);
+        // Rich golden amber direct sunbeam preserving crisp floor tiles, razor pillar shadow & glossy blue portal reflection!
+        light += vec3(5.2, 2.55, 0.68) * (ndv * pSh * beamEdge * 8.2 / (1.0 + dV * dV * 0.045));
       }
     }
+    // Warm golden GI bounce radiating off the sunlit floor pool onto adjacent pillar/cube/walls!
+    vec3 giPool = vec3(0.05, 0.08, -0.35);
+    vec3 toGI = giPool - p; float dGI = length(toGI);
+    light += vec3(1.15, 0.62, 0.18) * (max(dot(n, toGI / max(dGI, 1e-4)), 0.0) * 0.55 + 0.45) * (1.25 / (0.75 + dGI * dGI * 0.55));
   }
   return alb * light;
 }
 
 vec3 shadePortalsAperture(vec3 ro, vec3 rd, int mode, bool actionOn) {
   bool rtxMode = (mode == 2);
-  int maxDepth = (mode == 0) ? 2 : (mode == 1 ? (actionOn ? 1 : 10) : 9);
+  bool hasPillar = (mode != 0);
+  int maxDepth = (mode == 0) ? 2 : (mode == 1 ? (actionOn ? 1 : 10) : 6);
   vec2 blueCen = vec2(-0.08, 1.50);
   vec2 orangeCen = (mode == 0)
     ? vec2(-0.08, 1.50)
@@ -290,7 +304,7 @@ vec3 shadePortalsAperture(vec3 ro, vec3 rd, int mode, bool actionOn) {
     bool frontIsOrange = (mode != 0) && (((bounce + uPortalParity) & 1) == 1);
     float t = 0.004; vec2 hit = vec2(-1.0);
     for (int i = 0; i < 76; i++) {
-      vec2 h = mapApertureChamber(curRo + curRd * t, rtxMode);
+      vec2 h = mapApertureChamber(curRo + curRd * t, hasPillar);
       if (h.x < 0.0022) { hit = vec2(t, h.y); break; }
       t += max(h.x * 0.9, 0.0025);
       if (t > 16.0) break;
@@ -337,18 +351,12 @@ vec3 shadePortalsAperture(vec3 ro, vec3 rd, int mode, bool actionOn) {
       }
     }
 
-    vec3 n = normalAperture(p, rtxMode);
-    vec3 col = shadeApertureSurface(p, n, hit.y, rtxMode, frontIsOrange, blueCen, orangeCen, pRad);
+    vec3 n = normalAperture(p, hasPillar);
+    bool sunlitRoom = rtxMode && (bounce >= 1);
+    vec3 col = shadeApertureSurface(p, n, hit.y, rtxMode, hasPillar, sunlitRoom, frontIsOrange, blueCen, orangeCen, pRad);
 
-    // Continuous RTX volumetric sunbeam & floor reflection across chambers (bounce <= 2 -> zero pop-in on crossing!)
-    if (rtxMode && bounce <= 2) {
-      float beamT = clamp(hit.x, 0.0, 5.3);
-      vec3 midP = curRo + curRd * (beamT * 0.55);
-      float bDist = portalOvalDist(midP.xy, blueCen + vec2(0.15, -0.25), pRad * 1.15);
-      col += vec3(1.30, 0.78, 0.28) * (smoothstep(1.15, 0.1, bDist) * smoothstep(2.65, -2.55, midP.z) * 0.16);
-    }
-
-    if (rtxMode && m == 0 && bounce <= 2) {
+    // Glossy raytraced floor reflection in Portal RTX (reflects glowing portal ring, sunlit pillar, cube & golden walls!)
+    if (rtxMode && m == 0 && bounce == 0) {
       vec3 reflRd = reflect(curRd, n);
       vec3 reflRo = p + n * 0.025;
       float rt = 0.03; vec2 rh = vec2(-1.0);
@@ -364,15 +372,45 @@ vec3 shadePortalsAperture(vec3 ro, vec3 rd, int mode, bool actionOn) {
         vec3 rCol = vec3(0.0);
         if (rm == 3 && portalOvalDist(rp.xy, blueCen, pRad) < 1.14) {
           float ov = portalOvalDist(rp.xy, blueCen, pRad);
-          vec3 pGlow = frontIsOrange ? vec3(2.25, 0.45, 0.05) : vec3(0.14, 1.05, 2.35);
-          rCol = ov > 0.89 ? pGlow : vec3(0.48, 0.58, 0.76);
+          vec3 pGlow = frontIsOrange ? vec3(2.45, 0.50, 0.06) : vec3(0.14, 1.15, 2.65);
+          rCol = ov > 0.89 ? pGlow : vec3(1.55, 1.05, 0.48);
         } else {
           vec3 rn = normalAperture(rp, true);
-          rCol = shadeApertureSurface(rp, rn, rh.y, true, frontIsOrange, blueCen, orangeCen, pRad);
+          rCol = shadeApertureSurface(rp, rn, rh.y, true, true, false, frontIsOrange, blueCen, orangeCen, pRad);
         }
-        float fres = 0.14 + 0.44 * pow(1.0 - max(dot(n, -curRd), 0.0), 3.0);
+        float fres = 0.24 + 0.54 * pow(1.0 - max(dot(n, -curRd), 0.0), 3.0);
         col = mix(col, rCol, fres);
       }
+    }
+
+    // 14-step raymarched volumetric golden god-ray shaft pouring THROUGH the portal with live shadow streaks behind pillar & cube!
+    if (rtxMode && bounce == 0) {
+      vec3 virtualSun = vec3(blueCen.x - 0.74, blueCen.y + 2.15, -5.20);
+      float tEnd = min(hit.x, 6.2);
+      float vol = 0.0;
+      float stepLen = tEnd / 14.0;
+      for (int s = 0; s < 14; s++) {
+        float ts = (float(s) + 0.5) * stepLen;
+        vec3 vp = curRo + curRd * ts;
+        if (vp.z > -2.62 && vp.z < 2.55 && vp.y > 0.02 && vp.y < 3.40) {
+          vec3 toV = virtualSun - vp;
+          float dV = length(toV);
+          vec3 vd = toV / max(dV, 1e-4);
+          if (vd.z < -0.05) {
+            float tBlue = (-2.64 - vp.z) / vd.z;
+            vec3 hitB = vp + vd * tBlue;
+            float ov = portalOvalDist(hitB.xy, blueCen, pRad * 0.94);
+            if (ov < 1.0) {
+              float edge = smoothstep(1.0, 0.65, ov);
+              // Fast analytic occlusion check along ray toward portal so the pillar cuts a visible dark shadow streak through the air!
+              float occ = softShadowAperture(vp, vd, min(tBlue - 0.05, 4.0), 10.0, true);
+              float fade = exp(-max(0.0, vp.z + 2.65) * 0.28);
+              vol += edge * occ * fade * stepLen;
+            }
+          }
+        }
+      }
+      col += vec3(1.95, 1.12, 0.34) * (vol * 0.22);
     }
 
     // Smooth continuous distance attenuation instead of discrete per-bounce tint -> ZERO brightness jump on portal crossing!
@@ -612,7 +650,7 @@ vec3 shadeCodeParade(vec3 ro, vec3 rd) {
       float ribLight = 0.55 + 0.45 * cos(p.z * 2.618);
       float depthGlow = exp(-max(0.0, p.z + 18.5) * 0.16) * 1.1;
       vec3 col = alb * (0.32 + 0.78 * ribLight * (0.6 + 0.4 * max(n.y, 0.0))) + vec3(0.18, 0.82, 1.0) * depthGlow * 0.45;
-      return mix(col, vec3(0.10, 0.20, 0.34), (1.0 - exp(-max(0.0, -p.z - 2.0) * 0.045)) * 0.60);
+      return mix(col, vec3(0.10, 0.20, 0.34), (1.0 - exp(-max(0.0, -p.z) * 0.045)) * 0.60);
     }
     return vec3(0.12, 0.18, 0.28);
   }

@@ -114,8 +114,8 @@ export async function createAnimationEffect(gl) {
   let lastMmFK = null;
   let lastMmClip = "walk";
 
-  // Smooth C1 continuous stair-walk state (ZERO turnaround snaps, ZERO loop-wrap teleports, ZERO 13cm jumps!)
-  const stairWalk = { cycleT: 0.4, x: -1.45, yaw: Math.PI * 0.5, moveW: 0.0, walkPhase: 0.0 };
+  // Smooth C1 continuous stair-walk state (exact Mixamo stride sync -> ZERO foot skating & clean floor/top turnarounds!)
+  const stairWalk = { cycleT: 0.4, x: -1.74, yaw: Math.PI * 0.5, moveW: 0.0, walkPhase: 0.2 };
   function smoothRampEase(u) {
     const a = 0.14, v = 1.0 / (1.0 - a);
     if (u <= 0) return 0;
@@ -129,7 +129,7 @@ export async function createAnimationEffect(gl) {
     stairWalk.cycleT = (stairWalk.cycleT + h) % 8.8;
     const c = stairWalk.cycleT;
     if (c < 3.2) {
-      stairWalk.x = lerp(-1.45, 1.18, smoothRampEase(c / 3.2));
+      stairWalk.x = lerp(-1.74, 1.18, smoothRampEase(c / 3.2));
       stairWalk.yaw = Math.PI * 0.5;
       stairWalk.moveW = smoothstep(0.0, 0.38, c) * (1.0 - smoothstep(2.82, 3.2, c));
     } else if (c < 4.4) {
@@ -137,15 +137,15 @@ export async function createAnimationEffect(gl) {
       stairWalk.yaw = lerp(Math.PI * 0.5, -Math.PI * 0.5, smoothstep(3.25, 4.35, c));
       stairWalk.moveW = 0.0;
     } else if (c < 7.6) {
-      stairWalk.x = lerp(1.18, -1.45, smoothRampEase((c - 4.4) / 3.2));
+      stairWalk.x = lerp(1.18, -1.74, smoothRampEase((c - 4.4) / 3.2));
       stairWalk.yaw = -Math.PI * 0.5;
       stairWalk.moveW = smoothstep(4.4, 4.78, c) * (1.0 - smoothstep(7.22, 7.6, c));
     } else {
-      stairWalk.x = -1.45;
+      stairWalk.x = -1.74;
       stairWalk.yaw = lerp(-Math.PI * 0.5, Math.PI * 0.5, smoothstep(7.65, 8.75, c));
       stairWalk.moveW = 0.0;
     }
-    stairWalk.walkPhase += Math.abs(stairWalk.x - prevX) * 0.94 + h * 0.08 * stairWalk.moveW;
+    stairWalk.walkPhase += Math.abs(stairWalk.x - prevX) * 0.64;
   }
 
   // Motion Matching interactive steering (WASD, exact 3D raycast click-to-move, or clean waypoint circuit!)
@@ -368,8 +368,11 @@ export async function createAnimationEffect(gl) {
       }
     }
     gl.uniform4fv(uArena.uShadowPts, shPts);
-    gl.uniform3fv(uArena.uFootL, fk.worldPos[16] || [0, 0, 0]);
-    gl.uniform3fv(uArena.uFootR, fk.worldPos[20] || [0, 0, 0]);
+    const footSoleCenter = (iF, iT) => (fk.worldPos[iF] && fk.worldPos[iT])
+      ? [lerp(fk.worldPos[iF][0], fk.worldPos[iT][0], 0.42), fk.worldPos[iF][1], lerp(fk.worldPos[iF][2], fk.worldPos[iT][2], 0.42)]
+      : [0, 0, 0];
+    gl.uniform3fv(uArena.uFootL, footSoleCenter(16, 17));
+    gl.uniform3fv(uArena.uFootR, footSoleCenter(20, 21));
     gl.uniform1f(uArena.uShowFootRings, (stage === 4 || stage === 7) ? 1.0 : 0.0);
     gl.uniform2fv(uArena.uFloorScroll, floorScroll);
     gl.uniform1f(uArena.uTime, simTime);
