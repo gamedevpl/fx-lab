@@ -99,7 +99,7 @@ export function createPortalsEffect(gl) {
       else if (actionId === "lookAway") antiAutoWalk = !antiAutoWalk;
       else if (actionId === "inspectOutside") {
         flyInside = !flyInside;
-        if (flyInside) flyTime = 0.22 * 15.0; // Smoothly line up with archway instead of jumping mid-cycle!
+        if (flyInside) flyTime = 0.25 * 15.0; // Smoothly line up right outside the archway before gliding in!
       } else if (actionId === "placePhoto") {
         photoStamped = !photoStamped;
         if (photoStamped) viewfinderT = 0.0;
@@ -161,7 +161,7 @@ export function createPortalsEffect(gl) {
       curOrangeOff[0] += (orangeOff[0] - curOrangeOff[0]) * damp;
       curOrangeOff[1] += (orangeOff[1] - curOrangeOff[1]) * damp;
       const tFly = flyInside ? 1.0 : 0.0;
-      flyBlend += (tFly - flyBlend) * Math.min(1.0, dt * 4.5);
+      flyBlend += (tFly - flyBlend) * Math.min(1.0, dt * 2.4);
       const tPhoto = photoStamped ? 1.0 : 0.0;
       photoAmt += (tPhoto - photoAmt) * Math.min(1.0, dt * 5.0);
     },
@@ -206,11 +206,14 @@ export function createPortalsEffect(gl) {
         const target = [-0.08 + Math.sin(cam.yaw) * 0.25, 0.92 - cam.pitch * 0.20, -1.25];
         basis = basisFromLookAt(eye, target);
       } else if (stage === 4) {
-        // True 5-Room 360-deg FPP Walk around the central monolith at radius 1.85m (sculptures at r=2.88m -> zero clipping!)
+        // True 5-Room 360-deg FPP Walk around the central monolith with periodic smooth glance-back showing rooms silently rewritten behind you!
         const ang = shiftState;
         const r = 1.85;
         const eye = [Math.sin(ang) * r, 1.54 + cam.pitch * 0.6, Math.cos(ang) * r];
-        const ahead = ang + 0.74;
+        // Smooth periodic glance-back pulse right after passing each corner (clearly proves the golden stairs vanished behind you!)
+        const glanceCycle = ((ang % (Math.PI * 1.6)) + Math.PI * 1.6) % (Math.PI * 1.6);
+        const glanceW = ss((glanceCycle - 1.55) / 0.55) * (1.0 - ss((glanceCycle - 2.65) / 0.65));
+        const ahead = ang + 0.74 - glanceW * 2.15;
         const target = [Math.sin(ahead) * 2.45, 1.48 - cam.pitch * 0.5, Math.cos(ahead) * 2.45];
         basis = basisFromLookAt(eye, target);
       } else if (stage === 5) {

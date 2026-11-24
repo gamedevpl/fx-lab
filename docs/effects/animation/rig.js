@@ -365,7 +365,23 @@ export function applyFootIK(rig, fk, stairsMode, facingYaw) {
       const noseClearY = getSmoothStairRamp(Math.max(foot[0], toe[0])) + ANKLE_SOLE_H + 0.032;
       targetY = lerp(targetY, Math.max(targetY, noseClearY), swingW);
     }
-    const target = [foot[0], targetY, foot[2]];
+    let targetX = foot[0];
+    if (stairsMode === 1) {
+      // Keep planted boot toe & heel strictly clear of vertical stone risers (ZERO clipping into step faces!)
+      const stanceW = smoothstep(0.055, 0.008, soleLift);
+      if (stanceW > 0.01) {
+        const bootMaxX = Math.max(foot[0], toe[0]) + 0.045;
+        for (let k = 0; k < 5; k++) {
+          const rx = -1.40 + k * 0.56;
+          if (soleX < rx && bootMaxX > rx) {
+            const pushBack = Math.min(0.11, bootMaxX - rx);
+            targetX -= pushBack * stanceW;
+            break;
+          }
+        }
+      }
+    }
+    const target = [targetX, targetY, foot[2]];
 
     // Exact analytical pelvis height needed so this leg reaches its step tread with ZERO floating!
     const maxReach = (upperLen + lowerLen) * 0.976;
@@ -511,8 +527,8 @@ function collideParticleWithStairs(p, prev, r, applyVelocityResponse = false) {
     const vx = p[0] - prev[0], vy = p[1] - prev[1], vz = p[2] - prev[2];
     const vn = vx*hitNx + vy*hitNy + vz*hitNz;
     const tx = vx - vn*hitNx, ty = vy - vn*hitNy, tz = vz - vn*hitNz;
-    const fric = 0.87;
-    const bounce = vn < 0 ? -vn * 0.16 : 0;
+    const fric = 0.92;
+    const bounce = vn < 0 ? -vn * 0.20 : 0;
     prev[0] = p[0] - (tx * fric + hitNx * bounce);
     prev[1] = p[1] - (ty * fric + hitNy * bounce);
     prev[2] = p[2] - (tz * fric + hitNz * bounce);
@@ -632,8 +648,8 @@ export function createArticulatedRagdoll(rig, isActive = false) {
         if (pushOn) {
           // Real Verlet shove with organic asymmetry: one arm flings wide/overhead, legs split across steps -> unmistakable Hitman/HL2 ragdoll!
           const sgn = (state.pushSeed % 2 === 0) ? 1.0 : -1.0;
-          let wBack = (i === 1 || i === 2) ? 4.05 : (i === 3 || i === 6) ? 3.55 : (i === 0) ? 2.45 : 0.70;
-          let wUp   = (i === 1 || i === 2) ? 0.70 : (i === 0) ? 0.35 : 0.0;
+          let wBack = (i === 1 || i === 2) ? 5.65 : (i === 3 || i === 6) ? 4.85 : (i === 0) ? 3.85 : 1.75;
+          let wUp   = (i === 1 || i === 2) ? 0.55 : (i === 0) ? 0.20 : 0.0;
           let wSpin = 0.0;
           if (i === 4 || i === 5)       { wBack = 4.65; wUp = 1.45; wSpin =  2.15 * sgn; } // left arm flings wide & flops overhead
           else if (i === 7 || i === 8)  { wBack = 2.15; wUp = 0.55; wSpin = -2.25 * sgn; } // right arm splays outward to side

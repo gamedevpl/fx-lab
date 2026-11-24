@@ -157,8 +157,8 @@ export async function createAnimationEffect(gl) {
   window.addEventListener("keyup",   ev => { const k = ev.key?.toLowerCase(); if (k in keys) keys[k] = false; });
 
   function resetRagdolls(immediatePush = true) {
-    ragPassive.reset(0.78, false);
-    ragActive.reset(0.78, true);
+    ragPassive.reset(0.60, false);
+    ragActive.reset(0.60, true);
     ragTimer = immediatePush ? 0.30 : 0.0;
     if (immediatePush) {
       ragPassive.push(1.0);
@@ -435,8 +435,9 @@ export async function createAnimationEffect(gl) {
 
     enterStep(stepIdx) {
       if (stepIdx === 6) resetRagdolls(false);
-      if (stepIdx === 3 || stepIdx === 5) twistActive = true;
-      showSkeleton = (stepIdx === 1 || stepIdx === 2);
+      if (stepIdx === 3 || stepIdx === 4) twistActive = true;
+      // Show skeleton ONLY on 1992-93 Rigid Puppet (stepIdx 1) — NEVER on boneless Quake MDL vertex morphing (stepIdx 2)!
+      showSkeleton = (stepIdx === 1);
     },
 
     onReset() {
@@ -492,9 +493,9 @@ export async function createAnimationEffect(gl) {
         "1989 · PRINCE OF PERSIA · 12 FPS ROTOSCOPE",
         "1992–93 · RIGID POLYGON PUPPET (1-BONE)",
         "1996 · QUAKE MDL · PER-VERTEX MORPHING",
-        "1998 · HALF-LIFE / LBS · 190° CANDY-WRAPPER",
-        "2006–09 · MIXAMO WALK + 2-BONE FOOT IK",
+        "2000–04 · MULTI-BONE LBS · 180° CANDY-WRAPPER",
         "2007 · DUAL QUATERNION SKINNING (KAVAN)",
+        "2006–09 · MIXAMO WALK + 2-BONE FOOT IK",
         "2008 · LIMP RAGDOLL vs ACTIVE EUPHORIA",
         `2016–20 · MOTION MATCH (${lastMmClip.toUpperCase()}) + INERTIALIZATION`,
       ];
@@ -509,17 +510,13 @@ export async function createAnimationEffect(gl) {
       simTime += h;
       stepStairWalk(h);
 
-      // Smooth non-teleporting Step 7 cycle: 0..0.30s upright -> shove -> 4.55s smooth rewind -> 5.80s exact 0mm wrap!
+      // Natural long stair-tumble cycle: 0..0.30s upright -> shove -> full multi-step tumble & settle (no mid-shot levitating rewind!)
       ragTimer += h;
       if (ragTimer >= 0.30 && !ragPassive.state.pushed && !ragPassive.state.rwStart) {
         ragPassive.push(1.0);
         ragActive.push(1.0);
       }
-      if (ragTimer >= 4.55 && !ragPassive.state.rwStart) {
-        ragPassive.startSmoothRewind();
-        ragActive.startSmoothRewind();
-      }
-      if (ragTimer >= 5.80) {
+      if (ragTimer >= 8.20) {
         resetRagdolls(false);
       }
       ragPassive.step(h, false);
@@ -550,7 +547,7 @@ export async function createAnimationEffect(gl) {
           const dWp = Math.hypot(mm.targetX - mm.x, mm.targetZ - mm.z);
           if (dWp < 0.28) {
             mm.wpIdx = (mm.wpIdx + 1) % patrolWaypoints.length;
-            if (mm.wpIdx === 0) mm.idlePause = 1.25; // clean idle showcase pause!
+            if (mm.wpIdx === 0) mm.idlePause = 0.25; // brief turn pause without freezing motionless!
           }
           wantSpeed = (mm.wpIdx === 1 || mm.wpIdx === 3) ? 1.32 : 0.74;
         }

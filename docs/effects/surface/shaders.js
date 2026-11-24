@@ -312,8 +312,10 @@ vec3 evalNormalTS(vec2 uv, float matPart, float microWeight, float strength) {
 
 // Soft heightfield self-shadowing (Tatarchuk GDC 2006 POM & displaced micro-shadows!)
 float evalHeightShadow(vec2 uv, float h0, vec3 lDirTS, float matPart, vec2 depthScaleUv) {
-  if (lDirTS.z <= 0.04) return 0.14;
-  vec2 stepUv = (lDirTS.xy / max(lDirTS.z, 0.24)) * depthScaleUv;
+  // Smooth grazing fade instead of hard lDirTS.z <= 0.04 step -> ZERO vertical shadow terminator seam on cylinder!
+  float grazingFade = smoothstep(-0.02, 0.28, lDirTS.z);
+  if (grazingFade <= 0.001) return 0.14;
+  vec2 stepUv = (lDirTS.xy / max(lDirTS.z, 0.28)) * depthScaleUv;
   float sh = 0.0;
   const int S_STEPS = 10;
   for (int i = 1; i <= S_STEPS; i++) {
@@ -323,7 +325,7 @@ float evalHeightShadow(vec2 uv, float h0, vec3 lDirTS, float matPart, vec2 depth
     float occl = (sampleH - rayH) * (1.0 - frac * 0.42) * 4.8;
     sh = max(sh, occl);
   }
-  return clamp(1.0 - sh, 0.12, 1.0);
+  return mix(0.14, clamp(1.0 - sh, 0.12, 1.0), grazingFade);
 }
 
 void main() {
@@ -478,25 +480,43 @@ void main() {
     float wire = 1.0 - smoothstep(0.45, 1.15, min(dEdge, dDiag * 0.92));
     col = mix(col * 0.78, vec3(0.22, 0.96, 1.0), wire * 0.75);
   } else if (uDebugMode > 1.5 && uStage >= 6 && uFlatMode < 0.5) {
-    // Iconic UE5 Nanite / Meshlet spatial cluster debug shading (crisp packets + clean cluster seams!)
+    // Organic Voronoi spatial triangle-cluster debug view (authentic UE5 Nanite / Turing Meshlets — NOT a regular UV grid!)
     vec2 cGrid = (uStage == 7)
-      ? ((vMatPart < 0.5) ? vec2(12.0, 12.0) : vec2(5.5, 5.5))
-      : ((vMatPart < 0.5) ? vec2(6.5, 6.5)   : vec2(3.0, 3.0));
+      ? ((vMatPart < 0.5) ? vec2(11.5, 11.5) : vec2(5.2, 5.2))
+      : ((vMatPart < 0.5) ? vec2(6.2, 6.2)   : vec2(2.8, 2.8));
     vec2 cPos = (vMatPart < 0.5) ? (vUv * cGrid) : (vWorldPos.xz * cGrid);
-    vec2 cCell = floor(cPos);
-    vec2 cFrac = fract(cPos);
-    vec2 cFw = max(fwidth(cPos), vec2(0.001));
-    float cId = cCell.x * 31.0 + cCell.y * 17.0 + vMatPart * 113.0;
+    vec2 iCell = floor(cPos);
+    vec2 fCell = fract(cPos);
+    float d1 = 9.0, d2 = 9.0;
+    vec2 bestCell = iCell;
+    for (int oy = -1; oy <= 1; oy++) {
+      for (int ox = -1; ox <= 1; ox++) {
+        vec2 nb = vec2(float(ox), float(oy));
+        vec2 nCell = iCell + nb;
+        vec2 seed = vec2(hash12(nCell + vec2(1.7, 9.2)), hash12(nCell + vec2(8.3, 2.8)));
+        vec2 diffV = nb + (0.14 + 0.72 * seed) - fCell;
+        float dist = length(diffV);
+        if (dist < d1) { d2 = d1; d1 = dist; bestCell = nCell; }
+        else if (dist < d2) { d2 = dist; }
+      }
+    }
+    float cId = bestCell.x * 31.0 + bestCell.y * 17.0 + vMatPart * 113.0;
     vec3 cCol = clusterColor(cId);
     float clDiff = 0.34 + 0.66 * max(dot(N, L), 0.0) * 0.82 + 0.25 * max(dot(N, rimL), 0.0);
+    // Stage 6 Meshlets: visibly dim grazing/backfacing clusters to demonstrate per-meshlet normal-cone culling!
+    if (uStage == 6) {
+      float coneDot = dot(Ngeom, V);
+      float culledTint = smoothstep(0.16, 0.34, coneDot);
+      cCol = mix(vec3(0.14, 0.16, 0.22), cCol, culledTint);
+    }
     // Fine micropolygon triangle facet variation in Stage 7 Nanite debug view!
     if (uStage == 7) {
       vec3 flatN = normalize(cross(dFdx(vWorldPos), dFdy(vWorldPos)));
       float triTint = 0.80 + 0.32 * hash12(floor(cPos * 6.0));
       clDiff = (0.30 + 0.70 * abs(dot(flatN, L))) * triTint;
     }
-    float cEdge = min(min(cFrac.x, 1.0 - cFrac.x) / cFw.x, min(cFrac.y, 1.0 - cFrac.y) / cFw.y);
-    float border = 1.0 - smoothstep(0.6, 1.4, cEdge);
+    float fw = max(length(fwidth(cPos)), 0.002);
+    float border = 1.0 - smoothstep(fw * 0.55, fw * 1.45, d2 - d1);
     vec3 dbg = cCol * clDiff * mix(1.0, 0.14, border);
     col = mix(col, dbg, 0.92);
   }

@@ -474,8 +474,13 @@ function updateSplitOverlay() {
   $("splitUi").hidden = !split.enabled;
   document.documentElement.style.setProperty("--wipe", String(split.pos));
   $("splitHit").setAttribute("aria-valuenow", String(Math.round(split.pos * 100)));
-  $("splitLeftTag").textContent = lang === "pl" ? st.leftTagPl : st.leftTagEn;
-  $("splitRightTag").textContent = lang === "pl" ? st.rightTagPl : st.rightTagEn;
+  const lt = $("splitLeftTag");
+  const rt = $("splitRightTag");
+  lt.textContent = lang === "pl" ? st.leftTagPl : st.leftTagEn;
+  rt.textContent = lang === "pl" ? st.rightTagPl : st.rightTagEn;
+  // Prevent split labels from clipping off-screen when sweeping divider near viewport edges
+  lt.style.opacity = split.pos < 0.24 ? "0" : "1";
+  rt.style.opacity = split.pos > 0.76 ? "0" : "1";
   const u = UI[lang];
   const btn = $("splitBtn");
   btn.textContent = split.enabled ? u.splitOn : u.splitOff;

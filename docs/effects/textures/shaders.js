@@ -122,14 +122,14 @@ vec3 quantRGB565(vec3 c) {
 }
 
 vec3 sampleS3TC(int m, vec2 uv, float lod, out float blockEdge) {
-  // Effective 128x128 texel base so 4x4 S3TC/DXT1 macroblocks & RGB565 banding are unmistakable inside the 4x loupe!
-  float effRes = 128.0 / exp2(floor(clamp(lod, 0.0, 4.0)));
+  // Authentic hardware S3TC/DXT1: preserves full resolution + bilinear filtering while quantizing each 4x4 block to RGB565 endpoints!
+  float effRes = 384.0 / exp2(floor(clamp(lod, 0.0, 4.0)));
   vec2 tc = uv * effRes;
   vec2 blk = floor(tc * 0.25) * 4.0;
   vec2 inBlk = fract(tc * 0.25);
   blockEdge = smoothstep(0.43, 0.495, max(abs(inBlk.x - 0.5), abs(inBlk.y - 0.5)));
 
-  // Sample 4 corner + center texels of the 4x4 block to determine DXT1 min/max luminance endpoints
+  // Sample 4 corner texels of the 4x4 block to compute DXT1 RGB565 endpoints
   vec3 cMin = vec3(1.0), cMax = vec3(0.0);
   float lMin = 9.0, lMax = -1.0;
   vec3 endLo = vec3(0.0), endHi = vec3(1.0);
@@ -143,16 +143,17 @@ vec3 sampleS3TC(int m, vec2 uv, float lod, out float blockEdge) {
       cMin = min(cMin, s); cMax = max(cMax, s);
     }
   }
-  vec3 e0 = quantRGB565(mix(endLo, cMin, 0.35));
-  vec3 e1 = quantRGB565(mix(endHi, cMax, 0.35));
+  vec3 e0 = quantRGB565(mix(endLo, cMin, 0.25));
+  vec3 e1 = quantRGB565(mix(endHi, cMax, 0.25));
 
-  // Project current texel onto the 1D RGB565 line segment [e0, e1] and quantize to 2-bit index {0, 1/3, 2/3, 1}!
-  vec3 cur = sampleBaseLod(m, (floor(tc) + 0.5) / effRes, clamp(lod, 0.0, 5.0));
+  // Project bilinear-filtered texel onto [e0, e1] and quantize to 2-bit DXT1 palette (subtle banding up close, nearly lossless at normal viewing distance!)
+  vec3 cur = sampleBaseLod(m, uv, clamp(lod, 0.0, 5.0));
   vec3 axis = e1 - e0;
   float len2 = dot(axis, axis);
   float t = len2 > 1e-4 ? clamp(dot(cur - e0, axis) / len2, 0.0, 1.0) : 0.0;
   float q = floor(t * 3.0 + 0.5) / 3.0;
-  return mix(e0, e1, q);
+  vec3 dxtCol = mix(e0, e1, q);
+  return mix(cur, dxtCol, 0.72);
 }
 
 // Genuine 16x Anisotropic Filtering (EWA major-axis tap marching!)
@@ -190,27 +191,46 @@ vec3 sampleAnisotropic16(int m, vec2 uv, bool radeon8500) {
 }
 
 // Unique non-repeating MegaTexture world-space fresco / weathered patina layer (id Tech 5 / RAGE style!)
-vec3 megaUniqueTint(vec3 wp, int m, float lod) {
-  // Unique painted gallery bay numerals, warm golden fresco arcs, and subtle weathering unique to every meter!
+vec3 megaUniqueBlend(vec3 baseCol, vec3 wp, int m, float lod) {
+  // Large non-repeating world-space variation + unique painted murals, moss & decals per gallery bay -> unmistakably non-tiled vs left split!
   float bay = floor((6.5 - wp.z) / 2.875);
-  float h1 = fract(sin(bay * 127.1 + float(m) * 31.7) * 43758.5453);
+  float h1 = fract(sin(bay * 127.1 + float(m) * 31.7 + step(0.0, wp.x) * 19.3) * 43758.5453);
   float h2 = fract(sin(bay * 269.5 + 11.3) * 43758.5453);
-  vec3 patina = mix(vec3(1.0, 0.96, 0.90), vec3(0.86, 0.93, 1.0), h1);
-  // Paint unique bold fresco medallions on walls & floor bays that soften accurately with virtual page mip LOD!
-  float blur = clamp(lod * 0.08, 0.015, 0.45);
-  vec2 local = vec2(wp.x * 0.45, fract((6.5 - wp.z) / 2.875) - 0.5);
+  float h3 = fract(sin(bay * 419.2 + 53.7) * 43758.5453);
+  float blur = clamp(lod * 0.06, 0.012, 0.40);
+  float detailVis = 1.0 - clamp(lod / 6.5, 0.0, 0.85);
+
+  // Smooth large-scale non-repeating weathering patina across the entire 46m hall (breaks tile repetition immediately!)
+  float grimeWave = 0.5 + 0.5 * sin(wp.z * 0.27 + wp.x * 0.65) * cos(wp.z * 0.13 - wp.x * 0.42);
+  vec3 patina = mix(vec3(1.06, 0.96, 0.84), vec3(0.74, 0.85, 0.96), grimeWave);
+  vec3 col = baseCol * patina;
+
+  vec2 local = vec2(wp.x * 0.42, fract((6.5 - wp.z) / 2.875) - 0.5);
   if (m == 0) {
-    float ring = smoothstep(0.24 + blur, 0.21 - blur, abs(length(local - vec2((h2 - 0.5) * 0.7, 0.0)) - 0.16));
-    vec3 decalCol = h1 > 0.5 ? vec3(0.92, 0.34, 0.22) : vec3(0.14, 0.72, 0.86);
-    return mix(patina, decalCol, ring * 0.52 * (1.0 - clamp(lod / 6.5, 0.0, 0.85)));
+    // Unique painted floor medallions, amber/teal compass rings & weathered sandstone stains unique to each bay
+    float rDist = length(local - vec2((h2 - 0.5) * 0.85, (h3 - 0.5) * 0.22));
+    float ring = smoothstep(0.055 + blur, 0.025, abs(rDist - (0.14 + h1 * 0.10)));
+    float disc = smoothstep(0.09 + blur, 0.05, rDist) * step(0.45, h3);
+    vec3 paint = mix(vec3(0.92, 0.36, 0.16), vec3(0.14, 0.78, 0.86), step(0.5, h1));
+    col = mix(col, paint, max(ring, disc * 0.65) * 0.72 * detailVis);
+    // Non-repeating damp moss/ochre weathering streaks along floor edges
+    float moss = smoothstep(0.58, 0.92, sin(wp.z * 0.41 + sin(wp.x * 1.1)) * 0.5 + 0.5) * smoothstep(0.4, 2.2, abs(wp.x));
+    col = mix(col, vec3(0.18, 0.28, 0.17), moss * 0.52);
+  } else if (m == 1) {
+    // Bold unique painted fresco bands, diagonal chevrons & bay accent stripes on every wall segment
+    float yCenter = 1.25 + h2 * 1.45;
+    float stripe = smoothstep(0.28 + blur, 0.22, abs(wp.y - yCenter));
+    float accent = smoothstep(0.06 + blur, 0.02, abs(wp.y - (yCenter - 0.34)));
+    vec3 mural = mix(vec3(0.86, 0.46, 0.18), vec3(0.16, 0.68, 0.82), h1);
+    if (h3 > 0.66) mural = vec3(0.76, 0.24, 0.34);
+    col = mix(col, mural * (0.65 + 0.35 * baseCol), max(stripe * 0.68, accent * 0.82) * detailVis);
+  } else {
+    // Unique stencil stripes on crates so no two crates look identical!
+    float stencil = smoothstep(0.14 + blur, 0.08, abs(wp.y - (0.55 + h2 * 0.45)));
+    vec3 mark = h1 > 0.5 ? vec3(0.92, 0.66, 0.18) : vec3(0.22, 0.78, 0.86);
+    col = mix(col, mark, stencil * 0.62 * detailVis);
   }
-  if (m == 1) {
-    // Unique painted geometric wall mural strips per bay
-    float stripe = smoothstep(0.18 + blur, 0.12 - blur, abs(wp.y - (1.8 + h2 * 1.1)));
-    vec3 mural = mix(vec3(0.90, 0.55, 0.22), vec3(0.18, 0.75, 0.88), h1);
-    return mix(patina, mural, stripe * 0.44 * (1.0 - clamp(lod / 6.5, 0.0, 0.85)));
-  }
-  return patina;
+  return col;
 }
 
 // Color-coded mipmap level palette (LOD 0 red -> 1 orange -> 2 yellow -> 3 green -> 4 cyan -> 5 blue)
@@ -300,7 +320,7 @@ void main() {
     vec3 afCol = sampleAnisotropic16(m, baseUv, false);
     vec3 coarseCol = sampleBaseLod(m, baseUv, clamp(resMip, 0.0, 6.5));
     float popMix = smoothstep(0.35, 1.5, resMip);
-    texCol = mix(afCol, coarseCol, popMix) * megaUniqueTint(vWorldPos, m, resMip);
+    texCol = megaUniqueBlend(mix(afCol, coarseCol, popMix), vWorldPos, m, resMip);
     // Subtle tile boundary flash only while a page is actively streaming in!
     if (resMip > 0.65) {
       vec2 tileF = fract(vUvPage * 64.0);
@@ -313,7 +333,7 @@ void main() {
     vec2 vUvPage = worldToVirtualUv(vWorldPos, m);
     vec4 page = texture(uPageTable, vUvPage);
     vec3 afCol = sampleAnisotropic16(m, baseUv, false);
-    texCol = afCol * megaUniqueTint(vWorldPos, m, isoLod * 0.35);
+    texCol = megaUniqueBlend(afCol, vWorldPos, m, isoLod * 0.35);
     if (debugOn) {
       vec2 tileF = fract(vUvPage * 32.0);
       float tEdge = smoothstep(0.45, 0.495, max(abs(tileF.x - 0.5), abs(tileF.y - 0.5)));

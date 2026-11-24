@@ -224,7 +224,7 @@ export function createTexturesEffect(gl) {
         "1996 · 3DFX VOODOO BILINEAR (NO MIPS)",
         showMips ? "1996 · COLOR-CODED MIP LEVELS" : "1996 · MIPMAPPING & TRILINEAR",
         showBlocks ? "1998 · S3TC / DXT1 4×4 BLOCK GRID" : "1998 · S3TC / DXT1 COMPRESSION",
-        radeon8500 ? "2001 · RADEON 8500 ANGLE-DEP AF!" : "2001 · GEFORCE 3 16× ANISOTROPIC",
+        radeon8500 ? "2001 · RADEON 8500 ANGLE-DEP AF!" : "2001 · GEFORCE 3 8× / RADEON 16× AF",
         "2011 · RAGE MEGATEXTURE (POP-IN!)",
         feedbackMap ? "2020–26 · SAMPLER FEEDBACK HEATMAP" : "2020–26 · DX12 SAMPLER FEEDBACK",
       ][stepIdx] || "WEBGL2";
@@ -314,7 +314,8 @@ export function createTexturesEffect(gl) {
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, texScene); gl.uniform1i(uL.uSrc, 0);
       gl.uniform2f(uL.uRes, w, h);
       gl.uniform2fv(uL.uLoupeTarget, loupeTarget);
-      gl.uniform1f(uL.uLoupeOn, 1.0);
+      const hudHidden = typeof document !== "undefined" && document.body.classList.contains("no-hud");
+      gl.uniform1f(uL.uLoupeOn, hudHidden ? 0.0 : 1.0);
       gl.uniform1f(uL.uSplitX, split.enabled ? split.pos : -1.0);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
       gl.bindVertexArray(null);

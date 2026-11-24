@@ -232,6 +232,7 @@ nav .source{font-weight:700;font-size:14px}
 .split-tags .tag{
   position:absolute;top:0;font:700 12px var(--pix);letter-spacing:.08em;
   padding:5px 9px;box-shadow:0 0 0 2px var(--ink),3px 3px 0 2px rgba(0,0,0,.35);
+  transition:opacity .16s ease;
 }
 .split-tags .tag.left{right:14px;background:#1d1a2be8;color:var(--cream)}
 .split-tags .tag.right{left:14px;background:var(--amber);color:var(--ink)}
