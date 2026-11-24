@@ -116,6 +116,7 @@ const SCENE_AMBIENCE = {
   surface:      { kind: "fire",       baseFreq: 210, q: 1.5, gain: 0.13, detail: "torch" },
   skin:         { kind: "studio",     baseFreq: 220, q: 1.0, gain: 0.08, detail: "warm" },
   ascii:        { kind: "neon",       baseFreq: 110, q: 4.5, gain: 0.12, detail: "crt" },
+  hd2d:         { kind: "fire",       baseFreq: 195, q: 1.6, gain: 0.12, detail: "torch" },
 };
 
 function readPref(key, fallback) {
@@ -654,7 +655,8 @@ export function createAudioEngine({ mutedByUrl = false } = {}) {
       case "skin":
       case "surface":
       case "toon":
-      case "ascii":       playCue({ type: "lightChime" }); break;
+      case "ascii":
+      case "hd2d":        playCue({ type: "lightChime" }); break;
       default:            playUi("click"); break;
     }
   }

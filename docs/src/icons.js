@@ -405,6 +405,23 @@ const ICONS = {
     `<rect x="5" y="6" width="1" height="2" fill="#ff5c77"/>` +
     `<rect x="7" y="6" width="2" height="1" fill="#7ea4e8"/>` +
     `<rect x="3" y="8" width="6" height="1" fill="#1e273d"/>`,
+
+  // HD-2D Miniature Diorama: dark navy top/bottom tilt-shift blur framing a warm torchlit stone courtyard
+  hd2d:
+    `<rect x="1" y="1" width="10" height="10" fill="#131c33"/>` +
+    `<rect x="2" y="1" width="2" height="1" fill="#3b4d78"/>` +
+    `<rect x="8" y="1" width="2" height="2" fill="#46c9f0"/>` +
+    `<rect x="1" y="4" width="10" height="4" fill="#5e574e"/>` +
+    `<rect x="2" y="4" width="3" height="2" fill="#82786a"/>` +
+    `<rect x="6" y="4" width="4" height="2" fill="#756c60"/>` +
+    `<rect x="3" y="5" width="1" height="1" fill="#c43a31"/>` +
+    `<rect x="5" y="4" width="1" height="1" fill="#ffd166"/>` +
+    `<rect x="5" y="5" width="1" height="2" fill="#ff9632"/>` +
+    `<rect x="8" y="4" width="1" height="1" fill="#ffd166"/>` +
+    `<rect x="2" y="6" width="8" height="2" fill="#9c8a72"/>` +
+    `<rect x="5" y="6" width="2" height="1" fill="#ffe699"/>` +
+    `<rect x="2" y="9" width="2" height="2" fill="#ff8f32"/>` +
+    `<rect x="8" y="9" width="2" height="2" fill="#ff8f32"/>`,
 };
 
 const FALLBACK_ICON =
