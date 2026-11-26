@@ -227,33 +227,32 @@ void evalGasGiant(vec3 pRot, float tFlow, out vec3 albedo, out float bandContras
   bandContrast = zone;
 }
 
-// Background diagonal Milky Way ribbon & crisp starfield (gives near-black dither noise-floor & PS1 banding test!)
+// Background cosmic nebula (color eras) & razor-clean starfield (crisp pure black space in 1-bit!)
 void evalSpaceBackground(vec3 rd, out vec3 col, out float luma) {
-  // Delicate diagonal Milky Way dust ribbon sloping lower-left -> upper-right behind the gas giant!
+  // Subtle deep-indigo & warm-ivory diagonal nebula for color eras (Mega Drive & PS1 RGB555 banding test)
   vec3 mwNormal = normalize(vec3(0.48, -0.80, 0.36));
   float dPlane = dot(rd, mwNormal) + 0.02;
-  float mwWide = exp(-pow(dPlane * 4.4, 2.0));
-  float mwCore = exp(-pow(dPlane * 10.5, 2.0));
-  float mwCloud = fbm3(rd * 4.6 + vec3(2.3, 1.1, 4.7));
+  float mwWide = exp(-pow(dPlane * 5.2, 2.0));
+  float mwCloud = fbm3(rd * 4.8 + vec3(2.3, 1.1, 4.7));
   float mwRift  = smoothstep(0.42, 0.70, fbm3(rd * 8.8 + vec3(5.1, 2.4, 0.8)));
-  float dust = (mwWide * 0.42 + mwCore * 0.48) * smoothstep(0.24, 0.84, mwCloud) * (1.0 - 0.56 * mwRift);
+  float dust = mwWide * smoothstep(0.28, 0.84, mwCloud) * (1.0 - 0.55 * mwRift);
 
-  // Smooth deep-indigo & warm-ivory cosmic gradient (exposes PS1 RGB555 banding & Atkinson black clip without overpowering rings!)
   vec3 baseVoid = vec3(0.008, 0.013, 0.028);
   vec3 mwColor  = mix(vec3(0.14, 0.22, 0.40), vec3(0.42, 0.37, 0.32), mwCloud) * dust;
   col = baseVoid + mwColor;
-  luma = clamp(dust * 0.28, 0.0, 0.52);
+  // Keep 1-bit void crisp pitch-black (zero muddy scatter clouds when zooming out!)
+  luma = 0.0;
 
-  // Crisp multi-scale pinpoint stars locked on celestial sphere
-  vec3 sc = rd * 132.0;
+  // Crisp pinpoint stars locked on celestial sphere
+  vec3 sc = rd * 138.0;
   vec3 si = floor(sc);
   vec3 sf = fract(sc) - 0.5;
   float sh = hash31(si);
-  if (sh > 0.982) {
+  if (sh > 0.986) {
     vec3 jitter = vec3(hash31(si + 7.1), hash31(si + 13.7), hash31(si + 29.3)) - 0.5;
-    float d = length(sf - jitter * 0.55);
-    float star = smoothstep(0.22, 0.03, d) * smoothstep(0.982, 0.998, sh);
-    vec3 starTint = mix(vec3(0.80, 0.90, 1.0), vec3(1.0, 0.92, 0.74), hash31(si + 41.2));
+    float d = length(sf - jitter * 0.52);
+    float star = smoothstep(0.20, 0.03, d) * smoothstep(0.986, 0.999, sh);
+    vec3 starTint = mix(vec3(0.82, 0.90, 1.0), vec3(1.0, 0.92, 0.76), hash31(si + 41.2));
     col += starTint * star * 1.15;
     luma = max(luma, star * 0.96);
   }
@@ -311,15 +310,14 @@ void main() {
   float spaceLuma;
   evalSpaceBackground(rd, spaceCol, spaceLuma);
 
-  // Lush smooth atmospheric halo glow around the sunlit planetary limb (super clear PS1 RGB555 banding test!)
+  // Soft color halo around sunlit limb (color eras only — 1-bit space stays razor-clean obsidian black!)
   float closestT = max(0.0, -dot(ro, rd));
   vec3 closestP = ro + rd * closestT;
   float limbDist = length(closestP) - PLANET_R;
-  float haloMask = exp(-max(limbDist, 0.0) * 4.4) * step(0.0, limbDist);
-  float haloSun = smoothstep(-0.32, 0.72, dot(normalize(closestP), sunDir));
-  vec3 haloCol = vec3(0.38, 0.62, 0.96) * haloMask * (0.14 + 0.62 * haloSun);
+  float haloMask = exp(-max(limbDist, 0.0) * 5.2) * step(0.0, limbDist);
+  float haloSun = smoothstep(-0.22, 0.72, dot(normalize(closestP), sunDir));
+  vec3 haloCol = vec3(0.38, 0.62, 0.96) * haloMask * (0.12 + 0.60 * haloSun);
   spaceCol += haloCol;
-  spaceLuma = clamp(spaceLuma + haloMask * (0.06 + 0.30 * haloSun), 0.0, 1.0);
 
   // Start with sky/space as base solid hit
   float tSolid = 1e9;
@@ -398,9 +396,11 @@ void main() {
     objId = 0.66;
     edgeMask = smoothstep(0.28, 0.06, ndv);
     // Co-rotating equal-area cube UV tightly in [-1, +1] for full RGBA16F precision on ALL 6 cube faces!
+    // Exact 1:1 Nyquist pixel footprint at the planet's center distance so dots stay razor-sharp 1px at any zoom!
     float pFace = 0.0;
     surfUv = sphereCubeUv(pRot, pFace);
-    surfFoot = (4.0 / PI) * (tPlanet * pixelRad / PLANET_R) / max(ndv, 0.46);
+    float planetDist = max(length(ro) - PLANET_R * 0.55, 0.6);
+    surfFoot = (4.0 / PI) * (planetDist * pixelRad / PLANET_R);
     surfKind = 10.0 + pFace;
   }
 
@@ -428,7 +428,8 @@ void main() {
     edgeMask = smoothstep(0.36, 0.08, ndv);
     float mFace = 0.0;
     surfUv = sphereCubeUv(mLoc, mFace);
-    surfFoot = (4.0 / PI) * (tMoon * pixelRad / MOON_R) / max(ndv, 0.48);
+    float moonDist = max(length(ro - moonPos) - MOON_R * 0.5, 0.4);
+    surfFoot = (4.0 / PI) * (moonDist * pixelRad / MOON_R);
     surfKind = 20.0 + mFace;
   }
 
@@ -470,8 +471,8 @@ void main() {
       float rAng = uLoopPeriod > 0.5 ? (uTime / uLoopPeriod) * (2.0 * PI) : uTime * 0.08;
       rSpin.xz = rot2(rAng) * ringHitLoc.xz;
       surfUv = rSpin.xz / RING_OUT;
-      float rGraz = max(abs(rdLoc.y), 0.30);
-      surfFoot = (tRing * pixelRad / RING_OUT) / rGraz;
+      float ringDist = max(length(ro), 1.0);
+      surfFoot = (ringDist * pixelRad / RING_OUT) / max(abs(rdLoc.y), 0.52);
       surfKind = 30.0;
       objId = 0.33;
     }
@@ -611,23 +612,6 @@ vec2 rayCubeUv(vec3 d) {
   return atan(uv);
 }
 
-// Exact closed-form CDF of weighted sum Z = (1-f)*U0 + f*U1 of two Uniform(0,1) thresholds.
-// Guarantees mathematically Uniform(0,1) output at EVERY octave blend fraction f in [0,1] -> zero midtone pop!
-float blendUniformThresholds(float u0, float u1, float f) {
-  float a = 1.0 - f;
-  float b = f;
-  float m = min(a, b);
-  float M = max(a, b);
-  float z = a * u0 + b * u1;
-  if (m < 1e-3) return z;
-  if (z <= m) return (z * z) / (2.0 * a * b);
-  if (z >= M) {
-    float r = 1.0 - z;
-    return 1.0 - (r * r) / (2.0 * a * b);
-  }
-  return (z - 0.5 * m) / M;
-}
-
 float sampleBlueNoisePx(vec2 coord) {
   vec2 uv = (floor(coord) + 0.5) / 64.0;
   return texture(uBlueNoise, uv).r;
@@ -724,28 +708,17 @@ vec3 evalStageAt(vec2 uv, int stage, bool isLeftSide, bool sameStageSplit) {
     return mix(cDark, cLight, bit);
   }
 
-  // STAGE 7: 2024-26 Surface-Anchored 3D Blue-Noise Stippling (Dual-Octave Variance-Preserving CDF!)
-  // Stipple dots lock directly to the rotating gas giant clouds, rings, orbiting moon & starry sky
-  // while keeping crisp, zoom-stable 1-bit density at any distance with full 32-bit float precision!
+  // STAGE 7: 2024-26 Surface-Anchored 3D Blue-Noise Stippling (1:1 Nyquist-Matched Void-and-Cluster!)
+  // Anchors pure 64x64 Ulichney Blue Noise directly onto the co-rotating planet, rings, moon & sky
+  // at exact 1.00 texel-per-virtual-pixel pitch so dots stay razor-sharp with zero clumping at any zoom!
   vec4 surf = texture(uSurf, qUv);
   vec2 sUv = surf.rg;
   float foot = max(surf.b, 1e-4);
   float surfId = surf.a;
 
-  // Continuous log2 scale matching 1 blue-noise texel to ~1.0 virtual pixel on screen
-  float idealTexelsPerUnit = 1.0 / foot;
-  float lod = log2(max(idealTexelsPerUnit, 1.0));
-  float lod0 = floor(lod);
-  float frac = fract(lod);
-
-  float scale0 = exp2(lod0);
-  float scale1 = scale0 * 2.0;
-
   // Apply per-object/per-face decorrelation offset in full 32-bit float (never in RGBA16F!)
   vec2 faceOff = vec2(mod(surfId * 17.0, 64.0), mod(surfId * 31.0, 64.0));
-  float bn0 = sampleBlueNoisePx(sUv * scale0 + faceOff);
-  float bn1 = sampleBlueNoisePx(sUv * scale1 + faceOff + vec2(23.0, 41.0));
-  float thresh = blendUniformThresholds(bn0, bn1, smoothstep(0.08, 0.92, frac));
+  float thresh = sampleBlueNoisePx(sUv / foot + faceOff);
 
   float bit = step(thresh, luma);
   return mix(cDark, cLight, bit);
