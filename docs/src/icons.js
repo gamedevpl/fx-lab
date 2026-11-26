@@ -422,6 +422,29 @@ const ICONS = {
     `<rect x="5" y="6" width="2" height="1" fill="#ffe699"/>` +
     `<rect x="2" y="9" width="2" height="2" fill="#ff8f32"/>` +
     `<rect x="8" y="9" width="2" height="2" fill="#ff8f32"/>`,
+
+  // 1-Bit Dithering & Stippling: cream-on-obsidian stippled gas giant with diagonal planetary ring & silhouette moon
+  dithering:
+    `<rect x="1" y="1" width="10" height="10" fill="#09090d"/>` +
+    `<rect x="4" y="2" width="4" height="1" fill="#f3ead6"/>` +
+    `<rect x="3" y="3" width="4" height="1" fill="#f3ead6"/>` +
+    `<rect x="8" y="3" width="1" height="1" fill="#f3ead6"/>` +
+    `<rect x="2" y="4" width="4" height="1" fill="#f3ead6"/>` +
+    `<rect x="7" y="4" width="1" height="1" fill="#f3ead6"/>` +
+    `<rect x="2" y="5" width="3" height="1" fill="#f3ead6"/>` +
+    `<rect x="6" y="5" width="1" height="1" fill="#f3ead6"/>` +
+    `<rect x="8" y="5" width="1" height="1" fill="#f3ead6"/>` +
+    `<rect x="3" y="6" width="1" height="1" fill="#f3ead6"/>` +
+    `<rect x="5" y="6" width="1" height="1" fill="#f3ead6"/>` +
+    `<rect x="7" y="6" width="1" height="1" fill="#f3ead6"/>` +
+    `<rect x="4" y="7" width="1" height="1" fill="#f3ead6"/>` +
+    `<rect x="6" y="7" width="1" height="1" fill="#f3ead6"/>` +
+    `<rect x="1" y="9" width="2" height="1" fill="#f3ead6"/>` +
+    `<rect x="3" y="8" width="1" height="1" fill="#f3ead6"/>` +
+    `<rect x="9" y="3" width="2" height="1" fill="#f3ead6"/>` +
+    `<rect x="10" y="2" width="1" height="1" fill="#f3ead6"/>` +
+    `<rect x="3" y="4" width="2" height="2" fill="#09090d"/>` +
+    `<rect x="2" y="2" width="1" height="1" fill="#f3ead6"/>`,
 };
 
 const FALLBACK_ICON =

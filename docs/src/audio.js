@@ -117,6 +117,7 @@ const SCENE_AMBIENCE = {
   skin:         { kind: "studio",     baseFreq: 220, q: 1.0, gain: 0.08, detail: "warm" },
   ascii:        { kind: "neon",       baseFreq: 110, q: 4.5, gain: 0.12, detail: "crt" },
   hd2d:         { kind: "fire",       baseFreq: 195, q: 1.6, gain: 0.12, detail: "torch" },
+  dithering:    { kind: "portal",     baseFreq: 82.41, q: 3.4, gain: 0.11, detail: "crt" },
 };
 
 function readPref(key, fallback) {
@@ -644,6 +645,7 @@ export function createAudioEngine({ mutedByUrl = false } = {}) {
       case "grass":       playCue({ type: "grassGust" }); break;
       case "portals":     playCue({ type: stepIdx === 7 ? "polaroidStamp" : "portalShot" }); break;
       case "tonemapping":
+      case "dithering":
       case "terrain":     playCue({ type: "dialTick", norm: (ndcX + 1) * 0.5 }); break;
       case "glass":
       case "shadows":
