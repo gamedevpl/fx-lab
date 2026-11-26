@@ -18,7 +18,7 @@
 <meta name="twitter:description" content="53 years of dithering live in WebGL2: Bayer, live Floyd–Steinberg &amp; Atkinson, Mega Drive CRT stipple, PS1 RGB555, Obra Dinn &amp; 3D surface-anchored stippling.">
 <meta name="twitter:image" content="https://gamedevpl.github.io/fx-lab/og-dithering.png">
 <link rel="icon" type="image/svg+xml" href="../favicon.svg">
-<link rel="modulepreload" href="../src/app.js">
+<link rel="modulepreload" href="../src/app.js?v=2">
 <link rel="modulepreload" href="../src/catalog.js">
 <link rel="modulepreload" href="../src/icons.js">
 <link rel="modulepreload" href="../src/gl-utils.js">
@@ -26,7 +26,7 @@
 <link rel="modulepreload" href="../effects/dithering/bluenoise.js">
 <link rel="modulepreload" href="../effects/dithering/shaders.js">
 <link rel="stylesheet" href="../ask/ask.css">
-<link rel="stylesheet" href="../style.css">
+<link rel="stylesheet" href="../style.css?v=2">
 </head>
 <body>
 <main>
@@ -113,7 +113,7 @@
   <p id="noglBody"></p>
 </div>
 
-<script type="module" src="../src/app.js"></script>
+<script type="module" src="../src/app.js?v=2"></script>
 <script type="module">
 if (!new URLSearchParams(location.search).has("director") && ("LanguageModel" in self || self.__fxLabModel)) {
   import("../src/assistant.js").catch(() => {});

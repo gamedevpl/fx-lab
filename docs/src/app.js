@@ -119,6 +119,50 @@ let switchSeq = 0;
 let catalogOpen = false;
 let filterCat = "all";
 let filterQuery = "";
+let cardCollapsed = window.matchMedia("(max-width: 780px)").matches;
+
+function ensureCardCollapseUi() {
+  const card = $("card");
+  if (!card || $("cardToggle")) return;
+  const kicker = $("kicker");
+  const title = $("stepTitle");
+  const head = document.createElement("div");
+  head.className = "card-head-row";
+  const textWrap = document.createElement("div");
+  textWrap.className = "card-head-text";
+  const btn = document.createElement("button");
+  btn.id = "cardToggle";
+  btn.type = "button";
+  btn.className = "card-toggle";
+  btn.addEventListener("click", () => {
+    cardCollapsed = !cardCollapsed;
+    syncCardCollapse();
+    audio.playUi("click");
+  });
+  title.addEventListener("click", () => {
+    if (window.matchMedia("(max-width: 780px)").matches) {
+      cardCollapsed = !cardCollapsed;
+      syncCardCollapse();
+      audio.playUi("click");
+    }
+  });
+  card.insertBefore(head, kicker);
+  textWrap.append(kicker, title);
+  head.append(textWrap, btn);
+  syncCardCollapse();
+}
+
+function syncCardCollapse() {
+  const card = $("card");
+  const btn = $("cardToggle");
+  if (!card || !btn) return;
+  card.classList.toggle("is-collapsed", cardCollapsed);
+  btn.setAttribute("aria-expanded", String(!cardCollapsed));
+  btn.textContent = cardCollapsed
+    ? (lang === "pl" ? "Opis ▴" : "Info ▴")
+    : (lang === "pl" ? "Ukryj ▾" : "Hide ▾");
+}
+ensureCardCollapseUi();
 
 const siteMenu = initSiteMenu({
   currentSite: "fx-lab",
@@ -576,6 +620,7 @@ function updateCard() {
   $("moreFxBtn")?.addEventListener("click", () => setCatalogOpen(true));
 
   updateAudioControls();
+  syncCardCollapse();
   updateSplitOverlay();
   renderPicker();
   renderStepsBar();
