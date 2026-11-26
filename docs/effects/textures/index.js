@@ -247,7 +247,7 @@ export function createTexturesEffect(gl) {
       const swayX = Math.sin(simTime * 0.42) * 0.44;
       const snapWhip = snapTurnTimer > 0.0 ? Math.sin((snapTurnTimer / 1.65) * Math.PI) * 0.62 : 0.0;
 
-      const yaw = cam.yaw + snapWhip + (radeon8500 ? Math.sin(simTime * 0.85) * 0.44 : 0.0);
+      const yaw = cam.yaw + snapWhip + (radeon8500 ? Math.sin(simTime * 0.85) * 0.68 : 0.0);
       const pitch = clamp(cam.pitch, -0.10, 0.58);
       // Lower grazing floor angle -> dramatically magnifies Trilinear blur vs 16x AF & PS1 affine warp!
       const eye = [

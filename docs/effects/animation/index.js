@@ -107,6 +107,7 @@ export async function createAnimationEffect(gl) {
   const ragActive  = createArticulatedRagdoll(rig, true);
   const matcher = createMotionMatcher(rig);
 
+  const isDirector = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("director") === "1";
   let simTime = 2.6;
   let showSkeleton = false;
   let twistActive = true;
@@ -510,13 +511,13 @@ export async function createAnimationEffect(gl) {
       simTime += h;
       stepStairWalk(h);
 
-      // Natural long stair-tumble cycle: 0..0.30s upright -> shove -> full multi-step tumble & settle (no mid-shot levitating rewind!)
+      // Natural long stair-tumble cycle (in ?director=1 wait for explicit Push! trigger instead of auto-pushing early!)
       ragTimer += h;
-      if (ragTimer >= 0.30 && !ragPassive.state.pushed && !ragPassive.state.rwStart) {
+      if (!isDirector && ragTimer >= 0.30 && !ragPassive.state.pushed && !ragPassive.state.rwStart) {
         ragPassive.push(1.0);
         ragActive.push(1.0);
       }
-      if (ragTimer >= 8.20) {
+      if (!isDirector && ragTimer >= 8.20) {
         resetRagdolls(false);
       }
       ragPassive.step(h, false);

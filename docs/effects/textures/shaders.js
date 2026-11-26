@@ -259,7 +259,7 @@ void main() {
   vec2 screenUv = gl_FragCoord.xy / uRes;
   bool isLeft = uSplitX > 0.0 && screenUv.x < uSplitX;
   int stage = isLeft ? uStageLeft : uStageRight;
-  bool debugOn = uDebugOn > 0.5 && !isLeft;
+  bool debugOn = uDebugOn > 0.5 && (!isLeft || uBilinearLeft > 0.5);
   int m = int(floor(vMat + 0.5));
 
   vec3 texCol = vec3(0.5);
