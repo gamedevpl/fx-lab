@@ -407,7 +407,17 @@ vec3 evalPixelStage(ivec2 p, ivec2 maxP, vec2 uv, int stage) {
       vec3 g = vec3(mix(0.08, 0.96, h));
       vec2 f = fract(gridPos);
       float line = step(0.92, max(f.x, f.y));
-      return mix(g, g * 0.72 + vec3(0.03), line * 0.45);
+      vec3 c2d = mix(g, g * 0.72 + vec3(0.03), line * 0.45);
+      // Expanding amber ripple ping on the 2D noise grid when clicking/dragging on it
+      if (uLastRippleAge >= 0.0 && uLastRippleAge < 1.2) {
+        float dist = length(vec2(boxUv.x, 1.0 - boxUv.y) - uLastRippleUv);
+        float ring = abs(dist - uLastRippleAge * 0.65);
+        if (ring < 0.022) {
+          float fade = 1.0 - uLastRippleAge / 1.2;
+          c2d = mix(c2d, vec3(0.93, 0.65, 0.37), fade * 0.85);
+        }
+      }
+      return c2d;
     }
     // Crisp 1-pixel frame around the 2D noise square
     float bd = max(abs(centered.x), abs(centered.y));

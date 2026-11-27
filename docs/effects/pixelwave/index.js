@@ -377,6 +377,8 @@ export function createPixelwaveEffect(gl, { params } = {}) {
   let heightFloats = new Float32Array(32 * 32);
   let lastLayout = null;
   let lastInsetRect = [0.76, 0.62, 0.96, 0.88];
+  let lastSplitX = -1.0;
+  let lastLeftStage = 0;
 
   // Inline controls inside #card (4 biome buttons, 3 wave modes, 3 visual sliders)
   let ctrlEl = null;
@@ -416,21 +418,24 @@ export function createPixelwaveEffect(gl, { params } = {}) {
 
     if (!lastLayout) return { u: 0.5, v: 0.5, hit: false };
     const L = lastLayout;
-    const sx = ndcX * (L.lowW * 0.5) - L.offsetX;
-    const sy = ndcY * (L.lowH * 0.5) - L.offsetY;
-    const halfN = gridN * 0.5;
 
-    // Flat 2D Noise step: direct inverse
-    if (isoMorph < 0.2) {
-      const wx = sx / L.flatCellPx;
-      const wz = -sy / L.flatCellPx;
-      const u = (wx + halfN) / gridN;
-      const v = (wz + halfN) / gridN;
-      if (u >= -0.04 && u <= 1.04 && v >= -0.04 && v <= 1.04) {
-        return { u: clamp(u, 0, 1), v: clamp(v, 0, 1), hit: true };
+    // 2. Check full-stage 2D Noise (Step 1) OR left side of Split when comparing vs 2D Noise!
+    const inLeftSplit2D = lastSplitX >= 0.0 && uvX < lastSplitX && lastLeftStage === 0;
+    const inFull2D = lastSplitX < 0.0 && activeStage === 0;
+    if (inLeftSplit2D || inFull2D) {
+      const aspect = L.lowW / Math.max(1, L.lowH);
+      const halfBox = 0.36;
+      const bx = ((uvX - 0.5) * aspect) / (halfBox * 2.0) + 0.5;
+      const by = (uvY - 0.5) / (halfBox * 2.0) + 0.5;
+      if (bx >= -0.02 && bx <= 1.02 && by >= -0.02 && by <= 1.02) {
+        return { u: clamp(bx, 0, 1), v: clamp(1.0 - by, 0, 1), hit: true };
       }
       return { u: 0.5, v: 0.5, hit: false };
     }
+
+    const sx = ndcX * (L.lowW * 0.5) - L.offsetX;
+    const sy = ndcY * (L.lowH * 0.5) - L.offsetY;
+    const halfN = gridN * 0.5;
 
     // Rigid 2:1 Isometric pick: step top-down along column heights so clicking tall peaks hits the exact column!
     const yCenterShift = -0.5 * (L.baseThickPx + L.maxHeightPx * 0.48);
@@ -842,6 +847,8 @@ export function createPixelwaveEffect(gl, { params } = {}) {
 
       const leftStage = split.enabled ? (step.compareLeft ?? 0) : stage;
       const rightStage = split.enabled ? (step.compareRight ?? stage) : stage;
+      lastSplitX = split.enabled ? split.pos : -1.0;
+      lastLeftStage = leftStage;
 
       return core.renderFrame(w, h, {
         gridN,
