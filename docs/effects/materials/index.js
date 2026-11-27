@@ -357,9 +357,20 @@ export function createMaterialsEffect(gl, { params } = {}) {
       anisotropy:  pl ? "Anizotr." : "Anisotropy",
       iridescence: pl ? "Irydesc." : "Iridescence",
     };
+    const scaleMap = {
+      roughness:   pl ? ["Lustro", "Mat"]               : ["Mirror", "Matte"],
+      metallic:    pl ? ["Niemetal", "Metal"]           : ["Non-metal", "Raw metal"],
+      clearcoat:   pl ? ["Brak", "Lakier"]              : ["None", "Car lacquer"],
+      anisotropy:  pl ? ["Okrągły blik", "Szczotkowany"]: ["Round glow", "Brushed"],
+      iridescence: pl ? ["Brak", "Tęcza 720nm"]         : ["Off", "Rainbow 720nm"],
+    };
     for (const [k, txt] of Object.entries(lblMap)) {
       const el = ctrlEl.querySelector(`[data-mat-lbl="${k}"]`);
       if (el) el.textContent = txt;
+      const lo = ctrlEl.querySelector(`[data-mat-lo="${k}"]`);
+      const hi = ctrlEl.querySelector(`[data-mat-hi="${k}"]`);
+      if (lo) lo.textContent = scaleMap[k][0];
+      if (hi) hi.textContent = scaleMap[k][1];
     }
 
     const envLbl = ctrlEl.querySelector('[data-mat-row="env"]');
@@ -401,10 +412,16 @@ export function createMaterialsEffect(gl, { params } = {}) {
         }
         .mat-ctrls[hidden]{display:none!important}
         .mat-sliders{display:flex;flex-direction:column;gap:4px}
-        .mat-srow{display:flex;align-items:center;gap:7px;min-width:0}
-        .mat-lbl{flex:none;width:72px;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
-        .mat-rng{flex:1 1 auto;min-width:0;height:4px;accent-color:var(--amber);cursor:pointer;margin:0}
-        .mat-val{flex:none;width:40px;text-align:right;font-size:10.5px;color:#fff3dc;font-variant-numeric:tabular-nums}
+        .mat-srow{display:flex;align-items:flex-start;gap:7px;min-width:0}
+        .mat-lbl{flex:none;width:72px;padding-top:3px;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+        .mat-track{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:1px}
+        .mat-rng{width:100%;height:14px;accent-color:var(--amber);cursor:pointer;margin:0}
+        .mat-scale{
+          display:flex;justify-content:space-between;gap:6px;
+          font:600 9px/1.1 var(--sans,system-ui,sans-serif);color:#8f87a6;
+          letter-spacing:.01em;pointer-events:none;user-select:none;
+        }
+        .mat-val{flex:none;width:42px;padding-top:2px;text-align:right;font-size:10.5px;color:#fff3dc;font-variant-numeric:tabular-nums}
         .mat-prow{display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding-top:2px}
         .mat-rlbl{flex:none;min-width:36px;font-size:9.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--mint)}
         .mat-pill{
@@ -419,8 +436,9 @@ export function createMaterialsEffect(gl, { params } = {}) {
         .mat-pill.is-mint.is-on{background:var(--mint);color:var(--ink)}
         @media(max-width:780px){
           .mat-ctrls{margin-top:6px;padding-top:6px;gap:4px}
-          .mat-sliders{gap:3px}
+          .mat-sliders{gap:4px}
           .mat-lbl{width:64px;font-size:9.5px}
+          .mat-scale{font-size:8.5px}
           .mat-val{width:38px;font-size:9.5px}
           .mat-pill{padding:3px 7px;min-height:22px;font-size:10px}
         }
@@ -433,11 +451,11 @@ export function createMaterialsEffect(gl, { params } = {}) {
     ctrlEl.className = "mat-ctrls";
     ctrlEl.innerHTML = `
       <div class="mat-sliders">
-        <label class="mat-srow"><span class="mat-lbl" data-mat-lbl="roughness">Roughness</span><input class="mat-rng" id="matRough" type="range" min="4" max="100" step="1"><span class="mat-val" id="matRoughVal">0.14</span></label>
-        <label class="mat-srow"><span class="mat-lbl" data-mat-lbl="metallic">Metallic</span><input class="mat-rng" id="matMetal" type="range" min="0" max="100" step="1"><span class="mat-val" id="matMetalVal">1.00</span></label>
-        <label class="mat-srow"><span class="mat-lbl" data-mat-lbl="clearcoat">Clearcoat</span><input class="mat-rng" id="matCoat" type="range" min="0" max="100" step="1"><span class="mat-val" id="matCoatVal">0.22</span></label>
-        <label class="mat-srow"><span class="mat-lbl" data-mat-lbl="anisotropy">Anisotropy</span><input class="mat-rng" id="matAniso" type="range" min="0" max="100" step="1"><span class="mat-val" id="matAnisoVal">0.24</span></label>
-        <label class="mat-srow"><span class="mat-lbl" data-mat-lbl="iridescence">Iridescence</span><input class="mat-rng" id="matIrid" type="range" min="0" max="100" step="1"><span class="mat-val" id="matIridVal">496nm</span></label>
+        <label class="mat-srow"><span class="mat-lbl" data-mat-lbl="roughness">Roughness</span><span class="mat-track"><input class="mat-rng" id="matRough" type="range" min="4" max="100" step="1"><span class="mat-scale"><span data-mat-lo="roughness">Mirror</span><span data-mat-hi="roughness">Matte</span></span></span><span class="mat-val" id="matRoughVal">0.14</span></label>
+        <label class="mat-srow"><span class="mat-lbl" data-mat-lbl="metallic">Metallic</span><span class="mat-track"><input class="mat-rng" id="matMetal" type="range" min="0" max="100" step="1"><span class="mat-scale"><span data-mat-lo="metallic">Non-metal</span><span data-mat-hi="metallic">Raw metal</span></span></span><span class="mat-val" id="matMetalVal">1.00</span></label>
+        <label class="mat-srow"><span class="mat-lbl" data-mat-lbl="clearcoat">Clearcoat</span><span class="mat-track"><input class="mat-rng" id="matCoat" type="range" min="0" max="100" step="1"><span class="mat-scale"><span data-mat-lo="clearcoat">None</span><span data-mat-hi="clearcoat">Car lacquer</span></span></span><span class="mat-val" id="matCoatVal">0.22</span></label>
+        <label class="mat-srow"><span class="mat-lbl" data-mat-lbl="anisotropy">Anisotropy</span><span class="mat-track"><input class="mat-rng" id="matAniso" type="range" min="0" max="100" step="1"><span class="mat-scale"><span data-mat-lo="anisotropy">Round glow</span><span data-mat-hi="anisotropy">Brushed</span></span></span><span class="mat-val" id="matAnisoVal">0.24</span></label>
+        <label class="mat-srow"><span class="mat-lbl" data-mat-lbl="iridescence">Iridescence</span><span class="mat-track"><input class="mat-rng" id="matIrid" type="range" min="0" max="100" step="1"><span class="mat-scale"><span data-mat-lo="iridescence">Off</span><span data-mat-hi="iridescence">Rainbow 720nm</span></span></span><span class="mat-val" id="matIridVal">496nm</span></label>
       </div>
       <div class="mat-prow" id="matEnvRow"><span class="mat-rlbl" data-mat-row="env">IBL</span></div>
       <div class="mat-prow" id="matShapeRow"><span class="mat-rlbl" data-mat-row="shape">Mesh</span></div>
