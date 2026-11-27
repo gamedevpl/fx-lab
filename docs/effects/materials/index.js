@@ -357,20 +357,29 @@ export function createMaterialsEffect(gl, { params } = {}) {
       anisotropy:  pl ? "Anizotr." : "Anisotropy",
       iridescence: pl ? "Irydesc." : "Iridescence",
     };
-    const scaleMap = {
-      roughness:   pl ? ["Lustro", "Mat"]               : ["Mirror", "Matte"],
-      metallic:    pl ? ["Niemetal", "Metal"]           : ["Non-metal", "Raw metal"],
-      clearcoat:   pl ? ["Brak", "Lakier"]              : ["None", "Car lacquer"],
-      anisotropy:  pl ? ["Okrągły blik", "Szczotkowany"]: ["Round glow", "Brushed"],
-      iridescence: pl ? ["Brak", "Tęcza 720nm"]         : ["Off", "Rainbow 720nm"],
+    const tipMap = {
+      roughness:   pl ? ["Lustro (0.04)", "Mat (1.00)"]              : ["Mirror (0.04)", "Matte (1.00)"],
+      metallic:    pl ? ["Niemetal (0.00)", "Metal (1.00)"]          : ["Non-metal (0.00)", "Raw metal (1.00)"],
+      clearcoat:   pl ? ["Bez lakieru (0.00)", "Lakier (1.00)"]      : ["Bare (0.00)", "Car lacquer (1.00)"],
+      anisotropy:  pl ? ["Okrągły blik (0.00)", "Szczotkowany (1.00)"] : ["Round highlight (0.00)", "Brushed streak (1.00)"],
+      iridescence: pl ? ["Wyłączona (0)", "Tęcza cienkowarstwowa (720nm)"] : ["Off (0)", "Thin-film spectrum (720nm)"],
     };
     for (const [k, txt] of Object.entries(lblMap)) {
       const el = ctrlEl.querySelector(`[data-mat-lbl="${k}"]`);
       if (el) el.textContent = txt;
-      const lo = ctrlEl.querySelector(`[data-mat-lo="${k}"]`);
-      const hi = ctrlEl.querySelector(`[data-mat-hi="${k}"]`);
-      if (lo) lo.textContent = scaleMap[k][0];
-      if (hi) hi.textContent = scaleMap[k][1];
+      const v = clamp(matCur[k], 0, 1);
+      const lo = ctrlEl.querySelector(`[data-mat-sw="${k}:lo"]`);
+      const hi = ctrlEl.querySelector(`[data-mat-sw="${k}:hi"]`);
+      if (lo) {
+        lo.title = tipMap[k][0];
+        lo.setAttribute("aria-label", `${txt}: ${tipMap[k][0]}`);
+        lo.classList.toggle("is-near", v <= 0.12);
+      }
+      if (hi) {
+        hi.title = tipMap[k][1];
+        hi.setAttribute("aria-label", `${txt}: ${tipMap[k][1]}`);
+        hi.classList.toggle("is-near", v >= 0.88);
+      }
     }
 
     const envLbl = ctrlEl.querySelector('[data-mat-row="env"]');
@@ -411,17 +420,82 @@ export function createMaterialsEffect(gl, { params } = {}) {
           font:700 11px/1.2 var(--pix,"Courier New",monospace);color:var(--cream);
         }
         .mat-ctrls[hidden]{display:none!important}
-        .mat-sliders{display:flex;flex-direction:column;gap:4px}
-        .mat-srow{display:flex;align-items:flex-start;gap:7px;min-width:0}
-        .mat-lbl{flex:none;width:72px;padding-top:3px;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
-        .mat-track{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:1px}
-        .mat-rng{width:100%;height:14px;accent-color:var(--amber);cursor:pointer;margin:0}
-        .mat-scale{
-          display:flex;justify-content:space-between;gap:6px;
-          font:600 9px/1.1 var(--sans,system-ui,sans-serif);color:#8f87a6;
-          letter-spacing:.01em;pointer-events:none;user-select:none;
+        .mat-sliders{display:flex;flex-direction:column;gap:6px}
+        .mat-srow{display:flex;align-items:center;gap:6px;min-width:0}
+        .mat-lbl{flex:none;width:72px;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+        .mat-sw{
+          flex:none;width:18px;height:18px;min-width:18px;min-height:18px;padding:0;border:0;
+          background:transparent;box-shadow:none;
+          display:inline-flex;align-items:center;justify-content:center;
+          cursor:pointer;border-radius:50%;
+          transition:transform .12s ease,box-shadow .12s ease;
         }
-        .mat-val{flex:none;width:42px;padding-top:2px;text-align:right;font-size:10.5px;color:#fff3dc;font-variant-numeric:tabular-nums}
+        .mat-sw svg{width:18px;height:18px;display:block;overflow:visible}
+        .mat-sw:hover{background:transparent;transform:scale(1.16)}
+        .mat-sw.is-near{box-shadow:0 0 0 1.5px var(--amber)}
+        .mat-rng{
+          flex:1 1 auto;min-width:0;height:8px;margin:0;cursor:pointer;
+          -webkit-appearance:none;appearance:none;border-radius:999px;
+          box-shadow:inset 0 0 0 1px rgba(255,255,255,.15),0 0 0 1.5px var(--ink);
+          background:#2b2740;
+        }
+        /* Visual slider tracks showing the physical sweep directly */
+        .mat-rng--rough{
+          background:
+            radial-gradient(ellipse 14px 4px at 10% 34%,rgba(255,255,255,.95) 0%,rgba(255,255,255,0) 100%),
+            linear-gradient(90deg,#121420 0%,#24283b 24%,#4d4a60 58%,#837b8e 100%);
+        }
+        .mat-rng--metal{
+          background:
+            linear-gradient(180deg,rgba(255,255,255,.32) 0%,rgba(255,255,255,0) 46%,rgba(0,0,0,.38) 54%,rgba(255,255,255,.16) 100%),
+            linear-gradient(90deg,#25437c 0%,#354b76 34%,#7d8aa4 68%,#e6eefc 90%,#9ba8bf 100%);
+        }
+        .mat-rng--coat{
+          background:
+            linear-gradient(115deg,transparent 46%,rgba(255,255,255,.88) 54%,rgba(255,255,255,.22) 60%,transparent 68%),
+            linear-gradient(115deg,transparent 74%,rgba(255,255,255,.92) 82%,rgba(255,255,255,.15) 89%,transparent 96%),
+            linear-gradient(90deg,#1b2138 0%,#1f2b4d 45%,#283e75 100%);
+        }
+        .mat-rng--aniso{
+          background:
+            linear-gradient(90deg,#2d3345 0%,rgba(45,51,69,0) 58%),
+            repeating-linear-gradient(0deg,rgba(255,255,255,.26) 0 1px,rgba(0,0,0,.35) 1px 2.5px),
+            linear-gradient(90deg,#2d3345 0%,#636d85 52%,#d6dfef 76%,#79839b 100%);
+        }
+        .mat-rng--irid{
+          background:linear-gradient(90deg,
+            #8d92a0 0%,
+            #708ad4 12%,
+            #68cde0 22%,
+            #d9be3a 32%,
+            #cf5ad9 43%,
+            #4bc4e3 54%,
+            #8cc940 65%,
+            #d67ae0 77%,
+            #72d14f 89%,
+            #6cd9e8 100%
+          );
+        }
+        .mat-rng::-webkit-slider-thumb{
+          -webkit-appearance:none;appearance:none;
+          width:10px;height:16px;border-radius:3px;
+          background:#fff3dc;border:2px solid var(--ink);
+          box-shadow:0 1px 3px rgba(0,0,0,.65);
+          cursor:ew-resize;
+        }
+        .mat-rng:hover::-webkit-slider-thumb,.mat-rng:focus-visible::-webkit-slider-thumb{
+          background:var(--amber);
+        }
+        .mat-rng::-moz-range-thumb{
+          width:10px;height:16px;border-radius:3px;box-sizing:border-box;
+          background:#fff3dc;border:2px solid var(--ink);
+          box-shadow:0 1px 3px rgba(0,0,0,.65);
+          cursor:ew-resize;
+        }
+        .mat-rng:hover::-moz-range-thumb,.mat-rng:focus-visible::-moz-range-thumb{
+          background:var(--amber);
+        }
+        .mat-val{flex:none;width:42px;text-align:right;font-size:10.5px;color:#fff3dc;font-variant-numeric:tabular-nums}
         .mat-prow{display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding-top:2px}
         .mat-rlbl{flex:none;min-width:36px;font-size:9.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--mint)}
         .mat-pill{
@@ -436,9 +510,10 @@ export function createMaterialsEffect(gl, { params } = {}) {
         .mat-pill.is-mint.is-on{background:var(--mint);color:var(--ink)}
         @media(max-width:780px){
           .mat-ctrls{margin-top:6px;padding-top:6px;gap:4px}
-          .mat-sliders{gap:4px}
-          .mat-lbl{width:64px;font-size:9.5px}
-          .mat-scale{font-size:8.5px}
+          .mat-sliders{gap:5px}
+          .mat-srow{gap:5px}
+          .mat-lbl{width:62px;font-size:9.5px}
+          .mat-sw,.mat-sw svg{width:16px;height:16px;min-width:16px;min-height:16px}
           .mat-val{width:38px;font-size:9.5px}
           .mat-pill{padding:3px 7px;min-height:22px;font-size:10px}
         }
@@ -447,15 +522,29 @@ export function createMaterialsEffect(gl, { params } = {}) {
       document.head.appendChild(st);
     }
 
+    // Visual 18x18 material-sphere swatches for slider endpoints (click to snap to min/max!)
+    const SW = {
+      roughLo: `<svg viewBox="0 0 18 18" aria-hidden="true"><defs><radialGradient id="msRLo" cx="35%" cy="32%" r="68%"><stop offset="0%" stop-color="#3c435c"/><stop offset="55%" stop-color="#181c2b"/><stop offset="100%" stop-color="#0b0d14"/></radialGradient></defs><circle cx="9" cy="9" r="7.5" fill="url(#msRLo)" stroke="#151423" stroke-width="1.3"/><rect x="4.7" y="4.1" width="3.5" height="2.4" rx=".7" transform="rotate(-24 6.4 5.3)" fill="#ffffff"/><path d="M13.5 13.8 A6.6 6.6 0 0 0 15.2 9.4" fill="none" stroke="rgba(180,205,255,.55)" stroke-width="1" stroke-linecap="round"/></svg>`,
+      roughHi: `<svg viewBox="0 0 18 18" aria-hidden="true"><defs><radialGradient id="msRHi" cx="38%" cy="34%" r="72%"><stop offset="0%" stop-color="#a89eb0"/><stop offset="62%" stop-color="#6e657a"/><stop offset="100%" stop-color="#3b3545"/></radialGradient></defs><circle cx="9" cy="9" r="7.5" fill="url(#msRHi)" stroke="#151423" stroke-width="1.3"/></svg>`,
+      metalLo: `<svg viewBox="0 0 18 18" aria-hidden="true"><defs><radialGradient id="msMLo" cx="36%" cy="32%" r="70%"><stop offset="0%" stop-color="#588ae0"/><stop offset="58%" stop-color="#294885"/><stop offset="100%" stop-color="#131e3b"/></radialGradient></defs><circle cx="9" cy="9" r="7.5" fill="url(#msMLo)" stroke="#151423" stroke-width="1.3"/><circle cx="6.2" cy="5.7" r="1.5" fill="rgba(255,255,255,.82)"/></svg>`,
+      metalHi: `<svg viewBox="0 0 18 18" aria-hidden="true"><defs><linearGradient id="msMHi" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#ffffff"/><stop offset="36%" stop-color="#b4c0d8"/><stop offset="50%" stop-color="#222638"/><stop offset="68%" stop-color="#5a637a"/><stop offset="100%" stop-color="#a8b3ca"/></linearGradient><clipPath id="msMClip"><circle cx="9" cy="9" r="7.2"/></clipPath></defs><circle cx="9" cy="9" r="7.5" fill="url(#msMHi)" stroke="#151423" stroke-width="1.3"/><ellipse cx="7" cy="4.8" rx="3.8" ry="1.8" fill="rgba(255,255,255,.92)" clip-path="url(#msMClip)"/></svg>`,
+      coatLo:  `<svg viewBox="0 0 18 18" aria-hidden="true"><defs><radialGradient id="msCLo" cx="40%" cy="35%" r="72%"><stop offset="0%" stop-color="#485a8f"/><stop offset="62%" stop-color="#273257"/><stop offset="100%" stop-color="#14192e"/></radialGradient></defs><circle cx="9" cy="9" r="7.5" fill="url(#msCLo)" stroke="#151423" stroke-width="1.3"/></svg>`,
+      coatHi:  `<svg viewBox="0 0 18 18" aria-hidden="true"><defs><radialGradient id="msCHi" cx="38%" cy="34%" r="70%"><stop offset="0%" stop-color="#3e62b5"/><stop offset="60%" stop-color="#1c2c5e"/><stop offset="100%" stop-color="#0d142e"/></radialGradient></defs><circle cx="9" cy="9" r="7.5" fill="url(#msCHi)" stroke="#151423" stroke-width="1.3"/><path d="M4.2 7.8 A5.7 5.7 0 0 1 10.6 3.5" fill="none" stroke="#ffffff" stroke-width="1.9" stroke-linecap="round"/><circle cx="9" cy="9" r="6.7" fill="none" stroke="rgba(210,232,255,.55)" stroke-width=".75"/></svg>`,
+      anisoLo: `<svg viewBox="0 0 18 18" aria-hidden="true"><defs><radialGradient id="msALo" cx="50%" cy="50%" r="58%"><stop offset="0%" stop-color="#ffffff"/><stop offset="28%" stop-color="#b6c0d4"/><stop offset="68%" stop-color="#4c5366"/><stop offset="100%" stop-color="#222633"/></radialGradient></defs><circle cx="9" cy="9" r="7.5" fill="url(#msALo)" stroke="#151423" stroke-width="1.3"/></svg>`,
+      anisoHi: `<svg viewBox="0 0 18 18" aria-hidden="true"><defs><linearGradient id="msAHi" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#262b3a"/><stop offset="32%" stop-color="#6b748c"/><stop offset="50%" stop-color="#ffffff"/><stop offset="68%" stop-color="#6b748c"/><stop offset="100%" stop-color="#262b3a"/></linearGradient><clipPath id="msAClip"><circle cx="9" cy="9" r="7"/></clipPath></defs><circle cx="9" cy="9" r="7.5" fill="url(#msAHi)" stroke="#151423" stroke-width="1.3"/><g clip-path="url(#msAClip)" stroke="rgba(16,18,28,.32)" stroke-width=".65"><line x1="1" y1="5" x2="17" y2="5"/><line x1="1" y1="8" x2="17" y2="8"/><line x1="1" y1="11" x2="17" y2="11"/><line x1="1" y1="14" x2="17" y2="14"/></g></svg>`,
+      iridLo:  `<svg viewBox="0 0 18 18" aria-hidden="true"><defs><radialGradient id="msILo" cx="35%" cy="30%" r="72%"><stop offset="0%" stop-color="#dce2ee"/><stop offset="48%" stop-color="#7c8496"/><stop offset="100%" stop-color="#292d3b"/></radialGradient></defs><circle cx="9" cy="9" r="7.5" fill="url(#msILo)" stroke="#151423" stroke-width="1.3"/></svg>`,
+      iridHi:  `<svg viewBox="0 0 18 18" aria-hidden="true"><defs><linearGradient id="msIHi" x1="12%" y1="10%" x2="88%" y2="90%"><stop offset="0%" stop-color="#ffe066"/><stop offset="34%" stop-color="#e356e8"/><stop offset="68%" stop-color="#48c4f5"/><stop offset="100%" stop-color="#4d48c7"/></linearGradient></defs><circle cx="9" cy="9" r="7.5" fill="url(#msIHi)" stroke="#151423" stroke-width="1.3"/><ellipse cx="6.4" cy="5.5" rx="2.3" ry="1.3" transform="rotate(-25 6.4 5.5)" fill="rgba(255,255,255,.88)"/></svg>`,
+    };
+
     ctrlEl = document.createElement("div");
     ctrlEl.className = "mat-ctrls";
     ctrlEl.innerHTML = `
       <div class="mat-sliders">
-        <label class="mat-srow"><span class="mat-lbl" data-mat-lbl="roughness">Roughness</span><span class="mat-track"><input class="mat-rng" id="matRough" type="range" min="4" max="100" step="1"><span class="mat-scale"><span data-mat-lo="roughness">Mirror</span><span data-mat-hi="roughness">Matte</span></span></span><span class="mat-val" id="matRoughVal">0.14</span></label>
-        <label class="mat-srow"><span class="mat-lbl" data-mat-lbl="metallic">Metallic</span><span class="mat-track"><input class="mat-rng" id="matMetal" type="range" min="0" max="100" step="1"><span class="mat-scale"><span data-mat-lo="metallic">Non-metal</span><span data-mat-hi="metallic">Raw metal</span></span></span><span class="mat-val" id="matMetalVal">1.00</span></label>
-        <label class="mat-srow"><span class="mat-lbl" data-mat-lbl="clearcoat">Clearcoat</span><span class="mat-track"><input class="mat-rng" id="matCoat" type="range" min="0" max="100" step="1"><span class="mat-scale"><span data-mat-lo="clearcoat">None</span><span data-mat-hi="clearcoat">Car lacquer</span></span></span><span class="mat-val" id="matCoatVal">0.22</span></label>
-        <label class="mat-srow"><span class="mat-lbl" data-mat-lbl="anisotropy">Anisotropy</span><span class="mat-track"><input class="mat-rng" id="matAniso" type="range" min="0" max="100" step="1"><span class="mat-scale"><span data-mat-lo="anisotropy">Round glow</span><span data-mat-hi="anisotropy">Brushed</span></span></span><span class="mat-val" id="matAnisoVal">0.24</span></label>
-        <label class="mat-srow"><span class="mat-lbl" data-mat-lbl="iridescence">Iridescence</span><span class="mat-track"><input class="mat-rng" id="matIrid" type="range" min="0" max="100" step="1"><span class="mat-scale"><span data-mat-lo="iridescence">Off</span><span data-mat-hi="iridescence">Rainbow 720nm</span></span></span><span class="mat-val" id="matIridVal">496nm</span></label>
+        <div class="mat-srow"><span class="mat-lbl" data-mat-lbl="roughness">Roughness</span><button class="mat-sw" type="button" data-mat-sw="roughness:lo">${SW.roughLo}</button><input class="mat-rng mat-rng--rough" id="matRough" type="range" min="4" max="100" step="1"><button class="mat-sw" type="button" data-mat-sw="roughness:hi">${SW.roughHi}</button><span class="mat-val" id="matRoughVal">0.14</span></div>
+        <div class="mat-srow"><span class="mat-lbl" data-mat-lbl="metallic">Metallic</span><button class="mat-sw" type="button" data-mat-sw="metallic:lo">${SW.metalLo}</button><input class="mat-rng mat-rng--metal" id="matMetal" type="range" min="0" max="100" step="1"><button class="mat-sw" type="button" data-mat-sw="metallic:hi">${SW.metalHi}</button><span class="mat-val" id="matMetalVal">1.00</span></div>
+        <div class="mat-srow"><span class="mat-lbl" data-mat-lbl="clearcoat">Clearcoat</span><button class="mat-sw" type="button" data-mat-sw="clearcoat:lo">${SW.coatLo}</button><input class="mat-rng mat-rng--coat" id="matCoat" type="range" min="0" max="100" step="1"><button class="mat-sw" type="button" data-mat-sw="clearcoat:hi">${SW.coatHi}</button><span class="mat-val" id="matCoatVal">0.22</span></div>
+        <div class="mat-srow"><span class="mat-lbl" data-mat-lbl="anisotropy">Anisotropy</span><button class="mat-sw" type="button" data-mat-sw="anisotropy:lo">${SW.anisoLo}</button><input class="mat-rng mat-rng--aniso" id="matAniso" type="range" min="0" max="100" step="1"><button class="mat-sw" type="button" data-mat-sw="anisotropy:hi">${SW.anisoHi}</button><span class="mat-val" id="matAnisoVal">0.24</span></div>
+        <div class="mat-srow"><span class="mat-lbl" data-mat-lbl="iridescence">Iridescence</span><button class="mat-sw" type="button" data-mat-sw="iridescence:lo">${SW.iridLo}</button><input class="mat-rng mat-rng--irid" id="matIrid" type="range" min="0" max="100" step="1"><button class="mat-sw" type="button" data-mat-sw="iridescence:hi">${SW.iridHi}</button><span class="mat-val" id="matIridVal">412nm</span></div>
       </div>
       <div class="mat-prow" id="matEnvRow"><span class="mat-rlbl" data-mat-row="env">IBL</span></div>
       <div class="mat-prow" id="matShapeRow"><span class="mat-rlbl" data-mat-row="shape">Mesh</span></div>
@@ -466,17 +555,19 @@ export function createMaterialsEffect(gl, { params } = {}) {
     else card.appendChild(ctrlEl);
 
     const sliderDefs = [
-      ["roughness",   "#matRough", "#matRoughVal"],
-      ["metallic",    "#matMetal", "#matMetalVal"],
-      ["clearcoat",   "#matCoat",  "#matCoatVal"],
-      ["anisotropy",  "#matAniso", "#matAnisoVal"],
-      ["iridescence", "#matIrid",  "#matIridVal"],
+      ["roughness",   "#matRough", "#matRoughVal", 0.04, 1.0],
+      ["metallic",    "#matMetal", "#matMetalVal", 0.0,  1.0],
+      ["clearcoat",   "#matCoat",  "#matCoatVal",  0.0,  1.0],
+      ["anisotropy",  "#matAniso", "#matAnisoVal", 0.0,  1.0],
+      ["iridescence", "#matIrid",  "#matIridVal",  0.0,  1.0],
     ];
-    for (const [key, inpSel, valSel] of sliderDefs) {
+    for (const [key, inpSel, valSel, minVal, maxVal] of sliderDefs) {
       const inp = ctrlEl.querySelector(inpSel);
       sliders[key] = inp;
       valEls[key] = ctrlEl.querySelector(valSel);
       inp.addEventListener("input", () => applySliderOverride(key, Number(inp.value) / 100));
+      ctrlEl.querySelector(`[data-mat-sw="${key}:lo"]`)?.addEventListener("click", () => applySliderOverride(key, minVal));
+      ctrlEl.querySelector(`[data-mat-sw="${key}:hi"]`)?.addEventListener("click", () => applySliderOverride(key, maxVal));
     }
 
     // 3 IBL environment presets
