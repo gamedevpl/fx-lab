@@ -445,6 +445,22 @@ const ICONS = {
     `<rect x="10" y="2" width="1" height="1" fill="#f3ead6"/>` +
     `<rect x="3" y="4" width="2" height="2" fill="#09090d"/>` +
     `<rect x="2" y="2" width="1" height="1" fill="#f3ead6"/>`,
+
+  // Material Sandbox: studio shaderball with carved groove, dark cavity & gold-violet-cyan thin-film softbox glint
+  materials:
+    `<rect x="1" y="1" width="10" height="10" fill="#10131e"/>` +
+    `<rect x="4" y="2" width="4" height="1" fill="#7dd3fc"/>` +
+    `<rect x="3" y="3" width="6" height="1" fill="#a78bfa"/>` +
+    `<rect x="3" y="3" width="2" height="1" fill="#fde68a"/>` +
+    `<rect x="2" y="4" width="8" height="2" fill="#4f46e5"/>` +
+    `<rect x="3" y="4" width="2" height="1" fill="#fff7d6"/>` +
+    `<rect x="6" y="4" width="2" height="2" fill="#181829"/>` +
+    `<rect x="7" y="5" width="1" height="1" fill="#60a5fa"/>` +
+    `<rect x="2" y="6" width="8" height="1" fill="#1e1b33"/>` +
+    `<rect x="3" y="7" width="6" height="2" fill="#38bdf8"/>` +
+    `<rect x="4" y="7" width="3" height="1" fill="#c084fc"/>` +
+    `<rect x="4" y="9" width="4" height="1" fill="#475569"/>` +
+    `<rect x="3" y="10" width="6" height="1" fill="#1e293b"/>`,
 };
 
 const FALLBACK_ICON =

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en" data-fx="materials">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Material Sandbox — 6 PBR Shaders on One Mesh — FX Lab | gamedev.pl</title>
+<meta name="description" content="Interactive WebGL2 material sandbox: one sculpted shaderball (or Torus Knot), an orbiting rectangular softbox, 3 HDR IBL studios, 5 live PBR sliders, Auto-Morph, and 6 shaders from 2005 Blinn-Phong plastic and Oren-Nayar clay to brushed steel, clearcoat car paint, velvet sheen, and heat-blued iridescent titanium.">
+<link rel="canonical" href="https://gamedevpl.github.io/fx-lab/materials/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://gamedevpl.github.io/fx-lab/materials/">
+<meta property="og:title" content="Material Sandbox — 6 PBR Shaders on One Mesh — FX Lab">
+<meta property="og:description" content="Same 3D shaderball, 6 shaders live in WebGL2: 2005 Blinn-Phong plastic, Oren-Nayar dry clay, anisotropic brushed steel, clearcoat + metal flake car paint, Charlie velvet sheen &amp; thin-film iridescent titanium.">
+<meta property="og:image" content="https://gamedevpl.github.io/fx-lab/og-materials.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Material Sandbox — 6 PBR Shaders on One Mesh — FX Lab">
+<meta name="twitter:description" content="Interactive WebGL2 PBR material toy with orbiting softbox, 3 IBL environments, 5 live sliders, Auto-Morph &amp; Split vs 2005 Blinn-Phong.">
+<meta name="twitter:image" content="https://gamedevpl.github.io/fx-lab/og-materials.png">
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
+<link rel="modulepreload" href="../src/app.js?v=3">
+<link rel="modulepreload" href="../src/catalog.js">
+<link rel="modulepreload" href="../src/icons.js">
+<link rel="modulepreload" href="../src/gl-utils.js">
+<link rel="modulepreload" href="../effects/materials/index.js">
+<link rel="modulepreload" href="../effects/materials/shaders.js">
+<link rel="stylesheet" href="../ask/ask.css">
+<link rel="stylesheet" href="../style.css?v=2">
+</head>
+<body>
+<main>
+  <canvas id="c" aria-label="Interactive WebGL2 Material Sandbox viewport"></canvas>
+
+  <header>
+    <div class="brand">
+      <button id="menuBtn" class="menu-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="siteMenu" aria-label="Menu">
+        <svg width="15" height="15" viewBox="0 0 14 14" shape-rendering="crispEdges" aria-hidden="true">
+          <rect x="1" y="2" width="12" height="2" fill="currentColor"/>
+          <rect x="1" y="6" width="12" height="2" fill="currentColor"/>
+          <rect x="1" y="10" width="12" height="2" fill="currentColor"/>
+        </svg>
+      </button>
+      <h1>FX <em>LAB</em></h1>
+    </div>
+
+    <nav>
+      <button id="catalogBtn" class="fx-picker" type="button" aria-haspopup="dialog" aria-expanded="false">
+        <span class="fx-dot" id="pickerDot" aria-hidden="true"></span>
+        <span class="fx-name" id="pickerName">All 31</span>
+        <span class="fx-count" id="pickerCount">31/31</span>
+        <span class="fx-caret" aria-hidden="true">▾</span>
+      </button>
+      <a id="sourceLink" class="source" href="https://github.com/gamedevpl/fx-lab/tree/main/docs/effects/materials" target="_blank" rel="noopener">Source</a>
+      <button id="lang" type="button" aria-label="Switch language">PL</button>
+    </nav>
+  </header>
+
+  <section class="stage" id="stage">
+    <div class="split-ui" id="splitUi" hidden>
+      <div class="split-tags" id="splitTags">
+        <span class="tag left" id="splitLeftTag"></span>
+        <span class="tag right" id="splitRightTag"></span>
+      </div>
+      <div class="split-hit" id="splitHit" role="slider" tabindex="0" aria-label="Split comparison position" aria-valuemin="8" aria-valuemax="92" aria-valuenow="50">
+        <div class="split-line"></div>
+        <div class="split-grip" aria-hidden="true"></div>
+      </div>
+    </div>
+
+    <article class="card" id="card">
+      <p class="kicker" id="kicker"></p>
+      <h2 id="stepTitle"></h2>
+      <p id="stepNote"></p>
+      <div class="row">
+        <button id="prev" type="button" aria-label="Previous step">◀</button>
+        <span id="count">06 / 06</span>
+        <button id="next" type="button" aria-label="Next step">▶</button>
+        <button id="splitBtn" type="button" aria-pressed="true">Split: ON</button>
+        <button id="actionBtn" type="button" hidden></button>
+        <button id="pauseBtn" type="button">Pause</button>
+        <button id="resetBtn" type="button" title="Reset camera (R)">Reset</button>
+      </div>
+      <p class="hint" id="hintLine"></p>
+      <p class="film" id="filmLine"></p>
+    </article>
+  </section>
+
+  <footer>
+    <div class="chapters" id="stepsBar" role="tablist" aria-label="Steps"></div>
+  </footer>
+</main>
+
+<div class="catalog-backdrop" id="catalogModal" role="dialog" aria-modal="true" aria-labelledby="catalogTitle" hidden>
+  <div class="catalog-box">
+    <div class="catalog-head">
+      <div>
+        <h2 id="catalogTitle">Effects</h2>
+        <p id="catalogSub"></p>
+      </div>
+      <button id="catalogClose" class="catalog-close" type="button" aria-label="Close">×</button>
+    </div>
+    <div class="catalog-filters" id="catalogFilters" hidden>
+      <input id="catalogSearch" type="search" autocomplete="off">
+      <div class="catalog-cats" id="catalogCats"></div>
+    </div>
+    <div class="catalog-grid" id="catalogGrid"></div>
+  </div>
+</div>
+
+<div id="nogl" hidden>
+  <b id="noglTitle">WebGL2 is required</b>
+  <p id="noglBody"></p>
+</div>
+
+<script type="module" src="../src/app.js?v=3"></script>
+<script type="module">
+if (!new URLSearchParams(location.search).has("director") && ("LanguageModel" in self || self.__fxLabModel)) {
+  import("../src/assistant.js").catch(() => {});
+}
+</script>
+</body>
+</html>
