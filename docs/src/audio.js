@@ -119,6 +119,7 @@ const SCENE_AMBIENCE = {
   hd2d:         { kind: "fire",       baseFreq: 195, q: 1.6, gain: 0.12, detail: "torch" },
   dithering:    { kind: "portal",     baseFreq: 82.41, q: 3.4, gain: 0.11, detail: "crt" },
   materials:    { kind: "gallery",    baseFreq: 246.94, q: 2.8, gain: 0.10, detail: "shimmer" },
+  pixelwave:    { kind: "meadow",     baseFreq: 523.25, q: 1.5, gain: 0.11, detail: "coastal" },
 };
 
 function readPref(key, fallback) {

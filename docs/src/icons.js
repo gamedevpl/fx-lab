@@ -461,6 +461,24 @@ const ICONS = {
     `<rect x="4" y="7" width="3" height="1" fill="#c084fc"/>` +
     `<rect x="4" y="9" width="4" height="1" fill="#475569"/>` +
     `<rect x="3" y="10" width="6" height="1" fill="#1e293b"/>`,
+
+  // Isometric Pixel-Wave Toy: crisp 2:1 grass-and-soil voxel block wrapped in 1 px ink & white sticker border
+  pixelwave:
+    `<rect x="1" y="1" width="10" height="10" fill="#27313d"/>` +
+    `<rect x="4" y="1" width="4" height="1" fill="#fbf9f3"/>` +
+    `<rect x="2" y="2" width="8" height="7" fill="#fbf9f3"/>` +
+    `<rect x="1" y="3" width="10" height="5" fill="#fbf9f3"/>` +
+    `<rect x="4" y="9" width="4" height="2" fill="#fbf9f3"/>` +
+    `<rect x="4" y="2" width="4" height="1" fill="#14121d"/>` +
+    `<rect x="2" y="3" width="8" height="5" fill="#14121d"/>` +
+    `<rect x="4" y="8" width="4" height="2" fill="#14121d"/>` +
+    `<rect x="4" y="3" width="4" height="2" fill="#8be05a"/>` +
+    `<rect x="3" y="4" width="6" height="1" fill="#63c74d"/>` +
+    `<rect x="3" y="5" width="3" height="1" fill="#4eb043"/>` +
+    `<rect x="6" y="5" width="3" height="1" fill="#2f7a38"/>` +
+    `<rect x="3" y="6" width="3" height="2" fill="#a86943"/>` +
+    `<rect x="6" y="6" width="3" height="2" fill="#70422b"/>` +
+    `<rect x="5" y="8" width="2" height="1" fill="#70422b"/>`,
 };
 
 const FALLBACK_ICON =
