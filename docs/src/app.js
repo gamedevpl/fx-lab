@@ -122,6 +122,8 @@ let filterCat = "all";
 let filterQuery = "";
 let cardCollapsed = window.matchMedia("(max-width: 780px)").matches;
 
+const SVG_CODE_ICON = `<svg viewBox="0 0 16 12" width="13" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="5 2 1.5 6 5 10"/><line x1="9.5" y1="1.5" x2="6.5" y2="10.5"/><polyline points="11 2 14.5 6 11 10"/></svg>`;
+
 function ensureCardCollapseUi() {
   const card = $("card");
   if (!card || $("cardToggle")) return;
@@ -129,8 +131,19 @@ function ensureCardCollapseUi() {
   const title = $("stepTitle");
   const head = document.createElement("div");
   head.className = "card-head-row";
-  const textWrap = document.createElement("div");
-  textWrap.className = "card-head-text";
+  const actions = document.createElement("div");
+  actions.className = "card-head-actions";
+
+  let srcLink = $("sourceLink");
+  if (!srcLink) {
+    srcLink = document.createElement("a");
+    srcLink.id = "sourceLink";
+    srcLink.target = "_blank";
+    srcLink.rel = "noopener";
+  }
+  srcLink.className = "card-source";
+  srcLink.innerHTML = `${SVG_CODE_ICON}<span id="sourceLabel">Source</span>`;
+
   const btn = document.createElement("button");
   btn.id = "cardToggle";
   btn.type = "button";
@@ -148,8 +161,8 @@ function ensureCardCollapseUi() {
     }
   });
   card.insertBefore(head, kicker);
-  textWrap.append(kicker, title);
-  head.append(textWrap, btn);
+  actions.append(srcLink, btn);
+  head.append(kicker, actions, title);
   syncCardCollapse();
 }
 
@@ -564,8 +577,16 @@ function updateCard() {
   if ($("backLink")) $("backLink").textContent = u.back;
   renderSiteMenu();
   const srcLink = $("sourceLink");
-  srcLink.textContent = u.source;
-  srcLink.href = REPO_TREE_BASE + currentEffect.sourcePath;
+  if (srcLink) {
+    const srcLabel = $("sourceLabel");
+    if (srcLabel) srcLabel.textContent = u.source;
+    else srcLink.textContent = u.source;
+    srcLink.href = REPO_TREE_BASE + currentEffect.sourcePath;
+    const fxName = lang === "pl" ? currentEffect.pl : currentEffect.en;
+    const srcTip = lang === "pl" ? `Kod źródłowy: ${fxName} (GitHub)` : `Source code: ${fxName} (GitHub)`;
+    srcLink.title = srcTip;
+    srcLink.setAttribute("aria-label", srcTip);
+  }
   $("lang").textContent = lang === "en" ? "PL" : "EN";
   $("prev").setAttribute("aria-label", u.prev);
   $("next").setAttribute("aria-label", u.next);

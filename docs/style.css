@@ -109,7 +109,6 @@ h1 em{font-style:normal;color:var(--amber)}
 .fx-ico-lg{width:48px;height:48px;filter:drop-shadow(3px 3px 0 var(--ink))}
 
 nav{flex:none;display:flex;align-items:center;gap:9px;flex-wrap:nowrap}
-nav .source{font-weight:700;font-size:14px}
 #lang{font-family:var(--pix);min-width:42px}
 
 .fx-audio-grp{display:inline-flex;align-items:center;gap:5px}
@@ -254,8 +253,20 @@ nav .source{font-weight:700;font-size:14px}
   -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
   user-select:text;-webkit-user-select:text;
 }
-.card-head-row{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
-.card-head-text{min-width:0;flex:1 1 auto}
+.card-head-row{display:flex;flex-wrap:wrap;align-items:flex-start;gap:4px 10px}
+.card-head-row .kicker{flex:1 1 0;min-width:0;order:1;margin:0;padding-top:3px}
+.card-head-actions{flex:none;order:2;display:inline-flex;align-items:center;gap:5px}
+.card-head-row h2{flex:1 0 100%;order:3;margin:2px 0 7px}
+.card-source{
+  display:inline-flex;align-items:center;gap:5px;
+  font:700 11px/1 var(--pix);padding:4px 8px;min-height:26px;
+  background:#2a2540;color:var(--turquoise);text-decoration:none;
+  box-shadow:0 0 0 2px var(--ink),3px 3px 0 2px rgba(0,0,0,.35);
+  transition:transform .08s ease,background .12s ease;white-space:nowrap;
+}
+.card-source:hover{background:#3a3357;color:#a8ffe9;text-decoration:none}
+.card-source:active{transform:translate(2px,2px);box-shadow:0 0 0 2px var(--ink),1px 1px 0 1px rgba(0,0,0,.35)}
+.card-source svg{width:13px;height:11px;display:block;flex:none}
 .card-toggle{
   flex:none;font:700 11px var(--pix);padding:4px 8px;min-height:26px;
   background:#2a2540;color:var(--mint);
@@ -268,8 +279,12 @@ nav .source{font-weight:700;font-size:14px}
 .card.is-collapsed .film,
 .card.is-collapsed #pauseBtn,
 .card.is-collapsed #resetBtn{display:none}
-.card.is-collapsed .card-head-row{align-items:center;margin-bottom:5px}
+.card.is-collapsed .card-head-row{flex-wrap:nowrap;align-items:center;gap:8px;margin-bottom:5px}
+.card.is-collapsed .card-head-actions{order:2}
+.card.is-collapsed .card-source{padding:4px 6px}
+.card.is-collapsed .card-source span{display:none}
 .card.is-collapsed h2{
+  flex:1 1 auto;min-width:0;order:1;
   margin:0;font-size:14px;line-height:1.15;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
@@ -370,7 +385,6 @@ footer{
   .menu-btn{width:30px;min-width:30px;height:30px;min-height:30px}
   .fx-ribbon-wrap{display:none!important}
   nav{gap:5px}
-  nav .source{display:none}
   .fx-picker{padding:4px 7px;gap:5px;min-height:30px}
   .fx-name{display:none}
   .fx-audio-grp{gap:4px}
@@ -390,6 +404,8 @@ footer{
   #stepNote{font-size:13px;margin-bottom:8px}
   .row{gap:5px}
   button{font-size:12.5px;padding:5px 8px;min-height:30px}
+  .card-source,.card-toggle{font-size:10.5px;padding:4px 7px;min-height:26px}
+  .card.is-collapsed .card-source{padding:4px 6px}
   .hint,.film{display:none}
   footer{padding:4px 8px max(8px,env(safe-area-inset-bottom))}
   .chapters{gap:6px;padding:2px 2px 3px}

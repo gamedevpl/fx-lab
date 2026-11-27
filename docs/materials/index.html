@@ -18,14 +18,14 @@
 <meta name="twitter:description" content="Interactive WebGL2 PBR material toy with orbiting softbox, 3 IBL environments, 5 live sliders, Auto-Morph &amp; Split vs 2005 Blinn-Phong.">
 <meta name="twitter:image" content="https://gamedevpl.github.io/fx-lab/og-materials.png">
 <link rel="icon" type="image/svg+xml" href="../favicon.svg">
-<link rel="modulepreload" href="../src/app.js?v=3">
+<link rel="modulepreload" href="../src/app.js?v=4">
 <link rel="modulepreload" href="../src/catalog.js">
 <link rel="modulepreload" href="../src/icons.js">
 <link rel="modulepreload" href="../src/gl-utils.js">
 <link rel="modulepreload" href="../effects/materials/index.js">
 <link rel="modulepreload" href="../effects/materials/shaders.js">
 <link rel="stylesheet" href="../ask/ask.css">
-<link rel="stylesheet" href="../style.css?v=2">
+<link rel="stylesheet" href="../style.css?v=3">
 </head>
 <body>
 <main>
@@ -50,7 +50,6 @@
         <span class="fx-count" id="pickerCount">31/31</span>
         <span class="fx-caret" aria-hidden="true">▾</span>
       </button>
-      <a id="sourceLink" class="source" href="https://github.com/gamedevpl/fx-lab/tree/main/docs/effects/materials" target="_blank" rel="noopener">Source</a>
       <button id="lang" type="button" aria-label="Switch language">PL</button>
     </nav>
   </header>
@@ -112,7 +111,7 @@
   <p id="noglBody"></p>
 </div>
 
-<script type="module" src="../src/app.js?v=3"></script>
+<script type="module" src="../src/app.js?v=4"></script>
 <script type="module">
 if (!new URLSearchParams(location.search).has("director") && ("LanguageModel" in self || self.__fxLabModel)) {
   import("../src/assistant.js").catch(() => {});

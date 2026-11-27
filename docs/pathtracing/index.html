@@ -18,14 +18,14 @@
 <meta name="twitter:description" content="8 eras of path tracing live in WebGL2 — click anywhere in the Cornell Gallery to move the glowing orb and watch real-time GI and SVGF denoising react at 60 FPS.">
 <meta name="twitter:image" content="https://gamedevpl.github.io/fx-lab/og-pathtracing.png">
 <link rel="icon" type="image/svg+xml" href="../favicon.svg">
-<link rel="modulepreload" href="../src/app.js?v=2">
+<link rel="modulepreload" href="../src/app.js?v=4">
 <link rel="modulepreload" href="../src/catalog.js">
 <link rel="modulepreload" href="../src/icons.js">
 <link rel="modulepreload" href="../src/gl-utils.js">
 <link rel="modulepreload" href="../effects/pathtracing/index.js">
 <link rel="modulepreload" href="../effects/pathtracing/shaders.js">
 <link rel="stylesheet" href="../ask/ask.css">
-<link rel="stylesheet" href="../style.css?v=2">
+<link rel="stylesheet" href="../style.css?v=3">
 </head>
 <body>
 <main>
@@ -50,7 +50,6 @@
         <span class="fx-count" id="pickerCount">10/10</span>
         <span class="fx-caret" aria-hidden="true">▾</span>
       </button>
-      <a id="sourceLink" class="source" href="https://github.com/gamedevpl/fx-lab/tree/main/docs/effects/pathtracing" target="_blank" rel="noopener">Source</a>
       <button id="lang" type="button" aria-label="Switch language">PL</button>
     </nav>
   </header>
@@ -112,7 +111,7 @@
   <p id="noglBody"></p>
 </div>
 
-<script type="module" src="../src/app.js?v=2"></script>
+<script type="module" src="../src/app.js?v=4"></script>
 <script type="module">
 if ("LanguageModel" in self || self.__fxLabModel) {
   import("../src/assistant.js").catch(() => {});
