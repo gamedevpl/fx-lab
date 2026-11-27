@@ -1,110 +1,330 @@
+<div align="center">
+
 # FX Lab
 
-Interactive WebGL2 & WebGPU sandbox for real-time graphics effects from [gamedev.pl](https://gamedev.pl).
+**32 interactive WebGL2 & WebGPU graphics-effect sandboxes in plain ES modules — zero dependencies, zero build step.**
 
-**Live demo:** <https://gamedevpl.github.io/fx-lab/>
+[**Launch Live Sandbox ↗**](https://gamedevpl.github.io/fx-lab/) · [gamedev.pl](https://www.gamedev.pl) · [YouTube](https://www.youtube.com/@gamedev_pl) · [Game Design Codex](https://github.com/gamedevpl/gdc) · [Lumen Lab](https://github.com/gamedevpl/silnik3d-od-zera/tree/main/docs/lumen-lab)
 
-## Included effects
+![Stars](https://img.shields.io/github/stars/gamedevpl/fx-lab?style=flat-square)
+![License](https://img.shields.io/github/license/gamedevpl/fx-lab?style=flat-square)
+![Effects](https://img.shields.io/badge/effects-32%20live-00e4ac?style=flat-square)
+![Stack](https://img.shields.io/badge/WebGL2_%2F_WebGPU-vanilla_JS-f59e0b?style=flat-square)
 
-1. **[Pixel-Art Gaussian Splats](https://gamedevpl.github.io/fx-lab/splats/)** (5 steps · [Short](https://www.youtube.com/shorts/_XPeSD0esb8) · [source & notes](./docs/effects/splats/README.md)) — Procedural 3D Gaussian surfels rendered with EWA covariance projection, hard pixel grid snapping, 3-band stepped lighting, 24-color palette voting, Bayer 4×4 ordered dithering, and 1 px depth outlines.
-2. **[Evolution of Fire](https://gamedevpl.github.io/fx-lab/fire/)** (8 eras, 1985–2026 · [Short](https://www.youtube.com/shorts/KbYwPNdl8Hs) · [source & notes](./docs/effects/fire/README.md)) — Indexed palette cycling (CLUT), live 30 Hz PSX Doom cellular automaton, additive billboard sprite, soft particles with heat haze, baked 6-way directional lit flipbook with optical flow and blackbody HDR, 3D volumetric raymarching, sparse volume self-shadowing with split firelight GI, and a live 24×36×24 3D Navier–Stokes + vorticity confinement fluid solver with an interactive iron sphere collider.
-3. **[Evolution of Water](https://gamedevpl.github.io/fx-lab/water/)** (8 eras, 1985–2026 · [Short](https://www.youtube.com/shorts/x3HO4xdl5Zs) · [source & notes](./docs/effects/water/README.md)) — Indexed palette cycling, dual scrolling UV warp, Beer–Lambert depth absorption, Schlick Fresnel reflections, 6-wave Gerstner displacement with contact foam, Snell refraction with RGB caustics, spectral waves with backlit emerald SSS, and a live 128×128 zero-mean viscous shallow-water PDE with a 3D liquid splash crown, Worthington rebound jet, ballistic droplets, and click-to-ripple interaction.
-4. **[Evolution of Shadows](https://gamedevpl.github.io/fx-lab/shadows/)** (8 eras, 1988–2026 · [Short](https://www.youtube.com/shorts/AaOwo3sHVRk) · [source & notes](./docs/effects/shadows/README.md)) — 1988 ground blob discs, planar `y = 0` projection, *Doom 3*-style stencil volumes, real `88×88` hard shadow map aliasing, 16-tap Poisson PCF, PCSS contact-hardening, cone-traced ray-traced area lights with crevice AO and blue sky fill, and colored stained-glass shadows with crystal lens caustics and color-bounce GI.
-5. **[Evolution of Cloth](https://gamedevpl.github.io/fx-lab/cloth/)** (8 eras, 1988–2026 · [Short](https://www.youtube.com/shorts/R_xwfoOKS3I) · [source & notes](./docs/effects/cloth/README.md)) — 1988 2-frame `32×24` pixel banner, rigid hinged flap, travelling sine-wave vertex shader, Verlet mass-spring physics, 2-hop bending stiffness with woven linen normal map, PBR Charlie velvet sheen + backlit translucency, stretch-free XPBD sphere wrapping, and per-triangle aerodynamic wind with PCF self-shadows and live tearing.
-6. **[Evolution of Fur](https://gamedevpl.github.io/fx-lab/fur/)** (8 eras, 1992–2026 · [Short](https://www.youtube.com/shorts/PtXzuqlUVnY) · [source & notes](./docs/effects/fur/README.md)) — 1992 flat painted polygon mesh, directional normal maps, 8-layer & 40-layer instanced *Shell Texturing* with gravity combing and root AO, Kajiya–Kay anisotropic specular, Marschner dual-lobe scattering with golden backlit rim, 30,000 geometric clumped 3D hair strands, and a live `64×32` spring-damper wind, head-shake & petting groom.
-7. **[Evolution of Glass & Caustics](https://gamedevpl.github.io/fx-lab/glass/)** (8 eras, 1995–2026 · [Short](https://www.youtube.com/shorts/T2alevyW7Bo) · [source & notes](./docs/effects/glass/README.md)) — 1995 flat alpha transparency, studio env-map reflections, Schlick Fresnel (`F₀ = 0.04`), single-surface Snell refraction, thick double refraction with Beer–Lambert volume absorption, Cauchy chromatic dispersion, real-time `512×512` GPU photon-splatted caustics with frosted microfacets, and 4-bounce Total Internal Reflection with 98,304 six-band spectral caustic photons and interactive sun aiming.
-8. **[Evolution of Clouds & Sky](https://gamedevpl.github.io/fx-lab/clouds/)** (8 eras, 1992–2026 · [Short](https://www.youtube.com/shorts/ms-mbMSgG9A) · [source & notes](./docs/effects/clouds/README.md)) — 1992 banded sky with 2D pixel sprites, 1997 skybox scrolling cloud plane, 2002 camera-facing 3D billboard puffs, physical Rayleigh & Mie atmosphere, GPU-baked `64³` tileable Perlin–Worley 3D volumetric raymarching, Beer–Lambert self-shadowing with Henyey–Greenstein silver lining, Nubis-style multi-scattering powder with storm anvil toggle, and real-time crepuscular god-rays with interactive time-of-day sun placement.
-9. **[Evolution of Grass & Foliage](https://gamedevpl.github.io/fx-lab/grass/)** (8 eras, 1992–2026 · [Short](https://www.youtube.com/shorts/DnuMky0yNu0) · [source & notes](./docs/effects/grass/README.md)) — 1992 flat pixel tile, 1996 crossed alpha-cutout X-cards (with wireframe toggle), 2001 10-layer stacked shell grass, 28,000 GPU-instanced 3D curved blades, multi-octave travelling wind waves & root AO, backlit golden subsurface scattering, 650 swaying 3D wildflowers with drifting cloud shadows & sunlit pollen, and a live 128×128 spring-damper trampling trail field parted by a rolling carved orb and mouse clicks.
-10. **[Evolution of Path Tracing](https://gamedevpl.github.io/fx-lab/pathtracing/)** (8 eras, 1975–2026 · [Short](https://www.youtube.com/shorts/lKV2oTqJ0RU) · [source & notes](./docs/effects/pathtracing/README.md)) — 1975 Blinn–Phong local rasterization, 1980 Whitted ray tracing (hard shadows, chrome mirror & Snell crystal glass), 1984 Cook distributed ray tracing (soft area shadows, glossy gold, thin-lens DoF & swinging pendulum motion blur), 1986 Kajiya 1 SPP unbiased Monte Carlo path tracing, multi-SPP progressive temporal accumulation, importance sampling + NEE + Veach MIS, ReSTIR multi-light RIS + 4-pass edge-stopping À-Trous SVGF denoising, and 2026 interactive real-time browser path tracing.
-11. **[Evolution of Toon & NPR Shading](https://gamedevpl.github.io/fx-lab/toon/)** (8 eras, 1996–2026 · [Short](https://www.youtube.com/shorts/jityemaHGLc) · [source & notes](./docs/effects/toon/README.md)) — 1996 Decaudin cartoon rendering (2-tone cel + Z/normal discontinuity ink), 1998 Gooch warm-to-cool technical illustration, 2000 cel-shaded games with authentic back-face Inverted Hull geometry, 2002 *Wind Waker*-style saturated cel ramps, 2009 *Borderlands*-style Sobel ink & comic cross-hatching, 2014 *Guilty Gear Xrd* artist-edited normals, ILM masks, UV inner lines & stepped anime timing, 2018 *Spider-Verse*-style Ben-Day halftone, shadow hatching, CMYK offset & mixed 1s/2s animation, and 2026 real-time 8-sector Anisotropic Kuwahara painterly oil brushstrokes driven by a GPU Structure Tensor.
-12. **[Evolution of Anti-Aliasing & Temporal Upscaling](https://gamedevpl.github.io/fx-lab/aa/)** (8 eras, 1990–2026 · [Short](https://www.youtube.com/shorts/UizNrqtLYAs) · [source & notes](./docs/effects/aa/README.md)) — 1990 Haeberli & Akeley 4×4 SSAA, 1993 hardware 4× MSAA (smooth geometry edges with remaining specular aliasing), 2011 Timothy Lottes FXAA, 2012 Jorge Jimenez SMAA (sharp textures while subpixel wires still break up), 2010–2013 Early TAA (*Halo: Reach* / *Crysis 2* / *UE4*) showing motion ghosting, 2014 Motion Vectors + Catmull-Rom + YCoCg AABB clipping (Lottes 2011 / Malan 2012 / Karis SIGGRAPH 2014), Toksvig/Kaplanyan Specular AA, and FSR 2 / TSR-style 50%-axis (25% pixels) Halton(2,3) temporal upscaling with a clickable 4× pixel magnifier loupe.
-13. **[Evolution of Reflections](https://gamedevpl.github.io/fx-lab/reflections/)** (8 eras, 1976–2026 · [Short](https://www.youtube.com/shorts/ySQLiscu4U4) · [source & notes](./docs/effects/reflections/README.md)) — 1976 Blinn & Newell equirectangular environment mapping, 1996 *Duke Nukem 3D* / *Unreal* planar portal mirror, 1999 GeForce 256 / DX7 hardware cubemaps, 2011 *Crysis 2* DX11 real screen-space reflections (SSR) exposing behind-pillar occlusion holes and off-screen clipping, 2012 parallax-corrected cubemaps (Bjorke 2004 · popularized by Lagarde & Zanuttini, SIGGRAPH 2012), 2013 Brian Karis Split-Sum roughness IBL, 2018 *Battlefield V* DXR ray-traced reflections, and *UE5 Lumen* / *Cyberpunk 2077 RT Overdrive* multi-bounce glossy reflections with contact hardening and temporal denoising.
-14. **[Evolution of Surface Detail](https://gamedevpl.github.io/fx-lab/surface/)** (8 eras, 1978–2026 · [Short](https://www.youtube.com/shorts/22nWrL2uBKc) · [source & notes](./docs/effects/surface/README.md)) — 1978 Blinn Bump Mapping, 1998 Normal Mapping (Cohen & Cignoni 1998 · *Evolva* / *Giants* 2000 · *Doom 3* 2004), 2001 Kaneko / Welsh Parallax Mapping, 2005 Policarpo Relief Mapping, 2006 Tatarchuk Parallax Occlusion Mapping (POM) with live heightfield soft self-shadows (flat silhouette), 2009 programmable DX11 Tessellation & Displacement with wireframe toggle (true jagged 3D silhouette!), 2018–2020 NVIDIA Turing / DX12 Ultimate Meshlets, and 2022–2026 UE5 Nanite-style virtualized micropolygon clusters (emulated in WebGL2 via dense vertex-displaced meshes).
-15. **[Evolution of Fog & Volumetric Lighting](https://gamedevpl.github.io/fx-lab/fog/)** (8 eras, 1997–2026 · [Short](https://www.youtube.com/shorts/7DkkkWPEO8A) · [source & notes](./docs/effects/fog/README.md)) — 1997 *Turok* / 1999 *Silent Hill* distance depth fog (masking far-clipping), 2002 Hoffman & Preetham analytical Rayleigh/Mie aerial perspective, 2004 pre-2007 shadow-map 3D light-shaft slices, 2007 Kenny Mitchell (*GPU Gems 3* Ch. 13) screen-space radial god rays smoothly fading out when looking away, 2009 Tóth & Umenhoffer 3D raymarched volumetric shadows with interleaved sampling toggle, 2014 Bart Wronski temporal froxel fog (emulated in WebGL2, with Froxel Grid overlay), 2015 Sébastien Hillaire / Frostbite heterogeneous swirling mist & local colored lanterns, and 2020–2026 Hillaire (EGSR 2020) multi-scattering with stained-glass cathedral sunbeams sliced by a turning iron clockwork gear.
-16. **[Evolution of Global Illumination](https://gamedevpl.github.io/fx-lab/gi/)** (8 eras, 1996–2026 · **WebGPU Compute + WebGL2 fallback** · [Short](https://www.youtube.com/shorts/JnQ5xxRjIkE) · [source & notes](./docs/effects/gi/README.md)) — 1996 *Quake* baked lightmaps (breaking when you move the lamp), 1998–2004 Greger irradiance volumes & *Half-Life 2* Ambient Cube probes (leaking through a thin wall), 2007 *Crysis* SSAO (explicitly occlusion, not GI), 2009 Ritschel SSDO / SSGI (vanishing when looking away; noting LPV 2009), 2011 Crassin 3D Voxel Cone Tracing (`32×24×32` 3D storage textures in WebGPU; noting *Enlighten* BF3), 2019 Majercik DDGI octahedral probes + Chebyshev visibility (killing thin-wall leaks), 2022 *UE5 Lumen*-style software SDF multi-bounce GI, and 2023–2026 Alexander Sannikov Radiance Cascades (`C2→C1→C0` compute cascades with live `8×8` probe-block inspector).
-17. **[Evolution of Texture Mapping](https://gamedevpl.github.io/fx-lab/textures/)** (8 eras, 1994–2026 · [Short](https://www.youtube.com/shorts/X13_VuMJKmA) · [source & notes](./docs/effects/textures/README.md)) — 1994 PS1 affine texture warping (`vAffUv / vClipW` exact `noperspective` emulation) & GTE vertex snapping, 1996 *Quake* 16-pixel span perspective (Michael Abrash), 1996 *3dfx Voodoo* bilinear filtering (blurry up close, shimmering horizon), 1996 mipmapping & trilinear (Williams '83 noted; `Show Mip Levels`), 1998 S3TC/DXT1 live `4×4` RGB565 block compression (`Show 4×4 Blocks`), 2001 16× Anisotropic Filtering (*GeForce 3* vs angle-dependent *Radeon 8500* toggle), 2011 *RAGE* MegaTexture live `64×64` virtual page pop-in (`Snap Turn`), and 2020–2026 DX12 Sampler Feedback streaming (emulated in WebGL2, `Feedback Map`).
-18. **[Evolution of Portals & Impossible Spaces](https://gamedevpl.github.io/fx-lab/portals/)** (8 eras, 1994–2023 · [Short](https://www.youtube.com/shorts/luQ7DI7gWmg) · [source & notes](./docs/effects/portals/README.md)) — 1994 *Marathon* overlapping non-Euclidean rooms, 1996 *Build / Duke Nukem 3D* overlapping sectors (`Sector Glitch!`) & portal mirrors (*Descent* '95 noted), 2006 *Prey* fixed tilted 3D portals (*Narbacular Drop* '05 noted), 2007 *Portal* recursive Blue↔Orange infinite corridor (`Depth 1 vs 8`, click to move Orange portal), 2013 *Antichamber* look-away shifting rooms, 2018 *CodeParade* 1.8 m-outside / 22 m-inside pavilion (`Outside / Inside`), 2022 *Portal with RTX* light beams, shadows & reflections passing straight through portals (WebGL2 SDF ray-teleportation), and 2023 *Viewfinder* 2D Polaroid stamping real 3D geometry & sky into concrete walls (`Stamp Photo 3D`).
-19. **[Evolution of Tone Mapping & HDR](https://gamedevpl.github.io/fx-lab/tonemapping/)** (8 eras, 2002–2024 · [Short](https://www.youtube.com/shorts/O_lfxUgcVkY) · [source & notes](./docs/effects/tonemapping/)) — True `RGBA16F` floating-point HDR neon alley with separable HDR bloom, live dual response-curve graph, and interactive EV drag (`−3` to `+5.5 EV`): Pre-2002 LDR Clamp ("Notorious 6" neon-red to yellow clipping), 2002 Reinhard, 2004–05 *Far Cry 1.3* & *Half-Life 2: Lost Coast* bloom + tunnel adaptation, 2010 *Uncharted 2* (Hable & Hejl), 2014–17 ACES Filmic (Narkowicz / UE 4.15), 2016–17 Lottes & GT Sport Uchimura, 2023 *Blender 4.0* AgX, and 2024 Khronos PBR Neutral + Tony McMapface.
-20. **[Evolution of 3D Pixel Art](https://gamedevpl.github.io/fx-lab/pixel3d/)** (8 eras, 1992–2023 · [Short](https://www.youtube.com/shorts/BQ37q7o_rtM) · [source & notes](./docs/effects/pixel3d/)) — Multi-MRT coastal windmill island diorama with a draggable 4× pixel magnifier loupe: 1992 *Comanche* Voxel Space heightmap columns, 1994 *Donkey Kong Country* 8-angle pre-rendered sprites + Bayer dither, 1997 *Blood* 3D DDA cubic voxels, 2018 *Dead Cells* cel + 1 px outlines, 2018 *Octopath Traveler* HD-2D (pixel sprite + 3D tilt-shift DoF + bloom), 2018 *Return of the Obra Dinn* world-locked 1-bit dither toggle, 2019 *A Short Hike* naive low-res shimmer, and 2021–23 *t3ssel8r* orthographic texel-snapped sub-pixel camera + depth/normal outlines.
-21. **[Evolution of Character Animation](https://gamedevpl.github.io/fx-lab/animation/)** (8 eras, 1989–2020 · [source & notes](./docs/effects/animation/)) — Articulated 3D humanoid on an interactive stepped stone arena: 1989 *Prince of Persia* 12 fps rotoscoped 2D sprites, 1992–93 *Alone in the Dark* / *Virtua Fighter* rigid polygon puppets, 1996 *Quake* MDL per-vertex keyframe morphing, 1998 *Half-Life* / LBS 180° candy-wrapper collapse, 2006–09 *Gears of War* blend trees & real 2-bone analytical Foot IK on stairs, 2007 Kavan Dual Quaternion Skinning, 2008 passive ragdoll vs *GTA IV Euphoria* active PD-muscle physics, and 2016–20 Motion Matching & neural locomotion (WASD / click-to-steer).
-22. **[Evolution of Skin & Subsurface Scattering](https://gamedevpl.github.io/fx-lab/skin/)** (8 eras, 1975–2021 · [source & notes](./docs/effects/skin/)) — True `RGBA16F` multi-pass Separable SSS on a classical 3/4 sculpted bust with thin translucent ears & orbiting backlight: 1975 Phong plastic, 2001 Jensen Dipole BSSRDF, 2004 Wrapped Diffuse / Half-Lambert, 2007 *GPU Gems 3* Texture-Space Diffusion, 2009 Jimenez Screen-Space SSS, 2011 Penner Pre-Integrated curvature LUT, 2013–15 *Digital Ira* Separable SSS + Burley Normalized Diffusion + dual-lobe GGX specular, and 2021 MetaHuman-era volumetric Random-Walk SSS + peach-fuzz sheen.
-23. **[Evolution of Terrain & Level of Detail](https://gamedevpl.github.io/fx-lab/terrain/)** (8 eras, 1992–2024 · [source & notes](./docs/effects/terrain/)) — Real-time dynamic alpine mountain range with color-coded barycentric wireframe split-screen & Freeze Frustum inspector: 1992 *Comanche* Voxel Space, 1996–97 Lindstrom CLOD & ROAM adaptive binary triangle tree, 2000 GeoMipMapping T-junction cracks & popping, 2002 Chunked LOD vertical skirts, 2004–05 Geometry Clipmaps concentric rings, 2009–10 CDLOD geomorphing & *H.A.W.X 2* DX11 tessellation (emulated), 2011–12 *Battlefield 3* virtual terrain textures, and 2021–24 UE5 Nanite cluster meshlet LOD (emulated).
-24. **[Evolution of Motion Blur](https://gamedevpl.github.io/fx-lab/motionblur/)** (8 eras, 1999–2024 · [source & notes](./docs/effects/motionblur/)) — 4-pass `RGBA16F` aerospace/motorsport test studio with spinning 3-blade rotor, speeding racing capsule, swinging pendulum & static foreground pillar: 1999 *GTA III* frame-blending trails, 2004 Camera-Only nausea blur, 2007 *Crysis* per-object velocity silhouette clipping, 2012 McGuire `TileMax` + `NeighborMax`, 2014 Guertin & McGuire Soft-Z depth weighting, 2016 *DOOM* curved rotational arc blur, 2019 180° cinema shutter (`24 FPS Strobe` toggle), and 2024 16-tap reconstruction with live RGB Velocity Buffer inspector.
-25. **[Evolution of Depth of Field & Bokeh](https://gamedevpl.github.io/fx-lab/dof/)** (8 eras, 1998–2024 · [source & notes](./docs/effects/dof/)) — 4-pass `RGBA16F` HDR optical studio with 32 real HDR pinpoint night lights, wet reflections, near-field crystal & sharp centerpiece: 1998 pinhole camera, 2001 *Metal Gear Solid 2* Gaussian Z-blur halo bleed, 2004 *GPU Gems 1* depth-aware gather, 2007 *Crysis* layered near/far CoC dilation, 2011 *Battlefield 3* 6-blade hexagonal aperture bokeh, 2014 *UE4* Vogel spiral disk + optical rim, 2018 cat's-eye mechanical barrel vignetting, and 2024 2× anamorphic oval bokeh + LoCA with live click-to-focus & CoC heatmap.
-26. **[Evolution of Destruction & Fracturing](https://gamedevpl.github.io/fx-lab/destruction/)** (8 eras, 1998–2023 · **WebGPU Compute + WebGL2 fallback** · [source & notes](./docs/effects/destruction/)) — Blast the same brick-and-concrete watchtower across 8 parallel eras of real-time destruction: 1998 *Half-Life* `func_breakable` gib swap, 2001 *Red Faction* `Geo-Mod` CSG boolean carving (floating upper floors!), 2003 *Max Payne 2* Havok rigid-body debris, 2008 *Bad Company* pre-cut walls vs *The Force Unleashed* DMM material bending, 2009 *Red Faction: Guerrilla* structural load-stress collapse (*Bad Company 2* '10 noted), 2013–19 real-time impact Voronoi fracture (Müller '13 · *R6 Siege* '15 · *UE 4.23 Chaos* '19), 2020–22 *Teardown* `48×72×48` 3D DDA voxel destruction & flood-fill island detachment, and 2023 *The Finals*-scale compound demolition with 8,192 GPU-simulated debris chunks (`?renderer=webgl2` inspects the 49K-voxel / 1,024-debris WebGL2 fallback).
-27. **[Evolution of Collision Detection & Tunneling](https://gamedevpl.github.io/fx-lab/collisions/)** (8 eras, 1988–2024 · **WebGPU Compute + WebGL2 fallback** · [source & notes](./docs/effects/collisions/)) — Why fast bullets clip through walls across 36 years of physics engines: 1988 GJK & discrete tick-gap tunneling, 1993 *Doom* `p_map.c` directional fireball clipping bug (missing `abs()` lets West shots phase through solid walls while East shots hit!), 1995 *I-COLLIDE* Sweep-and-Prune 1D axis brackets, 1996 *Quake* BSP inflated Minkowski hull & *OBBTree* SAT, 2007 *GPU Gems 3* 3D GPU spatial hash broadphase (4,096 bodies on WebGPU), 2011–13 Erin Catto Speculative Contacts & TOI (*Diablo 3*), 2017–18 *PhysX 3.4* & *Unity* Continuous Dynamic CCD, and 2019–24 *Chaos*, *Jolt* & *Box2D 3.0* 4,096-bullet WebGPU Swept CCD + the fast-spinning long-rod rotational tunneling edge case.
-28. **[3D World-Space ASCII & CRT](https://gamedevpl.github.io/fx-lab/ascii/)** (8 steps · [source & notes](./docs/effects/ascii/)) — Why classic 2D screen-space ASCII shaders swim and crush detail on zoom, and how **42,000+ upright camera-facing 3D billboards** (zero UV-mapped wall textures, single `gl.drawArraysInstanced` draw call behind an opaque Z-buffer core) optically blend into a dark gothic painting from afar and reveal razor-sharp horizontal `< > + ; ~` rows and `S Z z N #` typography on 7.4× exponential zoom: clean Blender-sculpted walking gothic bishop (mitre, Roman collar, crimson stole, brass cross lantern), 2D luminance & Sobel `/ \ | _` filters, 100% camera-facing world billboards, 3D chiaroscuro lighting, 5-ghost spectral dash, charset/palette toggles (ASCII, Code, Hangul) and subtle analog CRT bloom at 60 FPS.
-29. **[HD-2D Miniature Diorama](https://gamedevpl.github.io/fx-lab/hd2d/)** (8 steps · [source & notes](./docs/effects/hd2d/README.md)) — How flat nearest-neighbor pixel boxes become a tiny living dungeon diorama in 8 live WebGL2 passes: wide 50° raw cubes, 24° telephoto cutaway walls, paired `64×64` pixel-art normal maps, 12 flickering HDR point lights + PCF shadows vs cool blue ambient, low-res 3D fighters (toggleable to *Octopath*-style 2D sprites) with golden sparks, separable `RGBA16F` HDR bloom + drifting foreground mist, 24-tap Vogel-disk **1904 Scheimpflug Tilt-Shift DoF** blurring lit upper windows, a cyan arcane shrine & foreground braziers into circular bokeh, and ACES filmic grading with live click-to-focus.
-30. **[Evolution of Dithering & 1-Bit Stippling](https://gamedevpl.github.io/fx-lab/dithering/)** (8 eras, 1973–2026 · [source & notes](./docs/effects/dithering/README.md)) — 53 years of faking continuous tone with tiny bit depths on a spinning ringed gas giant, swirling Great Storm & eclipsing moon with a draggable 4× pixel loupe: pre-1973 1-bit hard threshold, 1973 Bryce Bayer `8×8` / `4×4` ordered matrix, live CPU 1976 Floyd–Steinberg & 1984 Apple Macintosh Bill Atkinson (`6/8`) error diffusion (pause to freeze motion boil!), 1988–94 Mega Drive `RGB333` screen-door stipple alpha with live analog CRT composite blend, 1994 PlayStation 1 15-bit `RGB555` banding vs exact `4×4` hardware dither, Ulichney `64×64` Void-and-Cluster blue noise with 2018 *Return of the Obra Dinn* sphere-lock, and 2024–26 dual-octave variance-preserving surface-anchored 3D stippling.
-31. **[Material Sandbox](https://gamedevpl.github.io/fx-lab/materials/)** (6 PBR presets · [source & notes](./docs/effects/materials/README.md)) — Interactive studio material playground on a procedural CNC shaderball (with Torus Knot toggle), orbiting rectangular area softbox (Karis MRP + soft SDF shadows + 5-tap cavity AO + floor bounce), 3 procedural HDR IBL environments (*Studio Softbox*, *Low Sun*, *Neon Night*), 5 live sliders (`Roughness`, `Metallic`, `Clearcoat`, `Anisotropy`, `Iridescence`), `Split vs 2005 Phong`, `Orbit Light` / manual light drag, and `Auto-Morph` across 2005 Blinn–Phong plastic, Oren–Nayar dry clay, Anisotropic GGX brushed steel, clearcoat + 3D metal flake car paint, Charlie sheen velvet, and Belcour–Barla thin-film heat-blued titanium.
-32. **[Isometric Pixel-Wave Toy](https://gamedevpl.github.io/fx-lab/pixelwave/)** (5 steps · [source & notes](./docs/effects/pixelwave/README.md)) — Interactive low-resolution WebGL2 pixel-art voxel toy: discrete columns (`16×16` / `24×24` / `32×32`) in a rigid orthographic `2:1` isometric projection (`NEAREST` upscaling), 3 wave modes (`Diagonal Loop`, `Simplex Drift`, `Click Ripple` with live click/drag voxel picking), integer pixel `Height Steps` quantization, directional left lighting across 4 biomes (*Meadow*, *Ocean*, *Magma*, *Neon Grid*), a two-stage 2D outline pass (1 px black depth/silhouette ink + thick white vinyl sticker border with drop shadow over a checkered mat), and a live `Show 2D Noise` inset.
+<br>
 
-## Project structure
+<a href="https://gamedevpl.github.io/fx-lab/">
+  <img src="./media/hero.gif" alt="FX Lab live WebGL2 mosaic: HD-2D Miniature Diorama, 3D Navier-Stokes Fire, Shallow-Water Splash PDE, and Isometric Pixel-Wave" width="800">
+</a>
 
-Each effect lives in its own self-contained folder under `docs/effects/<id>/` with a technical `README.md`, CPU scene/simulation module, GLSL shader module, and WebGL2 renderer:
+*Every effect runs live in your browser: orbit the camera, scrub through 5–8 historical eras, drag a real-time before/after split divider, and poke the physics.*
 
-```text
-docs/
-├── index.html                                                                                              # Root entry (loads default effect)
-├── splats/ fire/ water/ shadows/ cloth/ fur/ glass/ clouds/ grass/ pathtracing/ toon/ aa/ reflections/ surface/ fog/ gi/ textures/ portals/ tonemapping/ pixel3d/ animation/ skin/ terrain/ motionblur/ dof/ destruction/ collisions/ ascii/ hd2d/ dithering/ materials/ pixelwave/ # Clean per-effect routes with dedicated Open Graph cards
-├── src/                                                                                                    # Shared app shell, catalog metadata, WebGL2 helpers
-└── effects/
-    ├── splats/                                                                                             # README.md · scene.js · shaders.js · index.js
-    ├── fire/                                                                                               # README.md · simulations.js · shaders.js · index.js
-    ├── water/                                                                                              # README.md · simulation.js · shaders.js · index.js
-    ├── shadows/                                                                                            # README.md · shaders.js · index.js
-    ├── cloth/                                                                                              # README.md · simulation.js · shaders.js · index.js
-    ├── fur/                                                                                                # README.md · groom.js · shaders.js · index.js
-    ├── glass/                                                                                              # README.md · optics.js · shaders.js · index.js
-    ├── clouds/                                                                                             # README.md · atmosphere.js · shaders.js · index.js
-    ├── grass/                                                                                              # README.md · scene.js · shaders.js · index.js
-    ├── pathtracing/                                                                                        # README.md · shaders.js · index.js
-    ├── toon/                                                                                               # README.md · scene.js · shaders.js · index.js
-    ├── aa/                                                                                                 # README.md · shaders.js · index.js
-    ├── reflections/                                                                                        # README.md · shaders.js · index.js
-    ├── surface/                                                                                            # README.md · mesh.js · shaders.js · index.js
-    ├── fog/                                                                                                # README.md · shaders.js · index.js
-    ├── gi/                                                                                                 # README.md · wgsl.js · webgpu.js · webgl2.js · shared.js · index.js
-    ├── textures/                                                                                           # README.md · mesh.js · atlas.js · shaders.js · index.js
-    ├── portals/                                                                                            # README.md · shaders.js · index.js
-    ├── tonemapping/                                                                                        # shaders.js · index.js
-    ├── pixel3d/                                                                                            # shaders.js · index.js
-    ├── animation/                                                                                          # mesh.js · shaders.js · index.js
-    ├── skin/                                                                                               # shaders.js · index.js
-    ├── terrain/                                                                                            # lod.js · shaders.js · index.js
-    ├── motionblur/                                                                                         # shaders.js · index.js
-    ├── dof/                                                                                                # shaders.js · index.js
-    ├── destruction/                                                                                        # shared.js · wgsl.js · webgpu.js · webgl2.js · index.js
-    ├── collisions/                                                                                         # shared.js · wgsl.js · webgpu.js · webgl2.js · index.js
-    ├── ascii/                                                                                              # atlas.js · priest-mesh.js · scene3d.js · shaders.js · index.js
-    ├── hd2d/                                                                                               # README.md · textures.js · scene.js · shaders.js · index.js
-    ├── dithering/                                                                                          # README.md · bluenoise.js · shaders.js · index.js
-    └── materials/                                                                                          # README.md · shaders.js · index.js
-```
+</div>
+
+---
+
+## Live before/after split-screen
+
+Hit `S` or drag the amber divider in any scene to compare eras side by side in real time — from 1985 palette-cycling tricks straight through 2026 live GPU fluid & ray-tracing solvers.
+
+<p align="center">
+  <a href="https://gamedevpl.github.io/fx-lab/fire/?split=1">
+    <img src="./media/split-wipe.gif" alt="Live split-screen wipe comparing 1985 CLUT palette fire against a 2026 3D Navier-Stokes fluid solver" width="760">
+  </a>
+</p>
+
+---
+
+## All 32 effects
+
+Click any thumbnail to jump straight into that sandbox.
+
+### Fluids, Volumetrics & Nature
+
+<table>
+  <tr>
+    <td align="center" width="33%" valign="top">
+      <a href="https://gamedevpl.github.io/fx-lab/fire/"><img src="./docs/thumbs/fire.jpg" width="260" alt="Evolution of Fire"></a><br>
+      <b><a href="https://gamedevpl.github.io/fx-lab/fire/">Evolution of Fire</a></b> · 8 eras<br>
+      <sub>1985 CLUT &amp; PSX Doom fire up to a live 3D Navier–Stokes fluid solver.</sub><br>
+      <sub><a href="./docs/effects/fire/">Code &amp; notes</a> · <a href="https://www.youtube.com/shorts/KbYwPNdl8Hs">Short ↗</a></sub>
+    </td>
+    <td align="center" width="33%" valign="top">
+      <a href="https://gamedevpl.github.io/fx-lab/water/"><img src="./docs/thumbs/water.jpg" width="260" alt="Evolution of Water"></a><br>
+      <b><a href="https://gamedevpl.github.io/fx-lab/water/">Evolution of Water</a></b> · 8 eras<br>
+      <sub>Beer–Lambert depth, Gerstner waves, RGB caustics, and a live 128² splash PDE.</sub><br>
+      <sub><a href="./docs/effects/water/">Code &amp; notes</a> · <a href="https://www.youtube.com/shorts/x3HO4xdl5Zs">Short ↗</a></sub>
+    </td>
+    <td align="center" width="33%" valign="top">
+      <a href="https://gamedevpl.github.io/fx-lab/clouds/"><img src="./docs/thumbs/clouds.jpg" width="260" alt="Evolution of Clouds & Sky"></a><br>
+      <b><a href="https://gamedevpl.github.io/fx-lab/clouds/">Clouds &amp; Sky</a></b> · 8 eras<br>
+      <sub>Sprite skies to Rayleigh/Mie atmosphere, 64³ Perlin–Worley raymarching &amp; god-rays.</sub><br>
+      <sub><a href="./docs/effects/clouds/">Code &amp; notes</a> · <a href="https://www.youtube.com/shorts/ms-mbMSgG9A">Short ↗</a></sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="33%" valign="top">
+      <a href="https://gamedevpl.github.io/fx-lab/grass/"><img src="./docs/thumbs/grass.jpg" width="260" alt="Evolution of Grass & Foliage"></a><br>
+      <b><a href="https://gamedevpl.github.io/fx-lab/grass/">Grass &amp; Foliage</a></b> · 8 eras<br>
+      <sub>X-cards &amp; shell grass to 28,000 instanced blades with interactive trampling trails.</sub><br>
+      <sub><a href="./docs/effects/grass/">Code &amp; notes</a> · <a href="https://www.youtube.com/shorts/DnuMky0yNu0">Short ↗</a></sub>
+    </td>
+    <td align="center" width="33%" valign="top">
+      <a href="https://gamedevpl.github.io/fx-lab/fog/"><img src="./docs/thumbs/fog.jpg" width="260" alt="Evolution of Fog & Volumetrics"></a><br>
+      <b><a href="https://gamedevpl.github.io/fx-lab/fog/">Fog &amp; Volumetrics</a></b> · 8 eras<br>
+      <sub>Silent Hill depth fog to radial god-rays, temporal froxels &amp; stained-glass sunbeams.</sub><br>
+      <sub><a href="./docs/effects/fog/">Code &amp; notes</a> · <a href="https://www.youtube.com/shorts/7DkkkWPEO8A">Short ↗</a></sub>
+    </td>
+    <td align="center" width="33%" valign="top">
+      <a href="https://gamedevpl.github.io/fx-lab/terrain/"><img src="./docs/thumbs/terrain.jpg" width="260" alt="Evolution of Terrain & LOD"></a><br>
+      <b><a href="https://gamedevpl.github.io/fx-lab/terrain/">Terrain &amp; LOD</a></b> · 8 eras<br>
+      <sub>Comanche Voxel Space &amp; GeoMipMapping cracks up to CDLOD and Nanite-style meshlets.</sub><br>
+      <sub><a href="./docs/effects/terrain/">Code</a></sub>
+    </td>
+  </tr>
+</table>
+
+### Lighting, Shadows & Materials
+
+<table>
+  <tr>
+    <td align="center" width="33%" valign="top">
+      <a href="https://gamedevpl.github.io/fx-lab/shadows/"><img src="./docs/thumbs/shadows.jpg" width="260" alt="Evolution of Shadows"></a><br>
+      <b><a href="https://gamedevpl.github.io/fx-lab/shadows/">Evolution of Shadows</a></b> · 8 eras<br>
+      <sub>Blob discs, Doom 3 stencil volumes, 88² shadow maps, PCSS &amp; stained-glass GI.</sub><br>
+      <sub><a href="./docs/effects/shadows/">Code &amp; notes</a> · <a href="https://www.youtube.com/shorts/AaOwo3sHVRk">Short ↗</a></sub>
+    </td>
+    <td align="center" width="33%" valign="top">
+      <a href="https://gamedevpl.github.io/fx-lab/gi/"><img src="./docs/thumbs/gi.jpg" width="260" alt="Evolution of Global Illumination"></a><br>
+      <b><a href="https://gamedevpl.github.io/fx-lab/gi/">Global Illumination</a></b> · WebGPU<br>
+      <sub>Quake lightmaps &amp; probe leaks to Voxel Cone Tracing, DDGI &amp; Radiance Cascades.</sub><br>
+      <sub><a href="./docs/effects/gi/">Code &amp; notes</a> · <a href="https://www.youtube.com/shorts/JnQ5xxRjIkE">Short ↗</a></sub>
+    </td>
+    <td align="center" width="33%" valign="top">
+      <a href="https://gamedevpl.github.io/fx-lab/pathtracing/"><img src="./docs/thumbs/pathtracing.jpg" width="260" alt="Evolution of Path Tracing"></a><br>
+      <b><a href="https://gamedevpl.github.io/fx-lab/pathtracing/">Path Tracing</a></b> · 8 eras<br>
+      <sub>Blinn–Phong &amp; Whitted rays to Monte Carlo MIS, ReSTIR &amp; SVGF denoising.</sub><br>
+      <sub><a href="./docs/effects/pathtracing/">Code &amp; notes</a> · <a href="https://www.youtube.com/shorts/lKV2oTqJ0RU">Short ↗</a></sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="33%" valign="top">
+      <a href="https://gamedevpl.github.io/fx-lab/reflections/"><img src="./docs/thumbs/reflections.jpg" width="260" alt="Evolution of Reflections"></a><br>
+      <b><a href="https://gamedevpl.github.io/fx-lab/reflections/">Reflections</a></b> · 8 eras<br>
+      <sub>Portal mirrors, cubemaps, SSR holes, split-sum IBL &amp; multi-bounce glossy RT.</sub><br>
+      <sub><a href="./docs/effects/reflections/">Code &amp; notes</a> · <a href="https://www.youtube.com/shorts/ySQLiscu4U4">Short ↗</a></sub>
+    </td>
+    <td align="center" width="33%" valign="top">
+      <a href="https://gamedevpl.github.io/fx-lab/glass/"><img src="./docs/thumbs/glass.jpg" width="260" alt="Evolution of Glass & Caustics"></a><br>
+      <b><a href="https://gamedevpl.github.io/fx-lab/glass/">Glass &amp; Caustics</a></b> · 8 eras<br>
+      <sub>Flat alpha to Snell refraction, dispersion &amp; 98K spectral caustic photons.</sub><br>
+      <sub><a href="./docs/effects/glass/">Code &amp; notes</a> · <a href="https://www.youtube.com/shorts/T2alevyW7Bo">Short ↗</a></sub>
+    </td>
+    <td align="center" width="33%" valign="top">
+      <a href="https://gamedevpl.github.io/fx-lab/materials/"><img src="./docs/thumbs/materials.jpg" width="260" alt="Material Sandbox"></a><br>
+      <b><a href="https://gamedevpl.github.io/fx-lab/materials/">Material Sandbox</a></b> · 6 PBR shaders<br>
+      <sub>5 live sliders, draggable softbox &amp; split vs 2005 Phong: clay, brushed steel, flake paint, velvet, titanium.</sub><br>
+      <sub><a href="./docs/effects/materials/">Code &amp; notes</a></sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="33%" valign="top">
+      <a href="https://gamedevpl.github.io/fx-lab/skin/"><img src="./docs/thumbs/skin.jpg" width="260" alt="Evolution of Skin & SSS"></a><br>
+      <b><a href="https://gamedevpl.github.io/fx-lab/skin/">Skin &amp; Subsurface Scattering</a></b> · 8 eras<br>
+      <sub>Plastic Phong to Dipole BSSRDF, Separable SSS, Burley diffusion &amp; backlit ears.</sub><br>
+      <sub><a href="./docs/effects/skin/">Code</a></sub>
+    </td>
+    <td align="center" width="33%" valign="top">
+      <a href="https://gamedevpl.github.io/fx-lab/tonemapping/"><img src="./docs/thumbs/tonemapping.jpg" width="260" alt="Evolution of Tone Mapping & HDR"></a><br>
+      <b><a href="https://gamedevpl.github.io/fx-lab/tonemapping/">Tone Mapping &amp; HDR</a></b> · 8 eras<br>
+      <sub>True RGBA16F neon alley with live EV drag: LDR clip, Reinhard, ACES, AgX &amp; PBR Neutral.</sub><br>
+      <sub><a href="./docs/effects/tonemapping/">Code</a> · <a href="https://www.youtube.com/shorts/O_lfxUgcVkY">Short ↗</a></sub>
+    </td>
+    <td align="center" width="33%" valign="top">
+      <a href="https://gamedevpl.github.io/fx-lab/surface/"><img src="./docs/thumbs/surface.jpg" width="260" alt="Evolution of Surface Detail"></a><br>
+      <b><a href="https://gamedevpl.github.io/fx-lab/surface/">Surface Detail</a></b> · 8 eras<br>
+      <sub>Bump, normal &amp; Parallax Occlusion Mapping vs true DX11 displacement &amp; meshlets.</sub><br>
+      <sub><a href="./docs/effects/surface/">Code &amp; notes</a> · <a href="https://www.youtube.com/shorts/22nWrL2uBKc">Short ↗</a></sub>
+    </td>
+  </tr>
+</table>
+
+### Stylization, Pixel Art & Non-Photorealistic
+
+<table>
+  <tr>
+    <td align="center" width="33%" valign="top">
+      <a href="https://gamedevpl.github.io/fx-lab/hd2d/"><img src="./docs/thumbs/hd2d.jpg" width="260" alt="HD-2D Miniature Diorama"></a><br>
+      <b><a href="https://gamedevpl.github.io/fx-lab/hd2d/">HD-2D Miniature Diorama</a></b> · 8 steps<br>
+      <sub>Pixel normal maps, 12 HDR point lights, bloom &amp; tilt-shift Scheimpflug bokeh.</sub><br>
+      <sub><a href="./docs/effects/hd2d/">Code &amp; notes</a></sub>
+    </td>
+    <td align="center" width="33%" valign="top">
+      <a href="https://gamedevpl.github.io/fx-lab/splats/"><img src="./docs/thumbs/splats.jpg" width="260" alt="Pixel-Art Gaussian Splats"></a><br>
+      <b><a href="https://gamedevpl.github.io/fx-lab/splats/">Pixel-Art Gaussian Splats</a></b> · 5 steps<br>
+      <sub>3D Gaussian surfels snapped to a pixel grid with 24-color palette voting &amp; 1 px ink.</sub><br>
+      <sub><a href="./docs/effects/splats/">Code &amp; notes</a> · <a href="https://www.youtube.com/shorts/_XPeSD0esb8">Short ↗</a></sub>
+    </td>
+    <td align="center" width="33%" valign="top">
+      <a href="https://gamedevpl.github.io/fx-lab/pixelwave/"><img src="./docs/thumbs/pixelwave.jpg" width="260" alt="Isometric Pixel-Wave Toy"></a><br>
+      <b><a href="https://gamedevpl.github.io/fx-lab/pixelwave/">Isometric Pixel-Wave Toy</a></b> · 5 steps<br>
+      <sub>2D noise turned into 2:1 isometric voxel waves, click ripples &amp; vinyl sticker outline.</sub><br>
+      <sub><a href="./docs/effects/pixelwave/">Code &amp; notes</a></sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="33%" valign="top">
+      <a href="https://gamedevpl.github.io/fx-lab/ascii/"><img src="./docs/thumbs/ascii.jpg" width="260" alt="3D World-Space ASCII & CRT"></a><br>
+      <b><a href="https://gamedevpl.github.io/fx-lab/ascii/">3D World-Space ASCII</a></b> · 8 steps<br>
+      <sub>42,000+ instanced 3D glyph billboards that stay razor-sharp even at 7.4× zoom.</sub><br>
+      <sub><a href="./docs/effects/ascii/">Code</a></sub>
+    </td>
+    <td align="center" width="33%" valign="top">
+      <a href="https://gamedevpl.github.io/fx-lab/pixel3d/"><img src="./docs/thumbs/pixel3d.jpg" width="260" alt="Evolution of 3D Pixel Art"></a><br>
+      <b><a href="https://gamedevpl.github.io/fx-lab/pixel3d/">3D Pixel Art</a></b> · 8 eras<br>
+      <sub>Voxel Space, DKC sprites, Obra Dinn 1-bit &amp; texel-snapped cameras with a 4× loupe.</sub><br>
+      <sub><a href="./docs/effects/pixel3d/">Code</a> · <a href="https://www.youtube.com/shorts/BQ37q7o_rtM">Short ↗</a></sub>
+    </td>
+    <td align="center" width="33%" valign="top">
+      <a href="https://gamedevpl.github.io/fx-lab/dithering/"><img src="./docs/thumbs/dithering.jpg" width="260" alt="Evolution of Dithering"></a><br>
+      <b><a href="https://gamedevpl.github.io/fx-lab/dithering/">Dithering &amp; 1-Bit Stippling</a></b> · 8 eras<br>
+      <sub>Bayer matrices, Floyd–Steinberg, Atkinson, PS1 RGB555 &amp; surface-locked blue noise.</sub><br>
+      <sub><a href="./docs/effects/dithering/">Code &amp; notes</a></sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="33%" valign="top">
+      <a href="https://gamedevpl.github.io/fx-lab/toon/"><img src="./docs/thumbs/toon.jpg" width="260" alt="Evolution of Toon & NPR Shading"></a><br>
+      <b><a href="https://gamedevpl.github.io/fx-lab/toon/">Toon &amp; NPR Shading</a></b> · 8 eras<br>
+      <sub>Inverted-hull cel, Gooch, Guilty Gear Xrd, Spider-Verse halftones &amp; Kuwahara oil paint.</sub><br>
+      <sub><a href="./docs/effects/toon/">Code &amp; notes</a> · <a href="https://www.youtube.com/shorts/jityemaHGLc">Short ↗</a></sub>
+    </td>
+    <td align="center" width="33%" valign="top">
+      <a href="https://gamedevpl.github.io/fx-lab/portals/"><img src="./docs/thumbs/portals.jpg" width="260" alt="Evolution of Portals & Impossible Spaces"></a><br>
+      <b><a href="https://gamedevpl.github.io/fx-lab/portals/">Portals &amp; Impossible Spaces</a></b> · 8 eras<br>
+      <sub>Build-engine sectors, recursive Portal corridors, non-Euclidean rooms &amp; Viewfinder 3D stamps.</sub><br>
+      <sub><a href="./docs/effects/portals/">Code &amp; notes</a> · <a href="https://www.youtube.com/shorts/luQ7DI7gWmg">Short ↗</a></sub>
+    </td>
+    <td align="center" width="33%" valign="top">
+      <a href="https://gamedevpl.github.io/fx-lab/textures/"><img src="./docs/thumbs/textures.jpg" width="260" alt="Evolution of Texture Mapping"></a><br>
+      <b><a href="https://gamedevpl.github.io/fx-lab/textures/">Texture Mapping</a></b> · 8 eras<br>
+      <sub>PS1 affine warping, Voodoo bilinear, S3TC 4×4 blocks, 16× AF &amp; MegaTexture streaming.</sub><br>
+      <sub><a href="./docs/effects/textures/">Code &amp; notes</a> · <a href="https://www.youtube.com/shorts/X13_VuMJKmA">Short ↗</a></sub>
+    </td>
+  </tr>
+</table>
+
+### Physics, Animation & Camera Post-FX
+
+<table>
+  <tr>
+    <td align="center" width="33%" valign="top">
+      <a href="https://gamedevpl.github.io/fx-lab/cloth/"><img src="./docs/thumbs/cloth.jpg" width="260" alt="Evolution of Cloth"></a><br>
+      <b><a href="https://gamedevpl.github.io/fx-lab/cloth/">Evolution of Cloth</a></b> · 8 eras<br>
+      <sub>2-frame pixel banners to Verlet springs, velvet sheen, XPBD wrapping &amp; live tearing.</sub><br>
+      <sub><a href="./docs/effects/cloth/">Code &amp; notes</a> · <a href="https://www.youtube.com/shorts/R_xwfoOKS3I">Short ↗</a></sub>
+    </td>
+    <td align="center" width="33%" valign="top">
+      <a href="https://gamedevpl.github.io/fx-lab/fur/"><img src="./docs/thumbs/fur.jpg" width="260" alt="Evolution of Fur"></a><br>
+      <b><a href="https://gamedevpl.github.io/fx-lab/fur/">Evolution of Fur</a></b> · 8 eras<br>
+      <sub>Shell texturing, Marschner scattering, 30K 3D strands &amp; click-to-pet wind dynamics.</sub><br>
+      <sub><a href="./docs/effects/fur/">Code &amp; notes</a> · <a href="https://www.youtube.com/shorts/PtXzuqlUVnY">Short ↗</a></sub>
+    </td>
+    <td align="center" width="33%" valign="top">
+      <a href="https://gamedevpl.github.io/fx-lab/destruction/"><img src="./docs/thumbs/destruction.jpg" width="260" alt="Evolution of Destruction & Fracturing"></a><br>
+      <b><a href="https://gamedevpl.github.io/fx-lab/destruction/">Destruction &amp; Fracturing</a></b> · WebGPU<br>
+      <sub>Blast one watchtower across 8 eras: gib swaps, Geo-Mod, Voronoi &amp; Teardown voxels.</sub><br>
+      <sub><a href="./docs/effects/destruction/">Code</a></sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="33%" valign="top">
+      <a href="https://gamedevpl.github.io/fx-lab/collisions/"><img src="./docs/thumbs/collisions.jpg" width="260" alt="Evolution of Collision Detection & Tunneling"></a><br>
+      <b><a href="https://gamedevpl.github.io/fx-lab/collisions/">Collisions &amp; Tunneling</a></b> · WebGPU<br>
+      <sub>Doom's directional clipping bug, BSP hulls, speculative contacts &amp; 4,096-bullet Swept CCD.</sub><br>
+      <sub><a href="./docs/effects/collisions/">Code</a></sub>
+    </td>
+    <td align="center" width="33%" valign="top">
+      <a href="https://gamedevpl.github.io/fx-lab/animation/"><img src="./docs/thumbs/animation.jpg" width="260" alt="Evolution of Character Animation"></a><br>
+      <b><a href="https://gamedevpl.github.io/fx-lab/animation/">Character Animation</a></b> · 8 eras<br>
+      <sub>Rotoscoped sprites, LBS candy-wrapper twist, Foot IK, Dual Quaternions &amp; Motion Matching.</sub><br>
+      <sub><a href="./docs/effects/animation/">Code</a></sub>
+    </td>
+    <td align="center" width="33%" valign="top">
+      <a href="https://gamedevpl.github.io/fx-lab/aa/"><img src="./docs/thumbs/aa.jpg" width="260" alt="Evolution of Anti-Aliasing & Temporal Upscaling"></a><br>
+      <b><a href="https://gamedevpl.github.io/fx-lab/aa/">Anti-Aliasing &amp; Upscaling</a></b> · 8 eras<br>
+      <sub>SSAA, MSAA, FXAA, SMAA, TAA ghosting, YCoCg clamping &amp; FSR2/TSR with a 4× loupe.</sub><br>
+      <sub><a href="./docs/effects/aa/">Code &amp; notes</a> · <a href="https://www.youtube.com/shorts/UizNrqtLYAs">Short ↗</a></sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="33%" valign="top">
+      <a href="https://gamedevpl.github.io/fx-lab/motionblur/"><img src="./docs/thumbs/motionblur.jpg" width="260" alt="Evolution of Motion Blur"></a><br>
+      <b><a href="https://gamedevpl.github.io/fx-lab/motionblur/">Motion Blur</a></b> · 8 eras<br>
+      <sub>Frame trails to McGuire TileMax/NeighborMax, Soft-Z depth &amp; live velocity buffer view.</sub><br>
+      <sub><a href="./docs/effects/motionblur/">Code</a></sub>
+    </td>
+    <td align="center" width="33%" valign="top">
+      <a href="https://gamedevpl.github.io/fx-lab/dof/"><img src="./docs/thumbs/dof.jpg" width="260" alt="Evolution of Depth of Field & Bokeh"></a><br>
+      <b><a href="https://gamedevpl.github.io/fx-lab/dof/">Depth of Field &amp; Bokeh</a></b> · 8 eras<br>
+      <sub>MGS2 halo bleed to hexagonal apertures, cat's-eye vignetting &amp; 2× anamorphic bokeh.</sub><br>
+      <sub><a href="./docs/effects/dof/">Code</a></sub>
+    </td>
+    <td align="center" width="33%" valign="middle">
+      <b>Want to poke the code?</b><br><br>
+      <sub>Every effect lives in a standalone folder under <a href="./docs/effects/"><code>docs/effects/&lt;id&gt;/</code></a> with raw GLSL/WGSL shaders and zero external packages.</sub>
+    </td>
+  </tr>
+</table>
+
+---
 
 ## Controls
 
-- **Drag** — Orbit and tilt the camera
-- **Scroll / Pinch** — Zoom in and out
-- **Double-click / `R`** — Reset camera
-- **Drag amber divider / `S`** — Toggle and slide before/after split-screen comparison
-- **`←` / `→`** — Step backward or forward
-- **`Space`** — Pause or resume simulation
-- **`M`** — Toggle procedural sound effects & scene ambience (Web Audio API)
-- **`B`** — Toggle adaptive procedural background music
-- **`E`** — Open the effects catalog
-- **`1`–`9`** — Jump directly to an effect
-- **Click pool (Water Step 8)** — Inject live concentric ripples
+| Input | Action |
+| --- | --- |
+| **Drag** / **Scroll** | Orbit camera / zoom (`R` or double-click resets) |
+| **`←` / `→`** | Step backward / forward across eras or passes |
+| **`S`** or drag divider | Toggle & slide live before/after split comparison |
+| **`E`** / **`1`–`9`** | Open effects catalog / jump directly to an effect |
+| **Click scene** | Interact (ripples, aim sun, fire shell, move focus, pet fur…) |
+| **`Space`** · **`M`** · **`B`** | Pause/resume · Web Audio SFX · background music |
+
+---
 
 ## Running locally
 
-No build step and no external dependencies — plain ES modules and raw WebGL2 inside `docs/`.
+No `npm install`, no bundler — just serve `docs/`:
 
 ```sh
 python3 -m http.server 8080 --directory docs
 ```
 
-Then open `http://localhost:8080/`.
+Then open <http://localhost:8080/>.
+
+<details>
+<summary><b>Project layout</b> (all 32 self-contained effect modules)</summary>
+
+```text
+docs/
+├── index.html          # Root shell (clean routes: /splats/, /fire/, /water/, …, /pixelwave/)
+├── src/                # App shell, bilingual catalog, WebGL2 utilities, Web Audio engine
+├── thumbs/             # Per-effect preview thumbnails
+└── effects/<id>/       # Self-contained shader + simulation + renderer (+ README.md notes)
+```
+
+WebGPU compute demos (`gi`, `destruction`, `collisions`) ship both WGSL compute pipelines and automatic WebGL2 fallbacks (`?renderer=webgl2`).
+
+</details>
+
+---
+
+## More interactive labs from [gamedev.pl](https://www.gamedev.pl)
+
+- **[Game Design Codex (GDC)](https://github.com/gamedevpl/gdc)** — 22 playable 3D mini-games exposing hidden game-design tricks (Coyote Time, Hitstop, Attack Tokens, Rubber Banding, AI Director…)
+- **[Lumen Lab](https://github.com/gamedevpl/silnik3d-od-zera/tree/main/docs/lumen-lab)** — 40 years of light and shadow in one single WebGL2 scene
+- **[Neon Canal (Demko)](https://github.com/gamedevpl/silnik3d-od-zera/tree/main/demko)** — 3D C++ / WebAssembly / Metal neon racer
+- **[Silnik 3D w C++ od zera](https://github.com/gamedevpl/silnik3d-od-zera)** — building a 3D C++ & OpenGL engine from an empty folder
 
 ## License
 
