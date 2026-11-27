@@ -424,7 +424,7 @@ export function createPixelwaveEffect(gl, { params } = {}) {
     const inFull2D = lastSplitX < 0.0 && activeStage === 0;
     if (inLeftSplit2D || inFull2D) {
       const aspect = L.lowW / Math.max(1, L.lowH);
-      const halfBox = 0.36;
+      const halfBox = Math.min(0.36, 0.38 * aspect);
       const bx = ((uvX - 0.5) * aspect) / (halfBox * 2.0) + 0.5;
       const by = (uvY - 0.5) / (halfBox * 2.0) + 0.5;
       if (bx >= -0.02 && bx <= 1.02 && by >= -0.02 && by <= 1.02) {

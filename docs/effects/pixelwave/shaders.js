@@ -398,7 +398,7 @@ vec3 evalPixelStage(ivec2 p, ivec2 maxP, vec2 uv, int stage) {
     // Map a clean centered square directly from uHeightTex so Split vs Step 1 works on any step!
     float aspect = uLowRes.x / max(uLowRes.y, 1.0);
     vec2 centered = (uv - 0.5) * vec2(aspect, 1.0);
-    float halfBox = 0.36;
+    float halfBox = min(0.36, 0.38 * aspect);
     vec2 boxUv = centered / (halfBox * 2.0) + 0.5;
     if (boxUv.x >= 0.0 && boxUv.x <= 1.0 && boxUv.y >= 0.0 && boxUv.y <= 1.0) {
       vec2 gridPos = vec2(boxUv.x, 1.0 - boxUv.y) * float(uGridN);
