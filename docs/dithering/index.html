@@ -6,6 +6,7 @@
 <title>Evolution of Dithering &amp; 1-Bit Stippling (1973–2026) — FX Lab | gamedev.pl</title>
 <meta name="description" content="53 years of dithering live in WebGL2: 1-bit threshold, 1973 Bayer matrix, live CPU Floyd–Steinberg &amp; 1984 Mac Atkinson error diffusion, Mega Drive screen-door stipple + CRT blend, PS1 15-bit RGB555 hardware dither, Ulichney blue noise, Obra Dinn sphere-lock &amp; 2026 surface-anchored 3D stippling.">
 <link rel="canonical" href="https://gamedevpl.github.io/fx-lab/dithering/">
+<meta property="og:site_name" content="FX Lab · gamedev.pl">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://gamedevpl.github.io/fx-lab/dithering/">
 <meta property="og:title" content="Evolution of Dithering &amp; 1-Bit Stippling (1973–2026) — FX Lab">
@@ -14,19 +15,20 @@
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@plgamedev">
 <meta name="twitter:title" content="Evolution of Dithering &amp; 1-Bit Stippling (1973–2026) — FX Lab">
 <meta name="twitter:description" content="53 years of dithering live in WebGL2: Bayer, live Floyd–Steinberg &amp; Atkinson, Mega Drive CRT stipple, PS1 RGB555, Obra Dinn &amp; 3D surface-anchored stippling.">
 <meta name="twitter:image" content="https://gamedevpl.github.io/fx-lab/og-dithering.png">
 <link rel="icon" type="image/svg+xml" href="../favicon.svg">
-<link rel="modulepreload" href="../src/app.js?v=5">
-<link rel="modulepreload" href="../src/catalog.js">
+<link rel="modulepreload" href="../src/app.js?v=6">
+<link rel="modulepreload" href="../src/catalog.js?v=6">
 <link rel="modulepreload" href="../src/icons.js">
 <link rel="modulepreload" href="../src/gl-utils.js">
 <link rel="modulepreload" href="../effects/dithering/index.js">
 <link rel="modulepreload" href="../effects/dithering/bluenoise.js">
 <link rel="modulepreload" href="../effects/dithering/shaders.js">
 <link rel="stylesheet" href="../ask/ask.css">
-<link rel="stylesheet" href="../style.css?v=3">
+<link rel="stylesheet" href="../style.css?v=6">
 </head>
 <body>
 <main>
@@ -112,7 +114,7 @@
   <p id="noglBody"></p>
 </div>
 
-<script type="module" src="../src/app.js?v=5"></script>
+<script type="module" src="../src/app.js?v=6"></script>
 <script type="module">
 if (!new URLSearchParams(location.search).has("director") && ("LanguageModel" in self || self.__fxLabModel)) {
   import("../src/assistant.js").catch(() => {});

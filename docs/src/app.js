@@ -1,7 +1,7 @@
 // FX Lab controller: lazy-loaded WebGL2 effects, scalable catalog overlay, orbit/zoom camera,
 // draggable split-screen divider, URL deep-linking, and window.FXLAB API.
 
-import { EFFECTS, UI, REPO_TREE_BASE, getEffect } from "./catalog.js";
+import { EFFECTS, UI, REPO_TREE_BASE, getEffect } from "./catalog.js?v=6";
 import { clamp } from "./gl-utils.js";
 import { getEffectIconSvg } from "./icons.js";
 import { createAudioEngine } from "./audio.js";
@@ -123,17 +123,120 @@ let filterCat = "all";
 let filterQuery = "";
 let cardCollapsed = window.matchMedia("(max-width: 780px)").matches;
 
+const STORAGE_VISITED = "fxlab_visited_v1";
+const visitedIds = new Set();
+try {
+  const saved = JSON.parse(localStorage.getItem(STORAGE_VISITED) || "[]");
+  if (Array.isArray(saved)) saved.forEach(id => visitedIds.add(id));
+} catch {}
+function markVisited(id) {
+  if (!id || visitedIds.has(id)) return;
+  visitedIds.add(id);
+  try { localStorage.setItem(STORAGE_VISITED, JSON.stringify([...visitedIds])); } catch {}
+}
+
+let introDismissed = false;
+try { introDismissed = sessionStorage.getItem("fxlab_intro_dismissed") === "1"; } catch {}
+
+function stepEffect(delta) {
+  const i = EFFECTS.findIndex(e => e.id === currentEffect.id);
+  const nextIdx = (i + delta + EFFECTS.length) % EFFECTS.length;
+  selectEffect(EFFECTS[nextIdx].id);
+}
+
+function randomEffect() {
+  const unvisited = EFFECTS.filter(e => e.id !== currentEffect.id && !visitedIds.has(e.id));
+  const pool = unvisited.length ? unvisited : EFFECTS.filter(e => e.id !== currentEffect.id);
+  if (!pool.length) return;
+  const pick = pool[Math.floor(Math.random() * pool.length)];
+  selectEffect(pick.id);
+}
+
+let copyTimer = null;
+function copyCurrentLink() {
+  const url = location.href;
+  const u = UI[lang];
+  const done = () => {
+    const btn = $("copyLinkBtn");
+    const lbl = $("copyLinkLabel");
+    if (!btn || !lbl) return;
+    btn.classList.add("is-copied");
+    lbl.textContent = u.copied;
+    audio.playUi("click");
+    clearTimeout(copyTimer);
+    copyTimer = setTimeout(() => {
+      btn.classList.remove("is-copied");
+      lbl.textContent = UI[lang].copyLink;
+    }, 1600);
+  };
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(url).then(done).catch(() => {
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = url; ta.style.position = "fixed"; ta.style.opacity = "0";
+        document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove();
+        done();
+      } catch {}
+    });
+  } else {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = url; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove();
+      done();
+    } catch {}
+  }
+}
+
 const SVG_CODE_ICON = `<svg viewBox="0 0 16 12" width="13" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="5 2 1.5 6 5 10"/><line x1="9.5" y1="1.5" x2="6.5" y2="10.5"/><polyline points="11 2 14.5 6 11 10"/></svg>`;
+const SVG_LINK_ICON = `<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.8 9.2a3.4 3.4 0 0 0 4.8 0l1.8-1.8a3.4 3.4 0 0 0-4.8-4.8L7.5 3.7"/><path d="M9.2 6.8a3.4 3.4 0 0 0-4.8 0L2.6 8.6a3.4 3.4 0 0 0 4.8 4.8l1.1-1.1"/></svg>`;
 
 function ensureCardCollapseUi() {
   const card = $("card");
   if (!card || $("cardToggle")) return;
   const kicker = $("kicker");
   const title = $("stepTitle");
+
+  if (!$("cardIntro")) {
+    const intro = document.createElement("div");
+    intro.id = "cardIntro";
+    intro.className = "card-intro";
+    intro.innerHTML = `<span class="card-intro-text" id="cardIntroText"></span><button id="cardIntroBrowse" class="card-intro-browse" type="button"></button><button id="cardIntroClose" class="card-intro-close" type="button">×</button>`;
+    card.insertBefore(intro, kicker);
+    $("cardIntroBrowse").addEventListener("click", () => setCatalogOpen(true));
+    $("cardIntroClose").addEventListener("click", () => {
+      introDismissed = true;
+      try { sessionStorage.setItem("fxlab_intro_dismissed", "1"); } catch {}
+      intro.hidden = true;
+      audio.playUi("click");
+    });
+  }
+
   const head = document.createElement("div");
   head.className = "card-head-row";
   const actions = document.createElement("div");
   actions.className = "card-head-actions";
+
+  const mobPrev = document.createElement("button");
+  mobPrev.id = "mobPrevFxBtn";
+  mobPrev.type = "button";
+  mobPrev.className = "card-mob-step";
+  mobPrev.textContent = "◀";
+  mobPrev.addEventListener("click", () => stepEffect(-1));
+
+  const mobNext = document.createElement("button");
+  mobNext.id = "mobNextFxBtn";
+  mobNext.type = "button";
+  mobNext.className = "card-mob-step";
+  mobNext.textContent = "▶";
+  mobNext.addEventListener("click", () => stepEffect(1));
+
+  const copyBtn = document.createElement("button");
+  copyBtn.id = "copyLinkBtn";
+  copyBtn.type = "button";
+  copyBtn.className = "card-copy";
+  copyBtn.innerHTML = `${SVG_LINK_ICON}<span id="copyLinkLabel">Copy link</span>`;
+  copyBtn.addEventListener("click", copyCurrentLink);
 
   let srcLink = $("sourceLink");
   if (!srcLink) {
@@ -162,7 +265,7 @@ function ensureCardCollapseUi() {
     }
   });
   card.insertBefore(head, kicker);
-  actions.append(srcLink, btn);
+  actions.append(mobPrev, mobNext, copyBtn, srcLink, btn);
   head.append(kicker, actions, title);
   syncCardCollapse();
 }
@@ -388,14 +491,56 @@ function ensureRibbon() {
   return rib;
 }
 
+function ensureFxStepControls() {
+  let grp = $("fxStepGrp");
+  if (!grp) {
+    const nav = document.querySelector("header nav");
+    const catBtn = $("catalogBtn");
+    if (!nav) return null;
+    grp = document.createElement("div");
+    grp.id = "fxStepGrp";
+    grp.className = "fx-step-grp";
+
+    const prev = document.createElement("button");
+    prev.id = "prevFxBtn";
+    prev.type = "button";
+    prev.className = "fx-step-btn";
+    prev.textContent = "◀";
+    prev.addEventListener("click", () => stepEffect(-1));
+
+    const next = document.createElement("button");
+    next.id = "nextFxBtn";
+    next.type = "button";
+    next.className = "fx-step-btn";
+    next.textContent = "▶";
+    next.addEventListener("click", () => stepEffect(1));
+
+    const rand = document.createElement("button");
+    rand.id = "randFxBtn";
+    rand.type = "button";
+    rand.className = "fx-step-btn";
+    rand.textContent = "↻";
+    rand.addEventListener("click", randomEffect);
+
+    grp.append(prev, next, rand);
+    if (catBtn && catBtn.parentNode === nav) nav.insertBefore(grp, catBtn);
+    else nav.prepend(grp);
+  }
+  return grp;
+}
+
 function renderPicker() {
+  ensureFxStepControls();
   const u = UI[lang];
   const fxIdx = EFFECTS.findIndex(e => e.id === currentEffect.id);
   const dot = $("pickerDot");
   dot.style.background = "transparent";
   dot.style.boxShadow = "none";
   dot.innerHTML = getEffectIconSvg(currentEffect.id, "fx-ico fx-ico-sm");
-  $("pickerName").textContent = u.effectsBtn(EFFECTS.length);
+  const isMob = window.matchMedia("(max-width: 780px)").matches;
+  $("pickerName").textContent = isMob
+    ? (lang === "pl" ? currentEffect.shortPl : currentEffect.shortEn)
+    : u.effectsBtn(EFFECTS.length);
   $("pickerCount").textContent = `${fxIdx + 1}/${EFFECTS.length}`;
   $("catalogBtn").setAttribute("aria-expanded", String(catalogOpen));
 
@@ -410,9 +555,10 @@ function renderPicker() {
   for (const fx of EFFECTS) {
     const isCur = fx.id === currentEffect.id;
     const isLoad = fx.id === loadingEffectId;
+    const isSeen = visitedIds.has(fx.id) && !isCur;
     const b = document.createElement("button");
     b.type = "button";
-    b.className = "fx-pill" + (isLoad ? " is-loading" : "");
+    b.className = "fx-pill" + (isLoad ? " is-loading" : "") + (isSeen ? " is-seen" : "");
     b.dataset.fx = fx.id;
     b.setAttribute("aria-current", String(isCur));
     b.title = lang === "pl" ? fx.pl : fx.en;
@@ -446,7 +592,7 @@ function ensureCatalogScroll() {
 function renderCatalogModal() {
   const u = UI[lang];
   $("catalogTitle").textContent = u.catalogTitle;
-  $("catalogSub").textContent = u.catalogSub(EFFECTS.length);
+  $("catalogSub").textContent = u.catalogSub(EFFECTS.length, visitedIds.size);
   $("catalogClose").setAttribute("aria-label", u.catalogClose);
   $("catalogSearch").placeholder = u.catalogSearch;
 
@@ -483,6 +629,7 @@ function renderCatalogModal() {
       if (!hay.includes(q)) continue;
     }
     const isCur = fx.id === currentEffect.id;
+    const isSeen = visitedIds.has(fx.id);
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "fx-card";
@@ -495,12 +642,15 @@ function renderCatalogModal() {
     const summary = lang === "pl" ? fx.summaryPl : fx.summaryEn;
     const tagsHtml = (fx.tags || []).map(t => `<span>${t}</span>`).join("");
     const thumbSrc = `${basePath}thumbs/${fx.id}.jpg`;
+    const statusBadge = isCur
+      ? `<span class="fx-card-active">${u.catalogActive}</span>`
+      : (isSeen ? `<span class="fx-card-seen">${u.catalogSeen}</span>` : "");
     btn.innerHTML = `
       <div class="fx-card-thumb"><img src="${thumbSrc}" loading="lazy" alt="${title}"></div>
       <div class="fx-card-body">
         <div class="fx-card-top">
           <span class="fx-card-meta">${catLbl} · ${stepsLbl}</span>
-          ${isCur ? `<span class="fx-card-active">${u.catalogActive}</span>` : ""}
+          ${statusBadge}
         </div>
         <h3 class="fx-card-title">${getEffectIconSvg(fx.id, "fx-ico")}<span>${title}</span></h3>
         <p>${summary}</p>
@@ -588,6 +738,26 @@ function updateCard() {
     srcLink.title = srcTip;
     srcLink.setAttribute("aria-label", srcTip);
   }
+  const intro = $("cardIntro");
+  if (intro) {
+    intro.hidden = introDismissed || directorMode;
+    $("cardIntroText").innerHTML = u.introLine(EFFECTS.length);
+    $("cardIntroBrowse").textContent = u.introBrowse(EFFECTS.length);
+    $("cardIntroClose").setAttribute("aria-label", u.introDismiss);
+    $("cardIntroClose").title = u.introDismiss;
+  }
+  const copyBtn = $("copyLinkBtn");
+  if (copyBtn) {
+    if (!copyBtn.classList.contains("is-copied")) $("copyLinkLabel").textContent = u.copyLink;
+    copyBtn.title = u.copyLink;
+    copyBtn.setAttribute("aria-label", u.copyLink);
+  }
+  const setTip = (id, tip) => { const el = $(id); if (el) { el.title = tip; el.setAttribute("aria-label", tip); } };
+  setTip("prevFxBtn", u.prevFx);
+  setTip("nextFxBtn", u.nextFx);
+  setTip("randFxBtn", u.randomFx);
+  setTip("mobPrevFxBtn", u.prevFx);
+  setTip("mobNextFxBtn", u.nextFx);
   $("lang").textContent = lang === "en" ? "PL" : "EN";
   $("prev").setAttribute("aria-label", u.prev);
   $("next").setAttribute("aria-label", u.next);
@@ -684,6 +854,7 @@ async function selectEffect(effectId, stepIdx = null, splitOpt = null) {
 
   // Update visible card, picker, step strip, loader and Source deeplink immediately before shader compile.
   currentEffect = nextFx;
+  markVisited(nextFx.id);
   currentStepIdx = stepIdx === null ? currentEffect.defaultStep : clamp(stepIdx, 0, currentEffect.steps.length - 1);
   if (splitOpt !== null) split.enabled = !!splitOpt;
   else if (changed) split.enabled = currentEffect.defaultSplit;
@@ -795,6 +966,8 @@ window.addEventListener("keydown", ev => {
   if (catalogOpen) return;
   if (ev.key === "ArrowRight") { ev.preventDefault(); selectStep(currentStepIdx + 1); }
   else if (ev.key === "ArrowLeft") { ev.preventDefault(); selectStep(currentStepIdx - 1); }
+  else if (ev.code === "BracketLeft") { ev.preventDefault(); stepEffect(-1); }
+  else if (ev.code === "BracketRight") { ev.preventDefault(); stepEffect(1); }
   else if (ev.key === " ") { ev.preventDefault(); paused = !paused; audio.setPaused(paused); audio.playUi("pause", paused); updateCard(); }
   else if (ev.key === "s" || ev.key === "S") {
     split.enabled = !split.enabled; audio.playUi("splitToggle", split.enabled); syncUrl(); updateSplitOverlay();

@@ -6,6 +6,7 @@
 <title>3D World-Space ASCII &amp; CRT — FX Lab | gamedev.pl</title>
 <meta name="description" content="Compare 2D screen-space ASCII post-processing vs true 3D World-Space ASCII live in WebGL2: 42,000+ upright camera-facing 3D billboards (zero UV wall textures), 7.4× optical fusion zoom, Blender-sculpted walking gothic bishop, real depth occlusion &amp; dark-room CRT halation at 60 FPS.">
 <link rel="canonical" href="https://gamedevpl.github.io/fx-lab/ascii/">
+<meta property="og:site_name" content="FX Lab · gamedev.pl">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://gamedevpl.github.io/fx-lab/ascii/">
 <meta property="og:title" content="3D World-Space ASCII &amp; CRT — FX Lab">
@@ -14,12 +15,13 @@
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@plgamedev">
 <meta name="twitter:title" content="3D World-Space ASCII &amp; CRT — FX Lab">
 <meta name="twitter:description" content="Compare 2D Screen-Space ASCII filters vs 42,000+ upright 3D World-Space billboards live at 60 FPS in WebGL2.">
 <meta name="twitter:image" content="https://gamedevpl.github.io/fx-lab/og-ascii.png">
 <link rel="icon" type="image/svg+xml" href="../favicon.svg">
-<link rel="modulepreload" href="../src/app.js?v=5">
-<link rel="modulepreload" href="../src/catalog.js">
+<link rel="modulepreload" href="../src/app.js?v=6">
+<link rel="modulepreload" href="../src/catalog.js?v=6">
 <link rel="modulepreload" href="../src/icons.js">
 <link rel="modulepreload" href="../src/gl-utils.js">
 <link rel="modulepreload" href="../effects/ascii/index.js">
@@ -28,7 +30,7 @@
 <link rel="modulepreload" href="../effects/ascii/scene3d.js">
 <link rel="modulepreload" href="../effects/ascii/shaders.js">
 <link rel="stylesheet" href="../ask/ask.css">
-<link rel="stylesheet" href="../style.css?v=3">
+<link rel="stylesheet" href="../style.css?v=6">
 </head>
 <body>
 <main>
@@ -114,7 +116,7 @@
   <p id="noglBody"></p>
 </div>
 
-<script type="module" src="../src/app.js?v=5"></script>
+<script type="module" src="../src/app.js?v=6"></script>
 <script type="module">
 if ("LanguageModel" in self || self.__fxLabModel) {
   import("../src/assistant.js").catch(() => {});

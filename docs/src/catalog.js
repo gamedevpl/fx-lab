@@ -6,6 +6,14 @@ export const UI = {
   en: {
     back: "← gamedev.pl",
     source: "Source",
+    copyLink: "Copy link",
+    copied: "Copied ✓",
+    prevFx: "Previous effect ([)",
+    nextFx: "Next effect (])",
+    randomFx: "Random effect",
+    introLine: n => `<b>${n} interactive WebGL2 &amp; WebGPU effects</b> — drag split [S] or scrub eras.`,
+    introBrowse: n => `Browse ${n} ▾`,
+    introDismiss: "Dismiss intro",
     loading: "Compiling shaders…",
     loadingTitle: "Compiling GPU shaders…",
     scrollLeft: "Scroll effects left",
@@ -13,11 +21,12 @@ export const UI = {
     effectsBtn: n => `All ${n}`,
     moreEffects: n => `More effects (${n}) ↗`,
     catalogTitle: "Effects",
-    catalogSub: n => `${n} interactive WebGL2 & WebGPU effects · press E to open`,
+    catalogSub: (n, seen) => `${n} interactive WebGL2 & WebGPU effects · explored ${seen}/${n} · press E`,
     catalogClose: "Close",
     catalogSearch: "Filter effects or techniques…",
     catalogAll: "All",
     catalogActive: "Active",
+    catalogSeen: "Visited ✓",
     stepsCount: (n, isEra) => isEra ? `${n} eras` : `${n} steps`,
     pause: "Pause",
     resume: "Resume",
@@ -89,6 +98,14 @@ export const UI = {
   pl: {
     back: "← gamedev.pl",
     source: "Kod",
+    copyLink: "Link",
+    copied: "Skopiowano ✓",
+    prevFx: "Poprzedni efekt ([)",
+    nextFx: "Następny efekt (])",
+    randomFx: "Losowy efekt",
+    introLine: n => `<b>${n} interaktywnych efektów WebGL2 i WebGPU</b> — przeciągnij podział [S] lub przełączaj ery.`,
+    introBrowse: n => `Katalog ${n} ▾`,
+    introDismiss: "Ukryj opis",
     loading: "Kompiluję shadery…",
     loadingTitle: "Kompiluję shadery GPU…",
     scrollLeft: "Przewiń efekty w lewo",
@@ -96,17 +113,18 @@ export const UI = {
     effectsBtn: n => `Wszystkie ${n}`,
     moreEffects: n => `Więcej efektów (${n}) ↗`,
     catalogTitle: "Efekty",
-    catalogSub: n => {
+    catalogSub: (n, seen) => {
       const m10 = n % 10, m100 = n % 100;
       const noun = n === 1 ? "interaktywny efekt"
         : (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) ? "interaktywne efekty"
         : "interaktywnych efektów";
-      return `${n} ${noun} WebGL2 i WebGPU · skrót E`;
+      return `${n} ${noun} WebGL2 i WebGPU · odkryto ${seen}/${n} · skrót E`;
     },
     catalogClose: "Zamknij",
     catalogSearch: "Szukaj efektu lub techniki…",
     catalogAll: "Wszystkie",
     catalogActive: "Aktywny",
+    catalogSeen: "Obejrzane ✓",
     stepsCount: (n, isEra) => isEra ? `${n} er` : `${n} kroków`,
     pause: "Pauza",
     resume: "Wznów",

@@ -6,6 +6,7 @@
 <title>Evolution of Global Illumination (1996–2026) — FX Lab | gamedev.pl</title>
 <meta name="description" content="30 years of real-time Global Illumination in WebGPU Compute (with automatic WebGL2 fallback): 1996 Quake baked lightmaps, 1998–2004 irradiance probes, 2007 Crysis SSAO, 2009 Ritschel SSDO/SSGI, 2011 Crassin 3D Voxel Cone Tracing, 2019 DDGI Chebyshev probes, 2022 UE5 Lumen-style software SDF GI, and 2023–26 Sannikov Radiance Cascades.">
 <link rel="canonical" href="https://gamedevpl.github.io/fx-lab/gi/">
+<meta property="og:site_name" content="FX Lab · gamedev.pl">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://gamedevpl.github.io/fx-lab/gi/">
 <meta property="og:title" content="Evolution of Global Illumination (1996–2026) — FX Lab">
@@ -14,12 +15,13 @@
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@plgamedev">
 <meta name="twitter:title" content="Evolution of Global Illumination (1996–2026) — FX Lab">
 <meta name="twitter:description" content="8 eras of Global Illumination live in WebGPU Compute + WebGL2 fallback — baked lightmaps, probes, SSAO, SSGI, 3D Voxel Cones, DDGI, Lumen SDF, and Radiance Cascades.">
 <meta name="twitter:image" content="https://gamedevpl.github.io/fx-lab/og-gi.png">
 <link rel="icon" type="image/svg+xml" href="../favicon.svg">
-<link rel="modulepreload" href="../src/app.js?v=5">
-<link rel="modulepreload" href="../src/catalog.js">
+<link rel="modulepreload" href="../src/app.js?v=6">
+<link rel="modulepreload" href="../src/catalog.js?v=6">
 <link rel="modulepreload" href="../src/icons.js">
 <link rel="modulepreload" href="../src/gl-utils.js">
 <link rel="modulepreload" href="../effects/gi/index.js">
@@ -27,7 +29,7 @@
 <link rel="modulepreload" href="../effects/gi/webgpu.js">
 <link rel="modulepreload" href="../effects/gi/wgsl.js">
 <link rel="stylesheet" href="../ask/ask.css">
-<link rel="stylesheet" href="../style.css?v=3">
+<link rel="stylesheet" href="../style.css?v=6">
 </head>
 <body>
 <main>
@@ -113,7 +115,7 @@
   <p id="noglBody"></p>
 </div>
 
-<script type="module" src="../src/app.js?v=5"></script>
+<script type="module" src="../src/app.js?v=6"></script>
 <script type="module">
 if ("LanguageModel" in self || self.__fxLabModel) {
   import("../src/assistant.js").catch(() => {});

@@ -6,6 +6,7 @@
 <title>Material Sandbox — 6 PBR Shaders on One Mesh — FX Lab | gamedev.pl</title>
 <meta name="description" content="Interactive WebGL2 material sandbox: one sculpted shaderball (or Torus Knot), an orbiting rectangular softbox, 3 HDR IBL studios, 5 live PBR sliders, Auto-Morph, and 6 shaders from 2005 Blinn-Phong plastic and Oren-Nayar clay to brushed steel, clearcoat car paint, velvet sheen, and heat-blued iridescent titanium.">
 <link rel="canonical" href="https://gamedevpl.github.io/fx-lab/materials/">
+<meta property="og:site_name" content="FX Lab · gamedev.pl">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://gamedevpl.github.io/fx-lab/materials/">
 <meta property="og:title" content="Material Sandbox — 6 PBR Shaders on One Mesh — FX Lab">
@@ -14,18 +15,19 @@
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@plgamedev">
 <meta name="twitter:title" content="Material Sandbox — 6 PBR Shaders on One Mesh — FX Lab">
 <meta name="twitter:description" content="Interactive WebGL2 PBR material toy with orbiting softbox, 3 IBL environments, 5 live sliders, Auto-Morph &amp; Split vs 2005 Blinn-Phong.">
 <meta name="twitter:image" content="https://gamedevpl.github.io/fx-lab/og-materials.png">
 <link rel="icon" type="image/svg+xml" href="../favicon.svg">
-<link rel="modulepreload" href="../src/app.js?v=5">
-<link rel="modulepreload" href="../src/catalog.js">
+<link rel="modulepreload" href="../src/app.js?v=6">
+<link rel="modulepreload" href="../src/catalog.js?v=6">
 <link rel="modulepreload" href="../src/icons.js">
 <link rel="modulepreload" href="../src/gl-utils.js">
 <link rel="modulepreload" href="../effects/materials/index.js">
 <link rel="modulepreload" href="../effects/materials/shaders.js">
 <link rel="stylesheet" href="../ask/ask.css">
-<link rel="stylesheet" href="../style.css?v=3">
+<link rel="stylesheet" href="../style.css?v=6">
 </head>
 <body>
 <main>
@@ -111,7 +113,7 @@
   <p id="noglBody"></p>
 </div>
 
-<script type="module" src="../src/app.js?v=5"></script>
+<script type="module" src="../src/app.js?v=6"></script>
 <script type="module">
 if (!new URLSearchParams(location.search).has("director") && ("LanguageModel" in self || self.__fxLabModel)) {
   import("../src/assistant.js").catch(() => {});

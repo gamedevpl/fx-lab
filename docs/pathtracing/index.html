@@ -6,6 +6,7 @@
 <title>Evolution of Path Tracing (1975–2026) — FX Lab | gamedev.pl</title>
 <meta name="description" content="Eight eras of ray &amp; path tracing live in WebGL2: 1975 Blinn-Phong rasterization, 1980 Whitted hard shadows &amp; glass, 1984 Cook soft shadows / DoF / motion blur, 1986 Kajiya 1 SPP path tracing, multi-SPP accumulation, NEE &amp; MIS, ReSTIR + SVGF denoising, and 2026 real-time browser path tracing.">
 <link rel="canonical" href="https://gamedevpl.github.io/fx-lab/pathtracing/">
+<meta property="og:site_name" content="FX Lab · gamedev.pl">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://gamedevpl.github.io/fx-lab/pathtracing/">
 <meta property="og:title" content="Evolution of Path Tracing (1975–2026) — FX Lab">
@@ -14,18 +15,19 @@
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@plgamedev">
 <meta name="twitter:title" content="Evolution of Path Tracing (1975–2026) — FX Lab">
 <meta name="twitter:description" content="8 eras of path tracing live in WebGL2 — click anywhere in the Cornell Gallery to move the glowing orb and watch real-time GI and SVGF denoising react at 60 FPS.">
 <meta name="twitter:image" content="https://gamedevpl.github.io/fx-lab/og-pathtracing.png">
 <link rel="icon" type="image/svg+xml" href="../favicon.svg">
-<link rel="modulepreload" href="../src/app.js?v=5">
-<link rel="modulepreload" href="../src/catalog.js">
+<link rel="modulepreload" href="../src/app.js?v=6">
+<link rel="modulepreload" href="../src/catalog.js?v=6">
 <link rel="modulepreload" href="../src/icons.js">
 <link rel="modulepreload" href="../src/gl-utils.js">
 <link rel="modulepreload" href="../effects/pathtracing/index.js">
 <link rel="modulepreload" href="../effects/pathtracing/shaders.js">
 <link rel="stylesheet" href="../ask/ask.css">
-<link rel="stylesheet" href="../style.css?v=3">
+<link rel="stylesheet" href="../style.css?v=6">
 </head>
 <body>
 <main>
@@ -111,7 +113,7 @@
   <p id="noglBody"></p>
 </div>
 
-<script type="module" src="../src/app.js?v=5"></script>
+<script type="module" src="../src/app.js?v=6"></script>
 <script type="module">
 if ("LanguageModel" in self || self.__fxLabModel) {
   import("../src/assistant.js").catch(() => {});
