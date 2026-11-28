@@ -83,45 +83,6 @@ const MUSIC_THEMES = {
   },
 };
 
-// Compact chord builder from root MIDI note + interval list (32 unique subtle motifs, 1 per FX Lab effect)
-const m2f = m => 440 * Math.pow(2, (m - 69) / 12);
-const mkChords = specs => specs.map(([root, ints]) => ints.map(i => m2f(root + i)));
-
-const EFFECT_MOTIFS = {
-  toon:        { tempo: 0.49, voice: "marimba",   bass: true,  cutoff: 1750, arp: [0, -1, 2, 4, -1, 4, 3, 2], chords: mkChords([[53,[0,4,7,11,14]],[50,[0,3,7,10,14]],[46,[0,4,7,11,14]],[48,[0,4,7,10,14]]]) },
-  aa:          { tempo: 0.48, voice: "glass",     bass: false, cutoff: 1950, arp: [0, 3, -1, 4, 2, -1, 4, 1], chords: mkChords([[51,[0,4,7,11,14]],[48,[0,3,7,10,14]],[44,[0,4,7,11,14]],[46,[0,4,7,9,14]]]) },
-  reflections: { tempo: 0.56, voice: "epiano",    bass: false, cutoff: 1450, arp: [0, -1, 3, 2, -1, 4, 3, -1], chords: mkChords([[50,[0,3,7,10,14]],[46,[0,4,7,11,14]],[43,[0,3,7,10,14]],[45,[0,5,7,10,14]]]) },
-  surface:     { tempo: 0.58, voice: "cello",     bass: false, cutoff: 1150, arp: [0, -1, -1, 2, 4, -1, 3, -1], chords: mkChords([[48,[0,3,7,10,14]],[44,[0,4,7,11,14]],[41,[0,3,7,10,14]],[43,[0,5,7,10,14]]]) },
-  fog:         { tempo: 0.61, voice: "organ",     bass: false, cutoff: 1200, arp: [0, -1, -1, 3, -1, 4, -1, 2], chords: mkChords([[45,[0,3,7,10,14]],[41,[0,4,7,11,18]],[50,[0,3,7,10,14]],[40,[0,5,7,12,14]]]) },
-  gi:          { tempo: 0.53, voice: "synthbell", bass: false, cutoff: 1700, arp: [0, 2, -1, 4, 3, -1, 2, 4], chords: mkChords([[43,[0,4,7,11,14]],[40,[0,3,7,10,14]],[48,[0,4,7,11,14]],[50,[0,4,7,9,14]]]) },
-  textures:    { tempo: 0.50, voice: "chiptune",  bass: true,  cutoff: 1350, arp: [0, 2, 4, -1, 3, 2, -1, 4], chords: mkChords([[52,[0,3,7,10,14]],[48,[0,4,7,11,14]],[43,[0,4,7,11,14]],[50,[0,4,7,9,14]]]) },
-  portals:     { tempo: 0.55, voice: "analog",    bass: false, cutoff: 1300, arp: [0, -1, 4, -1, 2, 3, -1, 4], chords: mkChords([[42,[0,3,7,10,14]],[50,[0,4,7,11,18]],[47,[0,3,7,10,14]],[49,[0,5,7,10,14]]]) },
-  tonemapping: { tempo: 0.51, voice: "analog",    bass: true,  cutoff: 1550, arp: [0, 1, 2, 4, 0, 2, 3, 4], chords: mkChords([[46,[0,4,7,11,14]],[43,[0,3,7,10,14]],[51,[0,4,7,11,14]],[41,[0,5,7,10,14]]]) },
-  pixel3d:     { tempo: 0.48, voice: "kalimba",   bass: true,  cutoff: 1850, arp: [0, -1, 2, 3, 4, -1, 3, 1], chords: mkChords([[48,[0,4,7,11,14]],[45,[0,3,7,10,14]],[41,[0,4,7,11,14]],[43,[0,4,7,9,14]]]) },
-  animation:   { tempo: 0.47, voice: "pulse",     bass: true,  cutoff: 1600, arp: [0, -1, 2, 4, -1, 3, 2, 1], chords: mkChords([[47,[0,3,7,10,14]],[43,[0,4,7,11,14]],[40,[0,3,7,10,14]],[42,[0,3,7,10,14]]]) },
-  skin:        { tempo: 0.60, voice: "cello",     bass: false, cutoff: 1100, arp: [0, -1, 2, -1, 4, -1, 3, 2], chords: mkChords([[44,[0,4,7,11,14]],[41,[0,3,7,10,14]],[49,[0,4,7,11,14]],[51,[0,4,7,9,14]]]) },
-  terrain:     { tempo: 0.54, voice: "kalimba",   bass: false, cutoff: 1750, arp: [0, 2, -1, 4, -1, 3, 4, -1], chords: mkChords([[50,[0,4,7,11,14]],[47,[0,3,7,10,14]],[43,[0,4,7,11,18]],[45,[0,4,7,9,14]]]) },
-  motionblur:  { tempo: 0.45, voice: "pulse",     bass: true,  cutoff: 1650, arp: [0, 2, 3, -1, 4, 2, 3, 1], chords: mkChords([[43,[0,3,7,10,14]],[51,[0,4,7,11,14]],[48,[0,3,7,10,14]],[50,[0,5,7,10,14]]]) },
-  dof:         { tempo: 0.61, voice: "epiano",    bass: false, cutoff: 1350, arp: [0, -1, -1, 3, 4, -1, 2, -1], chords: mkChords([[49,[0,4,7,11,14]],[46,[0,3,7,10,14]],[42,[0,4,7,11,14]],[44,[0,4,7,9,14]]]) },
-  destruction: { tempo: 0.49, voice: "pulse",     bass: true,  cutoff: 1450, arp: [0, -1, 2, 0, 4, -1, 3, 2], chords: mkChords([[40,[0,3,7,10,14]],[48,[0,4,7,11,14]],[43,[0,4,7,9,14]],[50,[0,5,7,12,14]]]) },
-  collisions:  { tempo: 0.47, voice: "marimba",   bass: true,  cutoff: 1650, arp: [0, 3, -1, 2, 4, -1, 3, 1], chords: mkChords([[49,[0,3,7,10,14]],[45,[0,4,7,11,14]],[42,[0,3,7,10,14]],[44,[0,5,7,10,14]]]) },
-  ascii:       { tempo: 0.52, voice: "analog",    bass: true,  cutoff: 1350, arp: [0, -1, 2, 4, 3, -1, 1, 2], chords: mkChords([[45,[0,3,7,10,14]],[41,[0,4,7,11,14]],[50,[0,3,7,10,14]],[40,[0,5,7,10,14]]]) },
-  hd2d:        { tempo: 0.54, voice: "lute",      bass: false, cutoff: 1600, arp: [0, 2, 4, -1, 3, 4, 2, -1], chords: mkChords([[50,[0,3,7,10,14]],[46,[0,4,7,11,14]],[43,[0,3,7,10,14]],[45,[0,5,7,10,14]]]) },
-  dithering:   { tempo: 0.57, voice: "synthbell", bass: false, cutoff: 1750, arp: [0, -1, 4, 2, -1, 3, -1, 4], chords: mkChords([[47,[0,3,7,10,14]],[50,[0,4,7,11,18]],[43,[0,4,7,11,14]],[42,[0,3,7,10,14]]]) },
-  splats:      { tempo: 0.52, voice: "kalimba",   bass: false, cutoff: 1850, arp: [0, 2, -1, 4, 2, 3, -1, 4], chords: mkChords([[48,[0,4,7,11,14]],[43,[0,4,7,9,14]],[45,[0,3,7,10,14]],[41,[0,4,7,11,14]]]) },
-  fire:        { tempo: 0.55, voice: "lute",      bass: true,  cutoff: 1400, arp: [0, -1, 2, 3, -1, 4, 2, -1], chords: mkChords([[50,[0,3,7,9,14]],[48,[0,4,7,9,14]],[46,[0,4,7,11,14]],[45,[0,5,7,10,14]]]) },
-  water:       { tempo: 0.54, voice: "glass",     bass: false, cutoff: 1800, arp: [0, 3, 4, -1, 2, 4, -1, 3], chords: mkChords([[41,[0,4,7,11,18]],[43,[0,4,7,9,14]],[45,[0,3,7,10,14]],[48,[0,4,7,11,14]]]) },
-  clouds:      { tempo: 0.62, voice: "synthbell", bass: false, cutoff: 1650, arp: [0, -1, -1, 4, 3, -1, -1, 2], chords: mkChords([[51,[0,4,7,11,18]],[48,[0,3,7,10,14]],[44,[0,4,7,11,14]],[46,[0,5,7,12,14]]]) },
-  grass:       { tempo: 0.53, voice: "kalimba",   bass: false, cutoff: 1850, arp: [0, -1, 3, 4, 2, -1, 3, 1], chords: mkChords([[43,[0,4,7,11,14]],[48,[0,4,7,11,14]],[40,[0,3,7,10,14]],[50,[0,4,7,9,14]]]) },
-  glass:       { tempo: 0.58, voice: "glass",     bass: false, cutoff: 2100, arp: [0, -1, 4, -1, 3, 4, -1, 2], chords: mkChords([[52,[0,4,7,11,14]],[49,[0,3,7,10,14]],[45,[0,4,7,11,14]],[47,[0,5,7,12,14]]]) },
-  shadows:     { tempo: 0.59, voice: "cello",     bass: false, cutoff: 1150, arp: [0, -1, 2, -1, 3, -1, 4, 2], chords: mkChords([[46,[0,3,7,10,14]],[42,[0,4,7,11,14]],[51,[0,3,7,10,14]],[41,[0,5,7,10,14]]]) },
-  cloth:       { tempo: 0.52, voice: "epiano",    bass: false, cutoff: 1600, arp: [0, 2, -1, 3, 4, -1, 2, 3], chords: mkChords([[45,[0,4,7,11,14]],[42,[0,3,7,10,14]],[50,[0,4,7,11,14]],[52,[0,4,7,9,14]]]) },
-  fur:         { tempo: 0.53, voice: "marimba",   bass: false, cutoff: 1550, arp: [0, -1, 2, 3, -1, 4, 3, 1], chords: mkChords([[53,[0,4,7,11,14]],[50,[0,3,7,10,14]],[48,[0,4,7,9,14]],[46,[0,4,7,11,14]]]) },
-  pathtracing: { tempo: 0.56, voice: "synthbell", bass: false, cutoff: 1850, arp: [0, -1, 3, 4, -1, 2, 4, -1], chords: mkChords([[40,[0,3,7,10,14]],[48,[0,4,7,11,18]],[43,[0,4,7,11,14]],[47,[0,3,7,10,14]]]) },
-  materials:   { tempo: 0.53, voice: "epiano",    bass: true,  cutoff: 1600, arp: [0, -1, 2, 4, 3, -1, 4, 2], chords: mkChords([[44,[0,4,7,11,14]],[51,[0,4,7,9,14]],[41,[0,3,7,10,14]],[49,[0,4,7,11,14]]]) },
-  pixelwave:   { tempo: 0.48, voice: "chiptune",  bass: true,  cutoff: 1500, arp: [0, 2, -1, 4, 3, 2, -1, 4], chords: mkChords([[48,[0,4,7,11,14]],[43,[0,4,7,9,14]],[41,[0,4,7,11,14]],[45,[0,3,7,10,14]]]) },
-};
-
 // Pentatonic / Lydian scale for musical Step 1..8 tab clicks
 const STEP_SCALE = [523.25, 587.33, 659.25, 783.99, 880.00, 987.77, 1174.66, 1318.51];
 
@@ -818,39 +779,29 @@ export function createAudioEngine({ mutedByUrl = false } = {}) {
     }, 240);
   }
 
-  // ---- LAYER 4: ADAPTIVE PROCEDURAL STUDIO SOUNDTRACK (32 BESPOKE MOTIFS) ----
-
-  function activeMotif() {
-    return EFFECT_MOTIFS[curFxId] || MUSIC_THEMES[curCategory] || MUSIC_THEMES.rendering;
-  }
+  // ---- LAYER 4: ADAPTIVE PROCEDURAL STUDIO SOUNDTRACK ----
 
   function scheduleMusicNote(time) {
-    const theme = activeMotif();
-    const voice = theme.voice || "epiano";
+    const theme = MUSIC_THEMES[curCategory] || MUSIC_THEMES.rendering;
     const barIdx = Math.floor(musicStep / 8) % theme.chords.length;
     const beatInBar = musicStep % 8;
     const chord = theme.chords[barIdx];
 
-    // Warm pad chord on beat 0 of every bar (voice-tailored harmonic wash)
+    // Warm pad chord on beat 0 of every bar (4-second lush harmonic wash)
     if (beatInBar === 0) {
-      const padDur = theme.tempo * 8.25;
-      const padType = (voice === "organ" || voice === "cello" || voice === "analog") ? "sawtooth" : "sine";
-      const padCut = voice === "cello" ? 620 : (voice === "organ" ? 880 : (voice === "analog" ? 950 : theme.cutoff * 0.68));
+      const padDur = theme.tempo * 8.2;
       for (let i = 0; i < 4; i++) {
         const o = ctx.createOscillator();
         const flt = ctx.createBiquadFilter();
         const g = ctx.createGain();
-        o.type = i === 0 ? "triangle" : padType;
-        const detune = (voice === "analog" || voice === "cello") ? (i % 2 === 0 ? -4 : 4) : 0;
+        o.type = i === 0 ? "triangle" : "sine";
         o.frequency.setValueAtTime(chord[i] * (i === 0 ? 0.5 : 1.0), time);
-        if (detune) o.detune.setValueAtTime(detune, time);
         flt.type = "lowpass";
-        flt.frequency.setValueAtTime(padCut, time);
+        flt.frequency.setValueAtTime(theme.cutoff * 0.72, time);
 
-        const baseAmp = padType === "sawtooth" ? 0.032 : 0.052;
-        const amp = i === 0 ? 0.095 : baseAmp;
+        const amp = i === 0 ? 0.10 : 0.055;
         g.gain.setValueAtTime(0.0001, time);
-        g.gain.linearRampToValueAtTime(amp, time + (voice === "organ" ? 0.25 : 0.65));
+        g.gain.linearRampToValueAtTime(amp, time + 0.65);
         g.gain.setTargetAtTime(0.0001, time + padDur - 0.85, 0.35);
 
         o.connect(flt);
@@ -862,82 +813,34 @@ export function createAudioEngine({ mutedByUrl = false } = {}) {
       }
     }
 
-    // Subtle deep bass pulse on beats 0 & 4 for rhythmic motifs
-    if (theme.bass && (beatInBar === 0 || beatInBar === 4)) {
-      const b = ctx.createOscillator();
-      const bg = ctx.createGain();
-      b.type = voice === "chiptune" ? "triangle" : "sine";
-      const bHz = chord[0] * (beatInBar === 0 ? 0.5 : 0.75);
-      b.frequency.setValueAtTime(bHz, time);
-      bg.gain.setValueAtTime(0.0001, time);
-      bg.gain.linearRampToValueAtTime(0.095, time + 0.01);
-      bg.gain.exponentialRampToValueAtTime(0.0001, time + theme.tempo * 1.4);
-      b.connect(bg);
-      bg.connect(musicGain);
-      b.start(time);
-      b.stop(time + theme.tempo * 1.5);
+    // Gentle melodic Rhodes/marimba arpeggio pluck
+    const noteHz = chord[theme.arp[beatInBar] % chord.length] * (beatInBar === 6 ? 2.0 : 1.0);
+    const o = ctx.createOscillator();
+    const flt = ctx.createBiquadFilter();
+    const g = ctx.createGain();
+    o.type = theme.tone;
+    // Slight subtle retro shimmer on early 1985-1996 eras!
+    o.frequency.setValueAtTime(noteHz, time);
+    flt.type = "lowpass";
+    flt.frequency.setValueAtTime(theme.cutoff, time);
+    flt.frequency.exponentialRampToValueAtTime(420, time + 0.65);
+
+    const accent = beatInBar === 0 ? 0.088 : (beatInBar % 2 === 0 ? 0.058 : 0.036);
+    g.gain.setValueAtTime(0.0001, time);
+    g.gain.linearRampToValueAtTime(accent, time + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, time + 0.72);
+
+    o.connect(flt);
+    flt.connect(g);
+    g.connect(musicGain);
+    if (delaySend) {
+      const wg = ctx.createGain();
+      wg.gain.value = 0.38;
+      g.connect(wg);
+      wg.connect(delaySend);
     }
-
-    // Rhythmic melodic voice (respects -1 rests for natural musical breathing!)
-    const slot = theme.arp[beatInBar];
-    if (slot >= 0) {
-      const oct = (beatInBar === 5 || beatInBar === 6) && (voice === "glass" || voice === "kalimba" || voice === "synthbell") ? 2.0 : 1.0;
-      const noteHz = chord[slot % chord.length] * oct;
-      const o = ctx.createOscillator();
-      const flt = ctx.createBiquadFilter();
-      const g = ctx.createGain();
-
-      const oscMap = {
-        epiano: "sine", marimba: "sine", kalimba: "triangle", lute: "triangle",
-        glass: "sine", chiptune: "square", analog: "sawtooth", organ: "triangle",
-        cello: "sawtooth", synthbell: "sine", pulse: "triangle",
-      };
-      o.type = oscMap[voice] || "triangle";
-      o.frequency.setValueAtTime(noteHz, time);
-
-      flt.type = "lowpass";
-      flt.frequency.setValueAtTime(theme.cutoff, time);
-      flt.frequency.exponentialRampToValueAtTime(voice === "glass" || voice === "synthbell" ? 720 : 380, time + 0.65);
-
-      const dur = voice === "organ" || voice === "cello" ? 1.15 : (voice === "pulse" || voice === "marimba" ? 0.45 : 0.76);
-      const atk = voice === "cello" ? 0.08 : (voice === "organ" ? 0.03 : 0.008);
-      const gainScale = (o.type === "square" || o.type === "sawtooth") ? 0.58 : 1.0;
-      const accent = (beatInBar === 0 ? 0.085 : (beatInBar % 2 === 0 ? 0.058 : 0.042)) * gainScale;
-
-      g.gain.setValueAtTime(0.0001, time);
-      g.gain.linearRampToValueAtTime(accent, time + atk);
-      g.gain.exponentialRampToValueAtTime(0.0001, time + dur);
-
-      o.connect(flt);
-      flt.connect(g);
-      g.connect(musicGain);
-
-      // Subtle harmonic overtone voice gives Rhodes tine / bell / kalimba / lute character
-      const overRatio = voice === "glass" || voice === "synthbell" ? 3.0 : (voice === "marimba" ? 4.0 : (voice === "epiano" || voice === "kalimba" || voice === "lute" ? 2.0 : 0));
-      if (overRatio) {
-        const o2 = ctx.createOscillator();
-        const g2 = ctx.createGain();
-        o2.type = "sine";
-        o2.frequency.setValueAtTime(noteHz * overRatio, time);
-        g2.gain.setValueAtTime(0.0001, time);
-        g2.gain.linearRampToValueAtTime(accent * (voice === "glass" ? 0.32 : 0.22), time + 0.006);
-        g2.gain.exponentialRampToValueAtTime(0.0001, time + dur * 0.42);
-        o2.connect(g2);
-        g2.connect(musicGain);
-        if (delaySend) g2.connect(delaySend);
-        o2.start(time);
-        o2.stop(time + dur * 0.48);
-      }
-
-      if (delaySend) {
-        const wg = ctx.createGain();
-        wg.gain.value = (voice === "glass" || voice === "synthbell" || voice === "analog") ? 0.48 : 0.34;
-        g.connect(wg);
-        wg.connect(delaySend);
-      }
-      o.start(time);
-      o.stop(time + dur + 0.06);
-    }
+    o.start(time);
+    o.stop(time + 0.78);
 
     musicStep = (musicStep + 1) % (theme.chords.length * 8);
   }
@@ -950,7 +853,7 @@ export function createAudioEngine({ mutedByUrl = false } = {}) {
         if (ctx) nextNoteTime = ctx.currentTime + 0.12;
         return;
       }
-      const theme = activeMotif();
+      const theme = MUSIC_THEMES[curCategory] || MUSIC_THEMES.rendering;
       while (nextNoteTime < ctx.currentTime + 0.24) {
         scheduleMusicNote(nextNoteTime);
         nextNoteTime += theme.tempo;
@@ -987,10 +890,7 @@ export function createAudioEngine({ mutedByUrl = false } = {}) {
       curCategory = category || "rendering";
       curStepIdx = stepIdx;
       strobeActive = false;
-      if (changed) {
-        musicStep = 0;
-        if (unlocked) rebuildSceneAmbience();
-      }
+      if (changed && unlocked) rebuildSceneAmbience();
     },
     setStep(stepIdx) {
       curStepIdx = stepIdx;
